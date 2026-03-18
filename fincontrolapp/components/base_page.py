@@ -1,30 +1,100 @@
+"""
+base_page.py — Базовый класс для всех экранов приложения.
+
+Паттерн: Template Method.
+BasePage определяет скелет экрана (заголовок + тело), а каждая
+дочерняя страница переопределяет только метод build_body().
+
+Наследование:
+    ft.Container → BasePage → HomePage, IncomePage, ExpensesPage, ...
+
+Пример создания новой страницы:
+    class MyPage(BasePage):
+        def __init__(self, page):
+            super().__init__(page, "Мой экран")
+
+        def build_body(self):
+            return ft.Text("Привет!")
+"""
+
 import flet as ft
 
 
 class BasePage(ft.Container):
-    """Базовый класс для всех страниц приложения"""
+    """
+    Базовый класс для всех страниц приложения.
+
+    Наследуется от ft.Container — значит сама является виджетом
+    и может быть напрямую помещена в page или другой контейнер.
+
+    Атрибуты:
+        page_ref  (ft.Page): ссылка на объект страницы Flet.
+                             Используется дочерними классами для показа
+                             диалогов, снэкбаров и т.д.
+        page_title (str):   заголовок экрана, отображается вверху.
+    """
 
     def __init__(self, page: ft.Page, title: str, **kwargs):
+        """
+        Инициализирует базовую страницу.
+
+        Параметры:
+            page  (ft.Page): объект страницы от Flet (передаётся из main).
+            title (str):     текст заголовка экрана.
+            **kwargs:        дополнительные параметры для ft.Container.
+
+        Порядок инициализации:
+            1. super().__init__() — инициализация ft.Container.
+            2. Сохранение ссылки на page и заголовка.
+            3. Настройка внешнего вида контейнера.
+            4. Вызов build_header() и build_body() для построения UI.
+               ВАЖНО: build_body() вызывается здесь, поэтому дочерние
+               классы должны вызывать super().__init__() в самом конце
+               своего __init__, либо не определять __init__ вообще.
+        """
         super().__init__(**kwargs)
-        self.page_ref = page
+        self.page_ref   = page
         self.page_title = title
-        self.expand = True
-        self.bgcolor = "#0F0F14"
-        self.padding = ft.padding.only(left=16, right=16, top=48, bottom=8)
+        self.expand     = True                    # занимает всё доступное пространство
+        self.bgcolor    = "transparent"               # фоновый цвет экрана
+        self.padding    = ft.Padding(left=16, right=16, top=48, bottom=8)
+        # top=48 — отступ сверху, чтобы контент не уходил под системную строку статуса
+        # scroll=AUTO на внешней колонке — скроллится весь экран целиком,
+        # включая заголовок. Дочерние build_body() НЕ должны задавать
+        # собственный scroll, иначе получится скролл внутри скролла.
         self.content = ft.Column(
             controls=[self.build_header(), self.build_body()],
             expand=True,
             spacing=16,
+            scroll=ft.ScrollMode.AUTO,
         )
 
-    def build_header(self):
+    def build_header(self) -> ft.Text:
+        """
+        Строит заголовок экрана.
+
+        Возвращает крупный белый текст с названием страницы.
+        Можно переопределить в дочернем классе для кастомной шапки
+        (например, с кнопкой или аватаром пользователя).
+
+        Возвращает:
+            ft.Text: виджет заголовка.
+        """
         return ft.Text(
             self.page_title,
-            size=28,
+            size=45,
             weight=ft.FontWeight.BOLD,
-            color="#FFFFFF",
+            color="#1A1A24",
         )
 
-    def build_body(self):
-        """Переопределяется в каждой странице"""
+    def build_body(self) -> ft.Control:
+        """
+        Строит тело страницы. ДОЛЖЕН быть переопределён в каждом дочернем классе.
+
+        Базовая реализация возвращает пустой контейнер — используется
+        только как заглушка, если метод не переопределён.
+
+        Возвращает:
+            ft.Control: любой виджет Flet (Column, ListView, Stack и т.д.)
+        """
         return ft.Container()

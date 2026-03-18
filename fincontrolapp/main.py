@@ -1,72 +1,179 @@
+"""
+main.py — Точка входа приложения FinControl.
+
+Здесь происходит:
+- настройка страницы (тема, цвета, отступы)
+- создание всех экранов приложения
+- настройка нижней навигационной панели
+- первоначальная навигация на главный экран
+
+Запуск:
+    flet run --ios fincontrolapp/main.py
+"""
+
 import flet as ft
 from pages import *
 from components import *
 
 
+
 def main(page: ft.Page):
+    """
+    Главная функция приложения. Вызывается Flet при старте.
+
+    Параметры:
+        page (ft.Page): объект страницы Flet — аналог окна/экрана приложения.
+                        Через него управляем темой, навигацией и контентом.
+    """
+
     # --- Настройки страницы ---
     page.title = "FinControl"
-    page.theme_mode = ft.ThemeMode.DARK
-    page.bgcolor = "#0F0F14"
-    page.padding = 0
+    page.theme_mode = ft.ThemeMode.LIGHT   # всегда светлая тема (можно добавить переключатель в настройках)
+    page.bgcolor = AppTheme.BG_PAGE        # фоновый цвет (почти чёрный)
+    page.padding = 0                      # убираем стандартные отступы страницы
 
     # --- Тёмная тема ---
     page.theme = ft.Theme(
         color_scheme=ft.ColorScheme(
-        primary="#6C63FF",
-        secondary="#03DAC6",
-        surface="#1A1A24",
-        on_primary="#FFFFFF",
+            primary="#6C63FF",
+            secondary="#03DAC6",
+            surface="#1A1A24",
+            on_primary="#FFFFFF",
         )
     )
 
     # --- Контейнер для контента ---
     content = ft.Container(expand=True)
 
-    # --- Экраны ---
-    pages = {
-        0: HomePage(page),
-        1: IncomePage(page),
-        2: ExpensesPage(page),
-        3: GoalsPage(page),
-        4: SubscriptionsPage(page),
-        5: AnalyticsPage(page),
-        6: SettingsPage(page),
-    }
+    # --- Контейнер для навигации ---
+    # Пересоздаётся при каждом переключении вкладки,
+    # чтобы обновить активное состояние иконок.
+    nav_container = ft.Container(expand=False)
+
+    def build_nav(selected_index: int) -> ft.Container:
+        """
+        Строит кастомную нижнюю навигационную панель.
+
+        Параметры:
+            selected_index (int): индекс активной вкладки.
+
+        Как работает:
+            — Для каждого элемента создаётся GestureDetector с on_tap.
+            — Активный элемент получает полупрозрачный фиолетовый фон.
+            — Неактивный элемент — прозрачный фон.
+
+        Возвращает:
+            ft.Container: панель навигации.
+        """
+        # Список вкладок: (путь к SVG, индекс страницы)
+        items = [
+            ("navigation/home.svg",         0),
+            ("navigation/transactions.svg", 1),
+            ("navigation/goals.svg",        2),
+            ("navigation/settings.svg",     3),
+        ]
+
+        def nav_item(src, index):
+            active = selected_index == index
+            return ft.GestureDetector(
+                on_tap=lambda e, i=index: navigate(i),
+                content=ft.Container(
+                    width=56,
+                    height=56,
+                    border_radius=16,
+                    bgcolor="#3D3D6B" if active else "#5B6EC7",
+                    alignment=ft.Alignment(0, 0),
+                    content=ft.Image(
+                        src=src,
+                        width=28,
+                        height=28,
+                    ),
+                ),
+            )
+
+        return ft.Container(
+            height=80,
+            clip_behavior=ft.ClipBehavior.HARD_EDGE,
+            content=ft.Stack(
+                controls=[
+                    ft.Container(
+                        expand=True,
+                        content=ft.Image(
+                            src="navigation/test.svg",
+                            fit="fill",
+                            expand=True,
+                        ),
+                    ),
+                    ft.Container(
+                        expand=True,
+                        padding=ft.Padding(left=16, right=16, top=12, bottom=24),
+                        content=ft.Row(
+                            controls=[nav_item(src, i) for src, i in items],
+                            alignment=ft.MainAxisAlignment.SPACE_AROUND,
+                        ),
+                    ),
+                ],
+            ),
+        )
 
     def navigate(index: int):
+        """
+        Переключает активный экран при нажатии на вкладку навигации.
+
+        Параметры:
+            index (int): индекс выбранной вкладки.
+
+        Как работает:
+            1. Устанавливаем новый контент в контейнер.
+            2. Пересоздаём навигационную панель с новым active-состоянием.
+            3. Вызываем .update() чтобы Flet перерисовал оба контейнера.
+        """
         content.content = pages[index]
         content.update()
-        nav.selected_index = index
-        nav.update()
+        nav_container.content = build_nav(index)
+        nav_container.update()
 
-    # --- Bottom Navigation Bar ---
-    nav = ft.NavigationBar(
-        selected_index=0,
-        bgcolor="#1A1A24",
-        indicator_color="#6C63FF",
-        destinations=[
-            ft.NavigationBarDestination(icon=ft.Icons.HOME_OUTLINED, selected_icon=ft.Icons.HOME, label="Главная"),
-            ft.NavigationBarDestination(icon=ft.Icons.TRENDING_UP_OUTLINED, selected_icon=ft.Icons.TRENDING_UP, label="Доходы"),
-            ft.NavigationBarDestination(icon=ft.Icons.SHOPPING_CART_OUTLINED, selected_icon=ft.Icons.SHOPPING_CART, label="Расходы"),
-            ft.NavigationBarDestination(icon=ft.Icons.STAR_OUTLINE, selected_icon=ft.Icons.STAR, label="Цели"),
-            ft.NavigationBarDestination(icon=ft.Icons.SUBSCRIPTIONS_OUTLINED, selected_icon=ft.Icons.SUBSCRIPTIONS, label="Подписки"),
-            ft.NavigationBarDestination(icon=ft.Icons.BAR_CHART_OUTLINED, selected_icon=ft.Icons.BAR_CHART, label="Графики"),
-            ft.NavigationBarDestination(icon=ft.Icons.SETTINGS_OUTLINED, selected_icon=ft.Icons.SETTINGS, label="Настройки"),
-        ],
-        on_change=lambda e: navigate(e.control.selected_index),
-    )
+    # --- Экраны ---
+    # Словарь: индекс вкладки → экземпляр страницы.
+    # Все страницы создаются сразу при старте (eager loading).
+    # Страница SubscriptionsPage (индекс 4) доступна только через
+    # кнопку быстрых действий на главном экране — не отображается в nav.
+    pages = {
+        0: HomePage(page),
+        1: TransactionsPage(page),
+        2: GoalsPage(page),
+        3: SettingsPage(page),
+        4: SubscriptionsPage(page),
+    }
+
+    # Сохраняем функцию навигации в данных страницы —
+    # чтобы дочерние страницы могли вызывать её через page.data["navigate"]
+    page.data = {"navigate": navigate}
 
     # --- Начальный экран ---
     content.content = pages[0]
+    nav_container.content = build_nav(0)
 
+    # --- Компоновка ---
+    # ft.Column с двумя элементами: контент (expand=True) + навигация.
+    # spacing=0 убирает зазор между ними.
     page.add(
-        ft.Column(
-            controls=[content, nav],
+        ft.Stack(
             expand=True,
-            spacing=0,
+            controls=[
+                ft.Image(
+                    src="bg.svg",
+                    fit="fill",
+                    expand=True,
+                ),
+                # Контент поверх фона
+                ft.Column(
+                    controls=[content, nav_container],
+                    expand=True,
+                    spacing=0,
+                ),
+            ],
         )
     )
 
-
-ft.app(main)
+ft.app(main, assets_dir="assets")

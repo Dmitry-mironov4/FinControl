@@ -1,21 +1,5 @@
-"""
-expenses.py — Экран расходов.
-
-Показывает:
-- Сетку категорий расходов (GridView, 4 колонки)
-- Историю расходов (пока заглушка)
-- Кнопку добавления нового расхода
-
-CATEGORIES — список кортежей (иконка, название, цвет HEX).
-Чтобы добавить новую категорию — просто допиши строку в CATEGORIES,
-она автоматически появится в сетке.
-
-TODO: подключить историю расходов из БД.
-TODO: при нажатии на категорию — фильтровать историю.
-"""
 import flet as ft
 from components.base_page import BasePage
-
 
 CATEGORIES = [
     (ft.Icons.RESTAURANT,     "Еда",          "#FF9800"),
@@ -29,10 +13,10 @@ CATEGORIES = [
 ]
 
 
-class ExpensesPage(BasePage):
+class TransactionsPage(BasePage):
     def __init__(self, page: ft.Page):
-        super().__init__(page, "Расходы")
-
+        super().__init__(page, "Транзакции")
+        
     def build_body(self):
         return ft.Column([
             ft.Text("Категории", size=16, weight=ft.FontWeight.W_600, color="#FFFFFF"),
