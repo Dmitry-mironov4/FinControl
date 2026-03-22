@@ -1,2 +1,2 @@
 # FinControl
-![[userflow1.drawio.png]]
+![UserFlow](https://github.com/Dmitry-mironov4/FinControl/blob/main/userflow1.drawio.png)
