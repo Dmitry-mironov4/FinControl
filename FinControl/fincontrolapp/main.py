@@ -16,7 +16,6 @@ from pages import *
 from components import *
 
 
-
 def main(page: ft.Page):
     """
     Главная функция приложения. Вызывается Flet при старте.
@@ -27,12 +26,19 @@ def main(page: ft.Page):
     """
 
     # --- Настройки страницы ---
-    page.title = "FinControl"
-    page.theme_mode = ft.ThemeMode.LIGHT   # всегда светлая тема (можно добавить переключатель в настройках)
-    page.bgcolor = AppTheme.BG_PAGE        # фоновый цвет (почти чёрный)
-    page.padding = 0                      # убираем стандартные отступы страницы
+    page.fonts = {
+        "Montserrat": "fonts/Montserrat-Regular.ttf",
+        "Montserrat Bold": "fonts/Montserrat-Bold.ttf",
+        "Montserrat Semibold": "fonts/Montserrat-SemiBold.ttf",
+        "Montserrat Medium": "fonts/Montserrat-Medium.ttf",
+        "Montserrat Extrabold": "fonts/Montserrat-ExtraBold.ttf"
+    }
 
-    # --- Тёмная тема ---
+    page.title = "FinControl"
+    page.theme_mode = ft.ThemeMode.LIGHT
+    page.bgcolor = AppTheme.BG_PAGE
+    page.padding = 0
+
     page.theme = ft.Theme(
         color_scheme=ft.ColorScheme(
             primary="#6C63FF",
@@ -57,20 +63,14 @@ def main(page: ft.Page):
         Параметры:
             selected_index (int): индекс активной вкладки.
 
-        Как работает:
-            — Для каждого элемента создаётся GestureDetector с on_tap.
-            — Активный элемент получает полупрозрачный фиолетовый фон.
-            — Неактивный элемент — прозрачный фон.
-
         Возвращает:
             ft.Container: панель навигации.
         """
-        # Список вкладок: (путь к SVG, индекс страницы)
         items = [
-            ("navigation/home.svg",         0),
+            ("navigation/home.svg", 0),
             ("navigation/transactions.svg", 1),
-            ("navigation/goals.svg",        2),
-            ("navigation/settings.svg",     3),
+            ("navigation/goals.svg", 2),
+            ("navigation/settings.svg", 3),
         ]
 
         def nav_item(src, index):
@@ -122,11 +122,6 @@ def main(page: ft.Page):
 
         Параметры:
             index (int): индекс выбранной вкладки.
-
-        Как работает:
-            1. Устанавливаем новый контент в контейнер.
-            2. Пересоздаём навигационную панель с новым active-состоянием.
-            3. Вызываем .update() чтобы Flet перерисовал оба контейнера.
         """
         content.content = pages[index]
         content.update()
@@ -134,10 +129,6 @@ def main(page: ft.Page):
         nav_container.update()
 
     # --- Экраны ---
-    # Словарь: индекс вкладки → экземпляр страницы.
-    # Все страницы создаются сразу при старте (eager loading).
-    # Страница SubscriptionsPage (индекс 4) доступна только через
-    # кнопку быстрых действий на главном экране — не отображается в nav.
     pages = {
         0: HomePage(page),
         1: TransactionsPage(page),
@@ -146,8 +137,7 @@ def main(page: ft.Page):
         4: SubscriptionsPage(page),
     }
 
-    # Сохраняем функцию навигации в данных страницы —
-    # чтобы дочерние страницы могли вызывать её через page.data["navigate"]
+    # Сохраняем функцию навигации в данных страницы
     page.data = {"navigate": navigate}
 
     # --- Начальный экран ---
@@ -155,8 +145,6 @@ def main(page: ft.Page):
     nav_container.content = build_nav(0)
 
     # --- Компоновка ---
-    # ft.Column с двумя элементами: контент (expand=True) + навигация.
-    # spacing=0 убирает зазор между ними.
     page.add(
         ft.Stack(
             expand=True,
@@ -166,7 +154,6 @@ def main(page: ft.Page):
                     fit="fill",
                     expand=True,
                 ),
-                # Контент поверх фона
                 ft.Column(
                     controls=[content, nav_container],
                     expand=True,
@@ -175,5 +162,6 @@ def main(page: ft.Page):
             ],
         )
     )
+
 
 ft.app(main, assets_dir="assets")
