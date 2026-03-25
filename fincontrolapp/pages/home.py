@@ -20,7 +20,7 @@ class HomePage(BasePage):
         Параметры:
             page (ft.Page): объект страницы Flet, передаётся из main.py.
         """
-        super().__init__(page, "Главная")
+        super().__init__(page, "Главн")
 
     def build_body(self):
         """

@@ -99,7 +99,7 @@ def main(page: ft.Page):
                     ft.Container(
                         expand=True,
                         content=ft.Image(
-                            src="navigation/test.svg",
+                            src="navigation/nav_bg.svg",
                             fit="fill",
                             expand=True,
                         ),
