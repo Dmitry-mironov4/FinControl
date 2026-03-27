@@ -11,7 +11,7 @@ Telegram бот для интеграции с финансовым прилож
 BOT_TOKEN=ваш_токен_от_BotFather 
 ```
 ### 2. Создание базы данных
-    python database.py
+    database.py
 
 ### 3. Запуск бота
     cd bot
