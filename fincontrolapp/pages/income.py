@@ -1,8 +1,8 @@
 import flet as ft
-from datetime import date
+from datetime import date, datetime
 from components.base_page import BasePage
 from components.dialogs import show_dialog as _show_dialog, close_dialog as _close_dialog
-from db_queries import get_transactions, add_transaction, delete_transaction, get_categories
+from db_queries import get_transactions, add_transaction, delete_transaction, get_categories, update_transaction
 
 
 MONTH_NAMES = [
@@ -144,7 +144,7 @@ class IncomePage(BasePage):
     def _open_salary_dialog(self, e):
         amount_field = ft.TextField(label="Сумма зарплаты", keyboard_type=ft.KeyboardType.NUMBER,
                                     border_color="#6C63FF", max_length=10)
-        date_field = ft.TextField(label="Дата", value=str(date.today()), border_color="#6C63FF")
+        date_field = ft.TextField(label="Дата", value=str(date.today().strftime("%d.%m.%Y")), border_color="#6C63FF")
         cats = get_categories(type_='income')
         salary_cat = next((c for c in cats if c['name'] == 'Зарплата'), cats[0] if cats else None)
 
@@ -154,29 +154,38 @@ class IncomePage(BasePage):
             _close_dialog(self.page_ref, dlg)
 
         def on_submit(e):
+            if not amount_field.value or not salary_cat:
+                return
             try:
-                if not amount_field.value or not salary_cat:
-                    return
                 amount = float(amount_field.value.replace(",", "."))
+            except ValueError:
+                self.page_ref.show_dialog(ft.SnackBar(ft.Text("Введите корректную сумму")))
+                return              
+            try:
+                parsed_date = datetime.strptime(date_field.value, "%d.%m.%Y").date()
+            except ValueError:
+                self.page_ref.show_dialog(ft.SnackBar(ft.Text("Введите корректную дату в формате ДД.ММ.ГГГГ")))
+                return 
+            existing = self._get_salary()
+            if existing:
+                update_transaction(existing['id'], amount, str(parsed_date))
+            else:
                 add_transaction(
                     user_id=self._user_id,
                     type_='income',
                     amount=amount,
                     category_id=salary_cat['id'],
                     description="Зарплата",
-                    date=date_field.value,
+                    date=str(parsed_date),
                     is_recurring=1,
                 )
-                self.refresh()
-                pages = self.page_ref.data.get("pages", {})
-                if 0 in pages:
-                    pages[0].refresh()
-                self.page_ref.snack_bar = ft.SnackBar(ft.Text("Зарплата сохранена"), open=True)
-                self.page_ref.update()
-            except ValueError:
-                return
-            finally:
-                _close_dialog(self.page_ref, dlg)
+            # refresh + snackbar — одинаково для обоих случаев
+            self.refresh()
+            pages = self.page_ref.data.get("pages", {})
+            if 0 in pages:
+                pages[0].refresh()
+            _close_dialog(self.page_ref, dlg)
+            self.page_ref.show_dialog(ft.SnackBar(ft.Text("Зарплата сохранена")))
 
         dlg.content = ft.Column([amount_field, date_field], tight=True, spacing=12)
         dlg.actions = [
@@ -194,7 +203,7 @@ class IncomePage(BasePage):
         amount_field = ft.TextField(label="Сумма", keyboard_type=ft.KeyboardType.NUMBER,
                                     border_color="#6C63FF", max_length=10)
         desc_field = ft.TextField(label="Описание (необязательно)", border_color="#6C63FF")
-        date_field = ft.TextField(label="Дата", value=str(date.today()), border_color="#6C63FF")
+        date_field = ft.TextField(label="Дата", value=str(date.today().strftime("%d.%m.%Y")), border_color="#6C63FF")
 
         dlg = ft.AlertDialog(modal=True, title=ft.Text("Добавить доход"))
 
@@ -202,28 +211,34 @@ class IncomePage(BasePage):
             _close_dialog(self.page_ref, dlg)
 
         def on_submit(e):
-            try:
-                if not amount_field.value or not category_dd.value:
-                    return
-                amount = float(amount_field.value.replace(",", "."))
-                add_transaction(
-                    user_id=self._user_id,
-                    type_='income',
-                    amount=amount,
-                    category_id=int(category_dd.value),
-                    description=desc_field.value or None,
-                    date=date_field.value,
-                )
-                self.refresh()
-                pages = self.page_ref.data.get("pages", {})
-                if 0 in pages:
-                    pages[0].refresh()
-                self.page_ref.snack_bar = ft.SnackBar(ft.Text("Доход добавлен"), open=True)
-                self.page_ref.update()
-            except ValueError:
+            if not amount_field.value or not category_dd.value:
                 return
-            finally:
-                _close_dialog(self.page_ref, dlg)
+            try:
+                amount = float(amount_field.value.replace(",", "."))
+            except ValueError:
+                self.page_ref.show_dialog(ft.SnackBar(ft.Text("Введите корректную сумму")))
+
+                return
+            
+            try:
+                parsed_date = datetime.strptime(date_field.value, "%d.%m.%Y").date()
+            except ValueError:
+                self.page_ref.show_dialog(ft.SnackBar(ft.Text("Введите корректную дату в формате ДД.ММ.ГГГГ"))) 
+                return
+            add_transaction(
+                user_id=self._user_id,
+                type_='income',
+                amount=amount,
+                category_id=int(category_dd.value),
+                description=desc_field.value or None,
+                date=str(parsed_date),
+            )
+            self.refresh()
+            pages = self.page_ref.data.get("pages", {})
+            if 0 in pages:
+                pages[0].refresh()
+            self.page_ref.show_dialog(ft.SnackBar(ft.Text("Доход добавлен")))   
+            _close_dialog(self.page_ref, dlg)
 
         dlg.content = ft.Column(
             [category_dd, amount_field, desc_field, date_field],

@@ -1,9 +1,9 @@
 import json
 import os
 import flet as ft
-from pages import *
+from pages import HomePage, TransactionsPage, GoalsPage, SettingsPage, SubscriptionsPage, IncomePage, ExpensesPage
 from pages.auth import AuthPage
-from components import *
+from components import AppTheme
 from database import create_tables, get_connection
 
 _SESSION_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "session.json")
