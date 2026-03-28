@@ -1,8 +1,10 @@
 import flet as ft
 from datetime import date, datetime
+from database import get_connection
 from components.base_page import BasePage
 from components.dialogs import show_dialog as _show_dialog, close_dialog as _close_dialog
-from db_queries import get_goals, add_goal, deposit_to_goal, delete_goal
+from modules.goals.repository import GoalRepository
+from modules.goals.service import GoalService
 
 def _calc_pace(target, current, deadline_value):
     """Возвращает строку с темпом накоплений или None."""
@@ -34,7 +36,10 @@ class GoalsPage(BasePage):
         super().__init__(page, "Цели")
 
     def build_body(self):
-        goals = get_goals(self._user_id)
+        with get_connection() as con:
+            repo = GoalRepository(con)
+            service = GoalService(repo)
+            goals = service.get_goals(self._user_id)
         return ft.Column([
             self._goals_list(goals),
             ft.ElevatedButton(
@@ -127,7 +132,10 @@ class GoalsPage(BasePage):
 
         def on_confirm(e):
             try:
-                delete_goal(goal_id)
+                with get_connection() as con:
+                    repo = GoalRepository(con)
+                    service = GoalService(repo)
+                    service.delete_goal(self._user_id, goal_id)
                 self.refresh()
             finally:
                 _close_dialog(self.page_ref, dlg)
@@ -156,12 +164,15 @@ class GoalsPage(BasePage):
                 if not name_field.value or not amount_field.value:
                     return
                 amount = float(amount_field.value.replace(",", "."))
-                add_goal(
-                    user_id=self._user_id,
-                    name=name_field.value,
-                    target_amount=amount,
-                    deadline=deadline_field.value or None,
-                )
+                with get_connection() as con:
+                    repo = GoalRepository(con)
+                    service = GoalService(repo)
+                    service.add_goal(
+                        user_id=self._user_id,
+                        name=name_field.value,
+                        target_amount=amount,
+                        deadline=deadline_field.value or None,
+                    )
                 self.refresh()
             except ValueError:
                 return
@@ -197,7 +208,10 @@ class GoalsPage(BasePage):
                 if not amount_field.value:
                     return
                 amount = float(amount_field.value.replace(",", "."))
-                deposit_to_goal(self._user_id, goal_id, amount)
+                with get_connection() as con:
+                    repo = GoalRepository(con)
+                    service = GoalService(repo)
+                    service.deposit_to_goal(self._user_id, goal_id, amount)
                 self.refresh()
                 pages = self.page_ref.data.get("pages", {})
                 if 0 in pages:

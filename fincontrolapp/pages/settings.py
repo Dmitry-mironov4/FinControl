@@ -143,8 +143,7 @@ class SettingsPage(BasePage):
     def _open_telegram_dialog(self, e):
         import webbrowser
         bot_username = "FinControlBot"
-        user_id = self._user_id
-        deep_link = f"https://t.me/f1nc0ntr0l_bot#"
+        deep_link = "https://t.me/f1nc0ntr0l_bot#"
         dlg = ft.AlertDialog(modal=True, title=ft.Text("Telegram-бот"))
 
         def on_cancel(e):
@@ -182,9 +181,9 @@ class SettingsPage(BasePage):
             try:
                 from database import get_connection
                 with get_connection() as conn:
-                    conn.execute("DELETE FROM transactions")
-                    conn.execute("DELETE FROM goals")
-                    conn.execute("DELETE FROM subscriptions")
+                    conn.execute("DELETE FROM transactions WHERE user_id=?", (self._user_id,))
+                    conn.execute("DELETE FROM goals WHERE user_id=?", (self._user_id,))
+                    conn.execute("DELETE FROM subscriptions WHERE user_id=?", (self._user_id,))
                 self.page_ref.snack_bar = ft.SnackBar(ft.Text("Данные удалены"), open=True)
                 self.page_ref.update()
             finally:
