@@ -4,7 +4,10 @@ import flet as ft
 from pages import HomePage, TransactionsPage, GoalsPage, SettingsPage, SubscriptionsPage, IncomePage, ExpensesPage
 from pages.auth import AuthPage
 from components import AppTheme
+from controllers import HomeController, GoalsController
 from database import create_tables, get_connection
+from components import show_dialog, close_dialog, build_nav
+
 
 _SESSION_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "session.json")
 
@@ -33,12 +36,6 @@ def _clear_session():
         pass
 
 
-def _show_dialog(page, dlg):
-    page.show_dialog(dlg)
-
-
-def _close_dialog(page, dlg):
-    page.pop_dialog()
 
 
 def main(page: ft.Page):
@@ -102,7 +99,7 @@ def main(page: ft.Page):
         dlg = ft.AlertDialog(modal=True, title=ft.Text("Начальный баланс"))
 
         def on_skip(e):
-            _close_dialog(page, dlg)
+            close_dialog(page, dlg)
 
         def on_submit(e):
             try:
@@ -158,7 +155,10 @@ def main(page: ft.Page):
                 page.snack_bar = ft.SnackBar(ft.Text("Не удалось сохранить баланс"), open=True)
                 page.update()
             finally:
-                _close_dialog(page, dlg)
+                close_dialog(page, dlg)
+                home = page.data.get("pages", {}).get(0)
+                if home:
+                    home.rebuild()
 
         dlg.content = ft.Column([
             ft.Text("Сколько денег у тебя сейчас?", color="#888888", size=14),
@@ -170,7 +170,7 @@ def main(page: ft.Page):
             ft.TextButton("Пропустить", on_click=on_skip),
             ft.TextButton("Сохранить", on_click=on_submit),
         ]
-        _show_dialog(page, dlg)
+        show_dialog(page, dlg)
 
     def show_auth():
         inner.content = AuthPage(page, on_success=on_auth_success)
@@ -182,59 +182,18 @@ def main(page: ft.Page):
         content = ft.Container(expand=True)
         nav_container = ft.Container(expand=False)
 
-        def build_nav(selected_index: int) -> ft.Container:
-            items = [
-                ("navigation/home.svg",         0),
-                ("navigation/transactions.svg", 1),
-                ("navigation/goals.svg",        2),
-                ("navigation/settings.svg",     3),
-            ]
-
-            def nav_item(src, index):
-                active = selected_index == index
-                return ft.GestureDetector(
-                    on_tap=lambda e, i=index: navigate(i),
-                    content=ft.Container(
-                        width=56, height=56,
-                        border_radius=16,
-                        bgcolor="#3D3D6B" if active else "#5B6EC7",
-                        alignment=ft.Alignment(0, 0),
-                        content=ft.Image(src=src, width=28, height=28),
-                    ),
-                )
-
-            return ft.Container(
-                height=80,
-                clip_behavior=ft.ClipBehavior.HARD_EDGE,
-                content=ft.Stack(
-                    controls=[
-                        ft.Container(
-                            expand=True,
-                            content=ft.Image(src="navigation/nav_bg.svg", fit="fill", expand=True),
-                        ),
-                        ft.Container(
-                            expand=True,
-                            padding=ft.Padding(left=16, right=16, top=12, bottom=24),
-                            content=ft.Row(
-                                controls=[nav_item(src, i) for src, i in items],
-                                alignment=ft.MainAxisAlignment.SPACE_AROUND,
-                            ),
-                        ),
-                    ],
-                ),
-            )
 
         def navigate(index: int):
             pages[index].refresh()
             content.content = pages[index]
             content.update()
-            nav_container.content = build_nav(index)
+            nav_container.content = build_nav(index, navigate)
             nav_container.update()
 
         pages = {
-            0: HomePage(page),
+            0: HomePage(page, HomeController(page.data["user_id"])),
             1: TransactionsPage(page),
-            2: GoalsPage(page),
+            2: GoalsPage(page, GoalsController(page.data["user_id"])),
             3: SettingsPage(page),
             4: SubscriptionsPage(page),
             5: IncomePage(page),
@@ -254,7 +213,7 @@ def main(page: ft.Page):
         )
 
         content.content = pages[0]
-        nav_container.content = build_nav(0)
+        nav_container.content = build_nav(0, navigate)
 
         inner.content = ft.Column(
             controls=[content, nav_container],

@@ -1,45 +1,16 @@
 import flet as ft
-from datetime import date, datetime
-from database import get_connection
 from components.base_page import BasePage
 from components.dialogs import show_dialog as _show_dialog, close_dialog as _close_dialog
-from modules.goals.repository import GoalRepository
-from modules.goals.service import GoalService
-
-def _calc_pace(target, current, deadline_value):
-    """Возвращает строку с темпом накоплений или None."""
-    remaining = target - current
-    if remaining <= 0 or not deadline_value:
-        return None
-    try:
-        if isinstance(deadline_value, datetime):
-            dl = deadline_value.date()
-        elif isinstance(deadline_value, date):
-            dl = deadline_value
-        elif isinstance(deadline_value, str):
-            dl = date.fromisoformat(deadline_value)
-        else:
-            return None
-
-        days_left = (dl - date.today()).days
-        if days_left <= 0:
-            return "Срок истёк"
-        months_left = max(days_left / 30, 1)
-        per_month = remaining / months_left
-        return f"Нужно: {per_month:,.0f} ₽/мес · осталось {int(months_left)} мес."
-    except (ValueError, TypeError):
-        return None
 
 
+    
 class GoalsPage(BasePage):
-    def __init__(self, page: ft.Page):
+    def __init__(self, page, ctrl):
+        self._ctrl = ctrl
         super().__init__(page, "Цели")
 
     def build_body(self):
-        with get_connection() as con:
-            repo = GoalRepository(con)
-            service = GoalService(repo)
-            goals = service.get_goals(self._user_id)
+        goals = self._ctrl.get_goals()
         return ft.Column([
             self._goals_list(goals),
             ft.ElevatedButton(
@@ -64,7 +35,7 @@ class GoalsPage(BasePage):
             progress = min(current / target, 1.0)
             percent = int(progress * 100)
             done = progress >= 1.0
-            pace = _calc_pace(target, current, g['deadline'])
+            pace = self._ctrl.calc_pace(target, current, g['deadline'])
 
             bar_color = "#4CAF50" if done else "#6C63FF"
             percent_color = "#4CAF50" if done else "#6C63FF"
@@ -132,10 +103,7 @@ class GoalsPage(BasePage):
 
         def on_confirm(e):
             try:
-                with get_connection() as con:
-                    repo = GoalRepository(con)
-                    service = GoalService(repo)
-                    service.delete_goal(self._user_id, goal_id)
+                self._ctrl.delete_goal(goal_id)
                 self.refresh()
             finally:
                 _close_dialog(self.page_ref, dlg)
@@ -164,15 +132,11 @@ class GoalsPage(BasePage):
                 if not name_field.value or not amount_field.value:
                     return
                 amount = float(amount_field.value.replace(",", "."))
-                with get_connection() as con:
-                    repo = GoalRepository(con)
-                    service = GoalService(repo)
-                    service.add_goal(
-                        user_id=self._user_id,
-                        name=name_field.value,
-                        target_amount=amount,
-                        deadline=deadline_field.value or None,
-                    )
+                self._ctrl.add_goal(
+                    name=name_field.value,
+                    target_amount=amount,
+                    deadline=deadline_field.value or None,
+                )
                 self.refresh()
             except ValueError:
                 return
@@ -208,10 +172,7 @@ class GoalsPage(BasePage):
                 if not amount_field.value:
                     return
                 amount = float(amount_field.value.replace(",", "."))
-                with get_connection() as con:
-                    repo = GoalRepository(con)
-                    service = GoalService(repo)
-                    service.deposit_to_goal(self._user_id, goal_id, amount)
+                self._ctrl.deposit(goal_id, amount)
                 self.rebuild()
                 pages = self.page_ref.data.get("pages", {})
                 if 0 in pages:

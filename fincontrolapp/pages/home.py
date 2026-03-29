@@ -1,8 +1,8 @@
 import flet as ft
 import os
-from datetime import date
 from components.base_page import BasePage
-from db_queries import get_balance, get_monthly_balance, get_transactions
+from controllers import HomeController
+
 
 
 def _find_graph_asset_src() -> str | None:
@@ -26,7 +26,8 @@ GRAPH_ASSET_SRC = _find_graph_asset_src()
 
 class HomePage(BasePage):
 
-    def __init__(self, page: ft.Page):
+    def __init__(self, page, ctrl):
+        self._ctrl = ctrl
         super().__init__(page, "Главная")
 
     def build_header(self):
@@ -43,10 +44,9 @@ class HomePage(BasePage):
         )
 
     def build_body(self):
-        today = date.today()
-        balance = get_balance(self._user_id)
-        monthly = get_monthly_balance(self._user_id, today.year, today.month)
-        transactions = get_transactions(self._user_id, limit=5)
+        balance = self._ctrl.get_balance()
+        monthly = self._ctrl.get_monthly_balance()
+        transactions = self._ctrl.get_recent_transactions(limit=5)
 
         controls = [
             self._balance_card(balance, monthly),
