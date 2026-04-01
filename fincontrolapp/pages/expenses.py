@@ -1,13 +1,8 @@
 import flet as ft
 from datetime import date
-from database import get_connection
+from components.base_page import BasePage
 from components.form_utils import parse_amount, parse_date
 from components.dialogs import show_dialog as _show_dialog, close_dialog as _close_dialog
-from components.base_page import BasePage
-from modules.categories.repository import CategoryRepository
-from modules.categories.service import CategoryService
-from modules.transactions.repository import TransactionRepository
-from modules.transactions.service import TransactionService
 
 
 CATEGORY_ICONS = {
@@ -23,24 +18,15 @@ CATEGORY_ICONS = {
 
 
 class ExpensesPage(BasePage):
-    def __init__(self, page: ft.Page):
+    def __init__(self, page: ft.Page, ctrl):
+        self._ctrl = ctrl
         self._selected_category_id = None
         self._selected_category_name = None
         super().__init__(page, "Расходы")
 
     def build_body(self):
-        with get_connection() as con:
-            repo = CategoryRepository(con)
-            service = CategoryService(repo)
-            categories = service.get_all(type_='expense')
-        # categories = get_categories(type_='expense')
-        with get_connection() as con:
-            repo = TransactionRepository(con)
-            service = TransactionService(repo)
-            expenses_all = service.get_transactions(
-                self._user_id, type_='expense',
-                category_id=self._selected_category_id,
-            )
+        categories = self._ctrl.get_categories()
+        expenses_all = self._ctrl.get_transactions(category_id=self._selected_category_id)
         expenses = [t for t in expenses_all if self._is_current_month(t['date'])]
         period = self._current_period_label()
         month_total = sum(t['amount'] for t in expenses)
@@ -170,11 +156,8 @@ class ExpensesPage(BasePage):
 
         def on_confirm(e):
             try:
-                with get_connection() as con:
-                    repo = TransactionRepository(con)
-                    service = TransactionService(repo)
-                    service.delete_transaction(transaction_id)
-                self.refresh()                
+                self._ctrl.delete_transaction(transaction_id)
+                self.refresh()
             finally:
                 _close_dialog(self.page_ref, dlg)
 
@@ -186,11 +169,7 @@ class ExpensesPage(BasePage):
         _show_dialog(self.page_ref, dlg)
 
     def _open_add_dialog(self, e):
-        with get_connection() as con:
-            repo = CategoryRepository(con)
-            service = CategoryService(repo)
-            cats = service.get_all(type_='expense')
-        # cats = get_categories(type_='expense')
+        cats = self._ctrl.get_categories()
         category_dd = ft.Dropdown(
             label="Категория", border_color="#6C63FF",
             options=[ft.dropdown.Option(str(c.id), c.name) for c in cats],
@@ -199,7 +178,8 @@ class ExpensesPage(BasePage):
         amount_field = ft.TextField(label="Сумма", keyboard_type=ft.KeyboardType.NUMBER,
                                     border_color="#6C63FF", max_length=10)
         desc_field = ft.TextField(label="Описание (необязательно)", border_color="#6C63FF")
-        date_field = ft.TextField(label="Дата", value=date.today().strftime("%d.%m.%Y"), border_color="#6C63FF")
+        date_field = ft.TextField(label="Дата", value=date.today().strftime("%d.%m.%Y"),
+                                  border_color="#6C63FF")
 
         dlg = ft.AlertDialog(modal=True, title=ft.Text("Добавить расход"))
 
@@ -223,7 +203,7 @@ class ExpensesPage(BasePage):
                     if amount <= 0:
                         amount_field.error = "Сумма должна быть больше нуля"
                 except ValueError:
-                    amount_field.error = "Введите целое число"
+                    amount_field.error = "Введите число, например: 500"
 
             parsed_date = None
             try:
@@ -237,17 +217,12 @@ class ExpensesPage(BasePage):
                 date_field.update()
                 return
 
-            with get_connection() as con:
-                repo = TransactionRepository(con)
-                service = TransactionService(repo)
-                service.add_transaction(
-                    user_id=self._user_id,
-                    type_='expense',
-                    amount=amount,
-                    category_id=int(category_dd.value),
-                    description=desc_field.value or None,
-                    date=str(parsed_date),
-                )
+            self._ctrl.add_transaction(
+                amount=amount,
+                category_id=int(category_dd.value),
+                description=desc_field.value or None,
+                date=str(parsed_date),
+            )
             self.rebuild()
             pages = self.page_ref.data.get("pages", {})
             if 0 in pages:
@@ -255,6 +230,7 @@ class ExpensesPage(BasePage):
             _close_dialog(self.page_ref, dlg)
             self.page_ref.show_dialog(ft.SnackBar(ft.Text("Расход добавлен")))
             self.page_ref.update()
+
         dlg.content = ft.Column(
             [category_dd, amount_field, desc_field, date_field],
             tight=True, spacing=12,

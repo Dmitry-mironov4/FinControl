@@ -2,7 +2,7 @@ import flet as ft
 from datetime import date
 from components.base_page import BasePage
 from components.dialogs import show_dialog as _show_dialog, close_dialog as _close_dialog
-from db_queries import get_transactions, add_transaction, delete_transaction, get_categories
+from components.form_utils import parse_amount, parse_date
 
 
 CATEGORY_ICONS = {
@@ -18,13 +18,15 @@ CATEGORY_ICONS = {
     "Другое": ft.Icons.MORE_HORIZ,
 }
 
+
 class TransactionsPage(BasePage):
-    def __init__(self, page: ft.Page):
+    def __init__(self, page: ft.Page, ctrl):
+        self._ctrl = ctrl
         self._filter = None
         super().__init__(page, "Транзакции")
 
     def build_body(self):
-        transactions = get_transactions(self._user_id, type_=self._filter)
+        transactions = self._ctrl.get_transactions(type_=self._filter)
         return ft.Column([
             ft.Row([
                 self._filter_btn("Все", None),
@@ -62,11 +64,11 @@ class TransactionsPage(BasePage):
             _close_dialog(self.page_ref, dlg)
 
         def on_confirm(e):
-                try:
-                    delete_transaction(transaction_id)
-                    self.refresh()
-                finally:
-                    _close_dialog(self.page_ref, dlg)
+            try:
+                self._ctrl.delete_transaction(transaction_id)
+                self.refresh()
+            finally:
+                _close_dialog(self.page_ref, dlg)
 
         dlg.content = ft.Text(f'Операция «{category_name}» будет удалена.')
         dlg.actions = [
@@ -146,43 +148,63 @@ class TransactionsPage(BasePage):
         amount_field = ft.TextField(label="Сумма", keyboard_type=ft.KeyboardType.NUMBER,
                                     border_color="#6C63FF")
         desc_field = ft.TextField(label="Описание (необязательно)", border_color="#6C63FF")
-        date_field = ft.TextField(label="Дата", value=str(date.today()), border_color="#6C63FF")
+        date_field = ft.TextField(label="Дата", value=date.today().strftime("%d.%m.%Y"),
+                                  border_color="#6C63FF")
 
         dlg = ft.AlertDialog(modal=True, title=ft.Text("Добавить транзакцию"))
 
         def load_categories(type_val):
-            cats = get_categories(type_=type_val)
-            category_dd.options = [ft.dropdown.Option(str(c['id']), c['name']) for c in cats]
+            cats = self._ctrl.get_categories(type_=type_val)
+            category_dd.options = [ft.dropdown.Option(str(c.id), c.name) for c in cats]
             category_dd.value = None
             self.page_ref.update()
 
-        def on_type_change(e):
-            load_categories(type_field.value)
-
-        type_field.on_change = on_type_change
+        type_field.on_change = lambda e: load_categories(type_field.value)
         load_categories("expense")
 
         def on_cancel(e):
             _close_dialog(self.page_ref, dlg)
 
         def on_submit(e):
+            category_dd.error = None
+            amount_field.error = None
+            date_field.error = None
+
+            if not category_dd.value:
+                category_dd.error = "Выберите категорию"
+
+            amount = None
+            if not amount_field.value:
+                amount_field.error = "Введите сумму"
+            else:
+                try:
+                    amount = parse_amount(amount_field.value)
+                    if amount <= 0:
+                        amount_field.error = "Сумма должна быть больше нуля"
+                except ValueError:
+                    amount_field.error = "Введите число, например: 500"
+
+            parsed_date = None
             try:
-                if not amount_field.value or not category_dd.value:
-                    return
-                amount = float(amount_field.value.replace(",", "."))
-                add_transaction(
-                    user_id=self._user_id,
-                    type_=type_field.value,
-                    amount=amount,
-                    category_id=int(category_dd.value),
-                    description=desc_field.value or None,
-                    date=date_field.value,
-                )
-                self.refresh()
+                parsed_date = parse_date(date_field.value)
             except ValueError:
+                date_field.error = "Формат даты: ДД.ММ.ГГГГ"
+
+            if any(f.error for f in (category_dd, amount_field, date_field)):
+                category_dd.update()
+                amount_field.update()
+                date_field.update()
                 return
-            finally:
-                _close_dialog(self.page_ref, dlg)
+
+            self._ctrl.add_transaction(
+                type_=type_field.value,
+                amount=amount,
+                category_id=int(category_dd.value),
+                description=desc_field.value or None,
+                date=str(parsed_date),
+            )
+            _close_dialog(self.page_ref, dlg)
+            self.refresh()
 
         dlg.content = ft.Column(
             [type_field, category_dd, amount_field, desc_field, date_field],

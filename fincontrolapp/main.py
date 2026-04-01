@@ -4,7 +4,9 @@ import flet as ft
 from pages import HomePage, TransactionsPage, GoalsPage, SettingsPage, SubscriptionsPage, IncomePage, ExpensesPage
 from pages.auth import AuthPage
 from components import AppTheme
-from controllers import HomeController, GoalsController, SubscriptionsController
+from controllers import (HomeController, GoalsController, SubscriptionsController,
+                         TransactionsController, ExpensesController, IncomeController,
+                         SettingsController)
 from database import create_tables, get_connection
 from components import show_dialog, close_dialog, build_nav
 
@@ -190,14 +192,15 @@ def main(page: ft.Page):
             nav_container.content = build_nav(index, navigate)
             nav_container.update()
 
+        uid = page.data["user_id"]
         pages = {
-            0: HomePage(page, HomeController(page.data["user_id"])),
-            1: TransactionsPage(page),
-            2: GoalsPage(page, GoalsController(page.data["user_id"])),
-            3: SettingsPage(page),
-            4: SubscriptionsPage(page, SubscriptionsController(page.data["user_id"])),
-            5: IncomePage(page),
-            6: ExpensesPage(page),
+            0: HomePage(page, HomeController(uid)),
+            1: TransactionsPage(page, TransactionsController(uid)),
+            2: GoalsPage(page, GoalsController(uid)),
+            3: SettingsPage(page, SettingsController(uid)),
+            4: SubscriptionsPage(page, SubscriptionsController(uid)),
+            5: IncomePage(page, IncomeController(uid)),
+            6: ExpensesPage(page, ExpensesController(uid)),
         }
 
         def logout():

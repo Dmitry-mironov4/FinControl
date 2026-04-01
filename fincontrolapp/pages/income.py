@@ -1,27 +1,19 @@
 import flet as ft
 from datetime import date
-from database import get_connection
 from components.base_page import BasePage
 from components.form_utils import parse_amount, parse_date
 from components.dialogs import show_dialog as _show_dialog, close_dialog as _close_dialog
-from modules.categories.repository import CategoryRepository
-from modules.categories.service import CategoryService
-from modules.transactions.repository import TransactionRepository
-from modules.transactions.service import TransactionService
 
 
 class IncomePage(BasePage):
-    def __init__(self, page: ft.Page):
+    def __init__(self, page: ft.Page, ctrl):
+        self._ctrl = ctrl
         super().__init__(page, "Доходы")
 
     def build_body(self):
         period = self._current_period_label()
-        salary = self._get_salary()
-
-        with get_connection() as con:
-            repo = TransactionRepository(con)
-            service = TransactionService(repo)
-            incomes_all = service.get_transactions(self._user_id, type_="income")
+        salary = self._ctrl.get_salary()
+        incomes_all = self._ctrl.get_transactions()
         monthly_incomes = [t for t in incomes_all if self._is_current_month(t['date'])]
         additional = [t for t in monthly_incomes if not t['is_recurring']]
         month_total = sum(t['amount'] for t in monthly_incomes)
@@ -50,14 +42,6 @@ class IncomePage(BasePage):
                 on_click=self._open_add_dialog,
             ),
         ], spacing=16)
-
-    def _get_salary(self):
-        with get_connection() as conn:
-            repo = TransactionRepository(conn)
-            service = TransactionService(repo)
-            salaries = service.get_transactions(self._user_id, type_='income')
-        recurring = [t for t in salaries if t['is_recurring']]
-        return recurring[0] if recurring else None
 
     def _salary_card(self, salary):
         amount_text = f"{salary['amount']:,.0f} ₽" if salary else "Не указана"
@@ -125,10 +109,7 @@ class IncomePage(BasePage):
 
         def on_confirm(e):
             try:
-                with get_connection() as conn:
-                    repo = TransactionRepository(conn)
-                    service = TransactionService(repo)
-                    service.delete_transaction(transaction_id)
+                self._ctrl.delete_transaction(transaction_id)
                 self.refresh()
             finally:
                 _close_dialog(self.page_ref, dlg)
@@ -141,14 +122,13 @@ class IncomePage(BasePage):
         _show_dialog(self.page_ref, dlg)
 
     def _open_salary_dialog(self, e):
+        cats = self._ctrl.get_categories()
+        salary_cat = next((c for c in cats if c.name == 'Зарплата'), cats[0] if cats else None)
+
         amount_field = ft.TextField(label="Сумма зарплаты", keyboard_type=ft.KeyboardType.NUMBER,
                                     border_color="#6C63FF", max_length=10)
-        date_field = ft.TextField(label="Дата", value=str(date.today().strftime("%d.%m.%Y")), border_color="#6C63FF")
-        with get_connection() as conn:
-            repo = CategoryRepository(conn)
-            service = CategoryService(repo)
-            cats = service.get_all(type_='income')
-        salary_cat = next((c for c in cats if c.name == 'Зарплата'), cats[0] if cats else None)
+        date_field = ft.TextField(label="Дата", value=date.today().strftime("%d.%m.%Y"),
+                                  border_color="#6C63FF")
 
         dlg = ft.AlertDialog(modal=True, title=ft.Text("Указать зарплату"))
 
@@ -168,7 +148,7 @@ class IncomePage(BasePage):
                     if amount <= 0:
                         amount_field.error = "Сумма должна быть больше нуля"
                 except ValueError:
-                    amount_field.error = "Введите целое число"
+                    amount_field.error = "Введите число, например: 50000"
 
             parsed_date = None
             try:
@@ -181,25 +161,17 @@ class IncomePage(BasePage):
                 date_field.update()
                 return
 
-            existing = self._get_salary()
+            existing = self._ctrl.get_salary()
             if existing:
-                with get_connection() as conn:
-                    repo = TransactionRepository(conn)
-                    service = TransactionService(repo)
-                    service.update_transaction(existing['id'], amount, str(parsed_date))
+                self._ctrl.update_transaction(existing['id'], amount, str(parsed_date))
             else:
-                with get_connection() as conn:
-                    repo = TransactionRepository(conn)
-                    service = TransactionService(repo)
-                    service.add_transaction(
-                        user_id=self._user_id,
-                        type_='income',
-                        amount=amount,
-                        category_id=salary_cat.id,
-                        description="Зарплата",
-                        date=str(parsed_date),
-                        is_recurring=1,
-                    )
+                self._ctrl.add_transaction(
+                    amount=amount,
+                    category_id=salary_cat.id,
+                    description="Зарплата",
+                    date=str(parsed_date),
+                    is_recurring=1,
+                )
             self.rebuild()
             pages = self.page_ref.data.get("pages", {})
             if 0 in pages:
@@ -207,7 +179,6 @@ class IncomePage(BasePage):
             _close_dialog(self.page_ref, dlg)
             self.page_ref.show_dialog(ft.SnackBar(ft.Text("Зарплата сохранена")))
             self.page_ref.update()
-
 
         dlg.content = ft.Column([amount_field, date_field], tight=True, spacing=12)
         dlg.actions = [
@@ -217,11 +188,7 @@ class IncomePage(BasePage):
         _show_dialog(self.page_ref, dlg)
 
     def _open_add_dialog(self, e):
-        with get_connection() as conn:
-            repo = CategoryRepository(conn)
-            service = CategoryService(repo)
-            cats = service.get_all(type_='income')
-
+        cats = self._ctrl.get_categories()
         category_dd = ft.Dropdown(
             label="Категория", border_color="#6C63FF",
             options=[ft.dropdown.Option(str(c.id), c.name) for c in cats],
@@ -229,7 +196,8 @@ class IncomePage(BasePage):
         amount_field = ft.TextField(label="Сумма", keyboard_type=ft.KeyboardType.NUMBER,
                                     border_color="#6C63FF", max_length=10)
         desc_field = ft.TextField(label="Описание (необязательно)", border_color="#6C63FF")
-        date_field = ft.TextField(label="Дата", value=str(date.today().strftime("%d.%m.%Y")), border_color="#6C63FF")
+        date_field = ft.TextField(label="Дата", value=date.today().strftime("%d.%m.%Y"),
+                                  border_color="#6C63FF")
 
         dlg = ft.AlertDialog(modal=True, title=ft.Text("Добавить доход"))
 
@@ -253,7 +221,7 @@ class IncomePage(BasePage):
                     if amount <= 0:
                         amount_field.error = "Сумма должна быть больше нуля"
                 except ValueError:
-                    amount_field.error = "Введите целое число"
+                    amount_field.error = "Введите число, например: 1000"
 
             parsed_date = None
             try:
@@ -267,17 +235,12 @@ class IncomePage(BasePage):
                 date_field.update()
                 return
 
-            with get_connection() as conn:
-                repo = TransactionRepository(conn)
-                service = TransactionService(repo)
-                service.add_transaction(
-                    user_id=self._user_id,
-                    type_='income',
-                    amount=amount,
-                    category_id=int(category_dd.value),
-                    description=desc_field.value or None,
-                    date=str(parsed_date),
-                )
+            self._ctrl.add_transaction(
+                amount=amount,
+                category_id=int(category_dd.value),
+                description=desc_field.value or None,
+                date=str(parsed_date),
+            )
             self.rebuild()
             pages = self.page_ref.data.get("pages", {})
             if 0 in pages:
@@ -285,6 +248,7 @@ class IncomePage(BasePage):
             _close_dialog(self.page_ref, dlg)
             self.page_ref.show_dialog(ft.SnackBar(ft.Text("Доход добавлен")))
             self.page_ref.update()
+
         dlg.content = ft.Column(
             [category_dd, amount_field, desc_field, date_field],
             tight=True, spacing=12,
