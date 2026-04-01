@@ -3,5 +3,9 @@ __pycache__/
 *.pyc
 .env
 *.db
-.DS_Store
 build/
+.DS_Store
+**/.DS_Store
+.pptx
+.md
+.vscode/

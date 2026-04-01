@@ -6,7 +6,7 @@ from .goals import GoalsPage
 from .subscriptions import SubscriptionsPage
 from .analytics import AnalyticsPage
 from .settings import SettingsPage
-
+from .auth import AuthPage
 
 __all__ = [
     "HomePage",
@@ -17,5 +17,5 @@ __all__ = [
     "SubscriptionsPage",
     "AnalyticsPage",
     "SettingsPage",
-    "TransactionsPage",
+    "AuthPage",
 ]

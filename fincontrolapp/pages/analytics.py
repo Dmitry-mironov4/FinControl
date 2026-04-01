@@ -25,6 +25,7 @@ analytics.py — Экран аналитики финансов.
     COL_W    (int): суммарная ширина одной колонки (BAR_W * 2 + BAR_GAP).
 """
 import flet as ft
+import os
 from components.base_page import BasePage
 
 
@@ -55,6 +56,26 @@ COL_W     = BAR_W * 2 + BAR_GAP   # ширина одной колонки (па
 # ─────────────────────────────────────────────────────────────────────────────
 
 
+def _find_graph_asset_src() -> str | None:
+    """Возвращает относительный путь до SVG с графиками, если он есть в assets."""
+    candidates = [
+        "analytics/graphs.svg",
+        "analytics/graph.svg",
+        "home/graphs.svg",
+        "home/graph.svg",
+        "graphs.svg",
+        "graph.svg",
+    ]
+    assets_root = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets")
+    for src in candidates:
+        if os.path.exists(os.path.join(assets_root, src)):
+            return src
+    return None
+
+
+GRAPH_ASSET_SRC = _find_graph_asset_src()
+
+
 def _title(text):
     return ft.Text(text, size=16, weight=ft.FontWeight.W_600, color="#FFFFFF")
 
@@ -76,15 +97,34 @@ class AnalyticsPage(BasePage):
         Возвращает:
             ft.Column: прокручиваемая колонка со всеми блоками.
         """
-        return ft.Column([
-            self._summary(),
+        controls = [self._summary()]
+
+        # Если в assets добавлен SVG-макет графиков, показываем его отдельным блоком.
+        if GRAPH_ASSET_SRC:
+            controls.extend([
+                _title("Графики (SVG макет)"),
+                _card(self._svg_graphs()),
+            ])
+
+        controls.extend([
             _title("Доходы и расходы по месяцам"),
             _card(self._bar_chart()),
             _title("Динамика баланса"),
             _card(self._balance_chart()),
             _title("Структура расходов"),
             _card(self._category_bars()),
-        ], spacing=16)
+        ])
+        return ft.Column(controls, spacing=16)
+
+    def _svg_graphs(self):
+        return ft.Container(
+            height=220,
+            content=ft.Image(
+                src=GRAPH_ASSET_SRC,
+                fit=ft.ImageFit.CONTAIN,
+                expand=True,
+            ),
+        )
 
     # ── Сводные плашки ────────────────────────────────────────────────────────
     def _summary(self):
