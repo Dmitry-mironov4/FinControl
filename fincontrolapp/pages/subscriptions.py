@@ -2,19 +2,18 @@ import flet as ft
 from datetime import date
 from components.base_page import BasePage
 from components.dialogs import show_dialog as _show_dialog, close_dialog as _close_dialog
-from db_queries import (get_subscriptions, get_subscriptions_monthly_total,
-                        add_subscription, delete_subscription, get_next_charge_date)
 
 MONTH_SHORT = ["янв", "фев", "мар", "апр", "май", "июн",
                "июл", "авг", "сен", "окт", "ноя", "дек"]
 
 class SubscriptionsPage(BasePage):
-    def __init__(self, page: ft.Page):
+    def __init__(self, page: ft.Page, ctrl):
+        self._ctrl = ctrl
         super().__init__(page, "Подписки")
 
     def build_body(self):
-        subscriptions = get_subscriptions(self._user_id)
-        monthly_total = get_subscriptions_monthly_total(self._user_id)
+        subscriptions = self._ctrl.get_subscriptions()
+        monthly_total = self._ctrl.get_monthly_total()
 
         return ft.Column([
             ft.Container(
@@ -44,7 +43,7 @@ class SubscriptionsPage(BasePage):
         rows = []
         for s in subscriptions:
             period_label = "в месяц" if s['period'] == 'monthly' else "в год"
-            next_date = get_next_charge_date(s['charge_day'], s['period'], s['start_date'])
+            next_date = self._ctrl.calc_next_charge_date(s['charge_day'], s['period'], s['start_date'])
             next_label = f"{next_date.day} {MONTH_SHORT[next_date.month - 1]}."
 
             rows.append(ft.Container(
@@ -93,7 +92,7 @@ class SubscriptionsPage(BasePage):
 
         def on_confirm(e):
             try:
-                delete_subscription(subscription_id)
+                self._ctrl.delete_subscription(subscription_id)
                 self.refresh()
             finally:
                 _close_dialog(self.page_ref, dlg)
@@ -128,28 +127,67 @@ class SubscriptionsPage(BasePage):
             _close_dialog(self.page_ref, dlg)
 
         def on_submit(e):
+            # сброс ошибок
+            name_field.error = None
+            amount_field.error = None
+            day_field.error = None
+            start_field.error = None
+
+            # 1. Название — не пустое и не только пробелы
+            name = name_field.value.strip() if name_field.value else ""
+            if not name:
+                name_field.error = "Введите название"
+
+            # 2. Сумма — число и больше нуля
+            amount = None
+            if not amount_field.value:
+                amount_field.error = "Введите сумму"
+            else:
+                try:
+                    amount = float(amount_field.value.replace(",", "."))
+                    if amount <= 0:
+                        amount_field.error = "Сумма должна быть больше нуля"
+                except ValueError:
+                    amount_field.error = "Введите число, например: 299.99"
+
+            # 3. День списания — целое число от 1 до 31
+            charge_day = None
+            if not day_field.value:
+                day_field.error = "Введите день списания"
+            else:
+                try:
+                    charge_day = int(day_field.value)
+                    if not 1 <= charge_day <= 31:
+                        day_field.error = "День должен быть от 1 до 31"
+                except ValueError:
+                    day_field.error = "Введите целое число"
+
+            # 4. Дата начала — формат ГГГГ-ММ-ДД
+            start_date = start_field.value or str(date.today())
             try:
-                if not name_field.value or not amount_field.value or not day_field.value:
-                    return
-                amount = float(amount_field.value.replace(",", "."))
-                charge_day = int(day_field.value)
-                if not 1 <= charge_day <= 31:
-                    return
-                add_subscription(
-                    user_id=self._user_id,
-                    name=name_field.value,
-                    amount=amount,
-                    charge_day=charge_day,
-                    period=period_dd.value,
-                    start_date=start_field.value or str(date.today()),
-                )
-                self.refresh()
-                self.page_ref.snack_bar = ft.SnackBar(ft.Text("Подписка добавлена"), open=True)
-                self.page_ref.update()
+                date.fromisoformat(start_date)
             except ValueError:
+                start_field.error = "Формат даты: ГГГГ-ММ-ДД"
+
+            # если есть хоть одна ошибка — показываем и не сохраняем
+            if any(f.error for f in (name_field, amount_field, day_field, start_field)):
+                name_field.update()
+                amount_field.update()
+                day_field.update()
+                start_field.update()
                 return
-            finally:
-                _close_dialog(self.page_ref, dlg)
+
+            self._ctrl.add_subscription(
+                name=name,
+                amount=amount,
+                charge_day=charge_day,
+                period=period_dd.value,
+                start_date=start_date,
+            )
+            _close_dialog(self.page_ref, dlg)
+            self.refresh()
+            self.page_ref.snack_bar = ft.SnackBar(ft.Text("Подписка добавлена"), open=True)
+            self.page_ref.update()
 
         dlg.content = ft.Column(
             [name_field, amount_field, start_field, day_field, period_dd],

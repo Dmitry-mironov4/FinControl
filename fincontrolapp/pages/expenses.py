@@ -207,32 +207,54 @@ class ExpensesPage(BasePage):
             _close_dialog(self.page_ref, dlg)
 
         def on_submit(e):
+            category_dd.error = None
+            amount_field.error = None
+            date_field.error = None
+
+            if not category_dd.value:
+                category_dd.error = "Выберите категорию"
+
+            amount = None
+            if not amount_field.value:
+                amount_field.error = "Введите сумму"
+            else:
+                try:
+                    amount = parse_amount(amount_field.value)
+                    if amount <= 0:
+                        amount_field.error = "Сумма должна быть больше нуля"
+                except ValueError:
+                    amount_field.error = "Введите целое число"
+
+            parsed_date = None
             try:
-                if not amount_field.value or not category_dd.value:
-                    return
-                amount = parse_amount(amount_field.value)
                 parsed_date = parse_date(date_field.value)
-                with get_connection() as con:
-                    repo = TransactionRepository(con)
-                    service = TransactionService(repo)
-                    service.add_transaction(
-                        user_id=self._user_id,
-                        type_='expense',
-                        amount=amount,
-                        category_id=int(category_dd.value),
-                        description=desc_field.value or None,
-                        date=str(parsed_date),
-                    )
-                self.rebuild()
-                pages = self.page_ref.data.get("pages", {})
-                if 0 in pages:
-                    pages[0].rebuild()
-                _close_dialog(self.page_ref, dlg)
-                self.page_ref.show_dialog(ft.SnackBar(ft.Text("Расход добавлен")))
-                self.page_ref.update()
-            except ValueError as e:
-                _close_dialog(self.page_ref, dlg)
-                self.page_ref.show_dialog(ft.SnackBar(ft.Text(str(e))))
+            except ValueError:
+                date_field.error = "Формат даты: ДД.ММ.ГГГГ"
+
+            if any(f.error for f in (category_dd, amount_field, date_field)):
+                category_dd.update()
+                amount_field.update()
+                date_field.update()
+                return
+
+            with get_connection() as con:
+                repo = TransactionRepository(con)
+                service = TransactionService(repo)
+                service.add_transaction(
+                    user_id=self._user_id,
+                    type_='expense',
+                    amount=amount,
+                    category_id=int(category_dd.value),
+                    description=desc_field.value or None,
+                    date=str(parsed_date),
+                )
+            self.rebuild()
+            pages = self.page_ref.data.get("pages", {})
+            if 0 in pages:
+                pages[0].rebuild()
+            _close_dialog(self.page_ref, dlg)
+            self.page_ref.show_dialog(ft.SnackBar(ft.Text("Расход добавлен")))
+            self.page_ref.update()
         dlg.content = ft.Column(
             [category_dd, amount_field, desc_field, date_field],
             tight=True, spacing=12,

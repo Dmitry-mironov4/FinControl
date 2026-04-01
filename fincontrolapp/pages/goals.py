@@ -128,20 +128,42 @@ class GoalsPage(BasePage):
             _close_dialog(self.page_ref, dlg)
 
         def on_submit(e):
-            try:
-                if not name_field.value or not amount_field.value:
-                    return
-                amount = float(amount_field.value.replace(",", "."))
-                self._ctrl.add_goal(
-                    name=name_field.value,
-                    target_amount=amount,
-                    deadline=deadline_field.value or None,
-                )
-                self.refresh()
-            except ValueError:
+            name_field.error = None
+            amount_field.error = None
+            deadline_field.error = None
+
+            name = name_field.value.strip() if name_field.value else ""
+            if not name:
+                name_field.error = "Введите название цели"
+
+            amount = None
+            if not amount_field.value:
+                amount_field.error = "Введите сумму"
+            else:
+                try:
+                    amount = float(amount_field.value.replace(",", "."))
+                    if amount <= 0:
+                        amount_field.error = "Сумма должна быть больше нуля"
+                except ValueError:
+                    amount_field.error = "Введите число, например: 10000"
+
+            deadline = deadline_field.value.strip() if deadline_field.value else None
+            if deadline:
+                try:
+                    from datetime import date as _date
+                    _date.fromisoformat(deadline)
+                except ValueError:
+                    deadline_field.error = "Формат даты: ГГГГ-ММ-ДД"
+
+            if any(f.error for f in (name_field, amount_field, deadline_field)):
+                name_field.update()
+                amount_field.update()
+                deadline_field.update()
                 return
-            finally:
-                _close_dialog(self.page_ref, dlg)
+
+            self._ctrl.add_goal(name=name, target_amount=amount, deadline=deadline)
+            _close_dialog(self.page_ref, dlg)
+            self.refresh()
 
         dlg.content = ft.Column([name_field, amount_field, deadline_field], tight=True, spacing=12)
         dlg.actions = [
@@ -168,23 +190,33 @@ class GoalsPage(BasePage):
             _close_dialog(self.page_ref, dlg)
 
         def on_submit(e):
-            try:
-                if not amount_field.value:
-                    return
-                amount = float(amount_field.value.replace(",", "."))
-                self._ctrl.deposit(goal_id, amount)
-                self.rebuild()
-                pages = self.page_ref.data.get("pages", {})
-                if 0 in pages:
-                    pages[0].rebuild()
-                self.page_ref.snack_bar = ft.SnackBar(
-                    ft.Text(f"Пополнено на {amount:,.0f} ₽"), open=True
-                )
-                self.page_ref.update()
-            except ValueError:
+            amount_field.error = None
+
+            amount = None
+            if not amount_field.value:
+                amount_field.error = "Введите сумму"
+            else:
+                try:
+                    amount = float(amount_field.value.replace(",", "."))
+                    if amount <= 0:
+                        amount_field.error = "Сумма должна быть больше нуля"
+                except ValueError:
+                    amount_field.error = "Введите число, например: 5000"
+
+            if amount_field.error:
+                amount_field.update()
                 return
-            finally:
-                _close_dialog(self.page_ref, dlg)
+
+            self._ctrl.deposit(goal_id, amount)
+            _close_dialog(self.page_ref, dlg)
+            self.rebuild()
+            pages = self.page_ref.data.get("pages", {})
+            if 0 in pages:
+                pages[0].rebuild()
+            self.page_ref.snack_bar = ft.SnackBar(
+                ft.Text(f"Пополнено на {amount:,.0f} ₽"), open=True
+            )
+            self.page_ref.update()
 
         dlg.actions = [
             ft.TextButton("Отмена", on_click=on_cancel),

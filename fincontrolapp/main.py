@@ -4,7 +4,7 @@ import flet as ft
 from pages import HomePage, TransactionsPage, GoalsPage, SettingsPage, SubscriptionsPage, IncomePage, ExpensesPage
 from pages.auth import AuthPage
 from components import AppTheme
-from controllers import HomeController, GoalsController
+from controllers import HomeController, GoalsController, SubscriptionsController
 from database import create_tables, get_connection
 from components import show_dialog, close_dialog, build_nav
 
@@ -195,7 +195,7 @@ def main(page: ft.Page):
             1: TransactionsPage(page),
             2: GoalsPage(page, GoalsController(page.data["user_id"])),
             3: SettingsPage(page),
-            4: SubscriptionsPage(page),
+            4: SubscriptionsPage(page, SubscriptionsController(page.data["user_id"])),
             5: IncomePage(page),
             6: ExpensesPage(page),
         }
