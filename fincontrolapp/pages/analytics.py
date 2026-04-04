@@ -11,7 +11,7 @@ analytics.py — Экран аналитики финансов.
 get_expense_categories() и get_balance_over_time().
 """
 import flet as ft
-from flet_charts import BarChart, BarChartGroup, BarChartRod, LineChart, LineChartData, ChartPointLine
+from flet_charts import BarChart, BarChartGroup, BarChartRod, LineChart, LineChartData, ChartPointLine, ChartGridLines
 from flet_charts import ChartAxis, ChartAxisLabel
 import os
 from components.base_page import BasePage
@@ -287,7 +287,7 @@ class AnalyticsPage(BasePage):
             bar_groups=bar_groups,
             bottom_axis=bottom_axis,
             left_axis=left_axis,
-            horizontal_grid_lines=ft.charts.ChartGridLines(color="#2A2A36"),
+            horizontal_grid_lines=ChartGridLines(color="#2A2A36"),
         )
 
         # Легенда (как в старом дизайне)
@@ -348,7 +348,7 @@ class AnalyticsPage(BasePage):
             data_series=[line_series],
             bottom_axis=bottom_axis,
             left_axis=left_axis,
-            horizontal_grid_lines=ft.charts.ChartGridLines(color="#2A2A36"),
+            horizontal_grid_lines=ChartGridLines(color="#2A2A36"),
         )
         return chart
 
