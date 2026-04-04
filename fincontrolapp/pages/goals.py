@@ -349,7 +349,6 @@ class GoalsPage(BasePage):
         )
         amount_field = ft.TextField(
             label="Целевая сумма",
-            keyboard_type=ft.KeyboardType.NUMBER,
             border_color="#6976EB",
             text_style=ft.TextStyle(font_family="Montserrat SemiBold", size=15),
             error_style=error_style,
@@ -460,11 +459,16 @@ class GoalsPage(BasePage):
                 tight=True,
                 spacing=16,
                 controls=[
-                    ft.Text(
-                        "Новая цель",
-                        color="#000000",
-                        font_family="Montserrat SemiBold",
-                        size=24,
+                    ft.Row(
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        controls=[
+                            ft.Text(
+                                "Новая цель",
+                                color="#000000",
+                                font_family="Montserrat SemiBold",
+                                size=24,
+                            ),
+                        ],
                     ),
                     name_field,
                     amount_field,
@@ -510,7 +514,6 @@ class GoalsPage(BasePage):
         )
         amount_field = ft.TextField(
             label="Сумма пополнения",
-            keyboard_type=ft.KeyboardType.NUMBER,
             text_style=ft.TextStyle(
                 font_family="Montserrat SemiBold",
                 size=15,
@@ -577,11 +580,16 @@ class GoalsPage(BasePage):
                 tight=True,
                 spacing=12,
                 controls=[
-                    ft.Text(
-                        f"Пополнить: {goal_name}",
-                        color="#000000",
-                        font_family="Montserrat SemiBold",
-                        size=24,
+                    ft.Row(
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        controls=[
+                            ft.Text(
+                                f"Пополнить: {goal_name}",
+                                color="#000000",
+                                font_family="Montserrat SemiBold",
+                                size=24,
+                            ),
+                        ],
                     ),
                     ft.Text(
                         "Сумма спишется с баланса как расход «Накопления».",

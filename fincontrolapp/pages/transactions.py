@@ -2,6 +2,7 @@ import flet as ft
 import datetime
 from datetime import date
 from components.base_page import BasePage
+from components.dialogs import close_dialog as _close_dialog
 from components.form_utils import parse_amount, parse_date
 
 
@@ -76,10 +77,10 @@ class TransactionsPage(BasePage):
         page = self.page_ref
 
         def on_cancel(e):
-            page.pop_dialog()
+            _close_dialog(page, dlg)
 
         def on_confirm(e):
-            page.pop_dialog()
+            _close_dialog(page, dlg)
             try:
                 self._ctrl.delete_transaction(transaction_id)
                 self.refresh()
@@ -295,7 +296,6 @@ class TransactionsPage(BasePage):
         )
         amount_field = ft.TextField(
             label="Сумма",
-            keyboard_type=ft.KeyboardType.NUMBER,
             border_color="#6C63FF",
             error_style=error_style,
         )
@@ -413,11 +413,16 @@ class TransactionsPage(BasePage):
                 tight=True,
                 spacing=16,
                 controls=[
-                    ft.Text(
-                        "Добавить транзакцию",
-                        color="#000000",
-                        font_family="Montserrat SemiBold",
-                        size=24,
+                    ft.Row(
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        controls=[
+                            ft.Text(
+                                "Добавить транзакцию",
+                                color="#000000",
+                                font_family="Montserrat SemiBold",
+                                size=24,
+                            ),
+                        ],
                     ),
                     type_field,
                     category_dd,

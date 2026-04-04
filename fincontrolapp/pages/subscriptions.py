@@ -2,6 +2,7 @@ import flet as ft
 import datetime
 from datetime import date
 from components.base_page import BasePage
+from components.dialogs import close_dialog as _close_dialog
 
 MONTH_SHORT = ["янв", "фев", "мар", "апр", "май", "июн",
                "июл", "авг", "сен", "окт", "ноя", "дек"]
@@ -172,10 +173,10 @@ class SubscriptionsPage(BasePage):
         page = self.page_ref
 
         def on_cancel(e):
-            page.pop_dialog()
+            _close_dialog(page, dlg)
 
         def on_confirm(e):
-            page.pop_dialog()
+            _close_dialog(page, dlg)
             try:
                 self._ctrl.delete_subscription(subscription_id)
                 self.refresh()
@@ -233,13 +234,11 @@ class SubscriptionsPage(BasePage):
         )
         amount_field = ft.TextField(
             label="Сумма",
-            keyboard_type=ft.KeyboardType.NUMBER,
             border_color="#6C63FF",
             error_style=error_style,
         )
         day_field = ft.TextField(
             label="День списания (1–31)",
-            keyboard_type=ft.KeyboardType.NUMBER,
             border_color="#6C63FF",
             error_style=error_style,
         )
@@ -321,7 +320,19 @@ class SubscriptionsPage(BasePage):
         amount_field.on_change = validate_amount
         day_field.on_change = validate_day
 
-        bs = ft.BottomSheet(open=False, content=ft.Container())
+        def dismiss_bs(e=None):
+            # Убираем фокус со всех полей (закрывает клавиатуру)
+            self.page.focus_trap = None
+            for field in (name_field, amount_field, day_field, start_field):
+                field.focused = False
+                field.update()
+            self.page.update()
+
+        bs = ft.BottomSheet(
+            open=False,
+            content=ft.Container(),
+            on_dismiss=lambda e: dismiss_bs(),
+        )
 
         def on_cancel(e):
             bs.open = False
@@ -383,11 +394,16 @@ class SubscriptionsPage(BasePage):
                 tight=True,
                 spacing=16,
                 controls=[
-                    ft.Text(
-                        "Добавить подписку",
-                        color="#000000",
-                        font_family="Montserrat SemiBold",
-                        size=24,
+                    ft.Row(
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        controls=[
+                            ft.Text(
+                                "Добавить подписку",
+                                color="#000000",
+                                font_family="Montserrat SemiBold",
+                                size=24,
+                            ),
+                        ],
                     ),
                     name_field,
                     amount_field,
