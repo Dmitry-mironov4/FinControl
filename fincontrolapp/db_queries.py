@@ -1,4 +1,4 @@
-from datetime import date, timedelta
+from datetime import date
 import calendar
 from database import get_connection
 
@@ -41,6 +41,14 @@ def get_transactions(user_id, type_=None, category_id=None, limit=None):
 def delete_transaction(transaction_id):
     with get_connection() as conn:
         conn.execute('DELETE FROM transactions WHERE id = ?', (transaction_id,))
+
+
+def update_transaction(transaction_id, amount, date):
+    with get_connection() as conn:
+        conn.execute(
+            'UPDATE transactions SET amount=?, date=? WHERE id=?',
+            (amount, date, transaction_id)
+        )
 
 
 # ─── БАЛАНС (для Home) ────────────────────────────────────────────────────────

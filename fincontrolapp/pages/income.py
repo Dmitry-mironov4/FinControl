@@ -1,26 +1,23 @@
 import flet as ft
+import datetime
 from datetime import date
 from components.base_page import BasePage
-from components.dialogs import show_dialog as _show_dialog, close_dialog as _close_dialog
-from db_queries import get_transactions, add_transaction, delete_transaction, get_categories
+from components.dialogs import close_dialog as _close_dialog
+from components.form_utils import parse_amount, parse_date
 
-
-MONTH_NAMES = [
-    "январь", "февраль", "март", "апрель", "май", "июнь",
-    "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь",
-]
 
 class IncomePage(BasePage):
-    def __init__(self, page: ft.Page):
+    def __init__(self, page: ft.Page, ctrl):
+        self._ctrl = ctrl
         super().__init__(page, "Доходы")
 
     def build_body(self):
         period = self._current_period_label()
-        salary = self._get_salary()
-        incomes = get_transactions(self._user_id, type_='income')
-        monthly_incomes = [t for t in incomes if self._is_current_month(t['date'])]
-        additional = [t for t in monthly_incomes if not t['is_recurring']]
-        month_total = sum(t['amount'] for t in monthly_incomes)
+        salary = self._ctrl.get_salary()
+        incomes_all = self._ctrl.get_transactions()
+        monthly_incomes = [t for t in incomes_all if self._is_current_month(t["date"])]
+        additional = [t for t in monthly_incomes if not t["is_recurring"]]
+        month_total = sum(t["amount"] for t in monthly_incomes)
 
         return ft.Column([
             self._salary_card(salary),
@@ -37,31 +34,31 @@ class IncomePage(BasePage):
                     alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                 ),
             ),
-            ft.Text("Дополнительные доходы", size=16, weight=ft.FontWeight.W_600, color="#1A1A24"),
+            ft.Text("Дополнительные доходы", size=16,
+                    weight=ft.FontWeight.W_600, color="#1A1A24"),
             self._income_list(additional),
-            ft.ElevatedButton(
-                "＋ Добавить доход",
-                style=ft.ButtonStyle(bgcolor="#4CAF50", color="#FFFFFF"),
-                width=float("inf"),
-                on_click=self._open_add_dialog,
+            ft.GestureDetector(
+                on_tap=self._open_add_dialog,
+                content=ft.Container(
+                    width=float("inf"),
+                    height=48,
+                    border_radius=12,
+                    gradient=ft.RadialGradient(
+                        colors=["#ffffff", "#4CAF50"],
+                        center=ft.Alignment(0, -0.2),
+                        radius=4.0,
+                        stops=[0.0, 0.8],
+                    ),
+                    alignment=ft.Alignment(0, 0),
+                    content=ft.Text(
+                        "＋ Добавить доход",
+                        color=ft.Colors.BLACK,
+                        font_family="Montserrat SemiBold",
+                        size=16,
+                    ),
+                ),
             ),
         ], spacing=16)
-
-    def _is_current_month(self, value):
-        if not value:
-            return False
-        dt = str(value)
-        month_key = date.today().strftime("%Y-%m")
-        return dt.startswith(month_key)
-
-    def _current_period_label(self):
-        today = date.today()
-        return f"{MONTH_NAMES[today.month - 1]} {today.year}"
-
-    def _get_salary(self):
-        salaries = get_transactions(self._user_id, type_='income')
-        recurring = [t for t in salaries if t['is_recurring']]
-        return recurring[0] if recurring else None
 
     def _salary_card(self, salary):
         amount_text = f"{salary['amount']:,.0f} ₽" if salary else "Не указана"
@@ -69,7 +66,8 @@ class IncomePage(BasePage):
             bgcolor="#1A1A24", border_radius=16, padding=16,
             content=ft.Column([
                 ft.Text("Основная зарплата", size=14, color="#888888"),
-                ft.Text(amount_text, size=24, weight=ft.FontWeight.BOLD, color="#4CAF50"),
+                ft.Text(amount_text, size=24,
+                        weight=ft.FontWeight.BOLD, color="#4CAF50"),
                 ft.ElevatedButton(
                     "Указать зарплату" if not salary else "Изменить зарплату",
                     icon=ft.Icons.EDIT,
@@ -88,32 +86,102 @@ class IncomePage(BasePage):
 
         rows = []
         for t in incomes:
-            rows.append(ft.Container(
-                padding=ft.padding.symmetric(vertical=10),
-                border=ft.Border(bottom=ft.BorderSide(1, "#2A2A35")),
+            delete_bg = ft.Container(
+                border_radius=8,
+                padding=ft.Padding.only(right=16),
+                alignment=ft.Alignment(1, 0),
+                bgcolor="#F4433622",
+                content=ft.Row(
+                    alignment=ft.MainAxisAlignment.END,
+                    controls=[
+                        ft.Icon(ft.Icons.DELETE_OUTLINE, color="#F44336", size=22),
+                        ft.Text("Удалить", color="#F44336", size=13),
+                    ],
+                    spacing=4,
+                ),
+                visible=False,
+            )
+
+            row_content = ft.Container(
+                padding=ft.Padding.symmetric(vertical=10),
+                bgcolor="#1A1A24",
                 content=ft.Row(
                     alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                     controls=[
                         ft.Column([
-                            ft.Text(t['category_name'], size=14, color="#FFFFFF",
+                            ft.Text(t["category_name"], size=14, color="#FFFFFF",
                                     weight=ft.FontWeight.W_500),
-                            ft.Text(t['description'] or t['date'], size=12, color="#888888"),
+                            ft.Text(t["description"] or t["date"],
+                                    size=12, color="#888888"),
                         ], spacing=2, expand=True),
                         ft.Row([
-                            ft.Text(f"+ {t['amount']:,.0f} ₽", color="#4CAF50",
-                                    size=14, weight=ft.FontWeight.W_600),
+                            ft.Text(
+                                f"+ {t['amount']:,.0f} ₽",
+                                color="#4CAF50", size=14,
+                                weight=ft.FontWeight.W_600,
+                            ),
+                            ft.IconButton(
+                                ft.Icons.EDIT_OUTLINED,
+                                icon_color="#555555",
+                                icon_size=18,
+                                on_click=lambda e, tr=t: self._open_edit_dialog(tr),
+                            ),
                             ft.IconButton(
                                 ft.Icons.DELETE_OUTLINE,
                                 icon_color="#555555",
                                 icon_size=18,
-                                on_click=lambda e, tid=t['id'], cat=t['category_name']: (
+                                on_click=lambda e, tid=t["id"], cat=t["category_name"]: (
                                     self._confirm_delete(tid, cat)
                                 ),
                             ),
                         ], spacing=0),
                     ],
                 ),
-            ))
+            )
+
+            stack = ft.Stack(controls=[delete_bg, row_content])
+
+            swipe = {"start_x": 0.0, "last_x": 0.0}
+
+            def on_pan_start(e, sw=swipe):
+                sw["start_x"] = e.local_position.x
+                sw["last_x"] = e.local_position.x
+
+            def on_pan_update(e, cc=row_content, db=delete_bg, sw=swipe):
+                sw["last_x"] = e.local_position.x
+                delta = e.local_position.x - sw["start_x"]
+                if delta < 0:
+                    offset_x = max(delta / 300, -0.35)
+                    cc.offset = ft.Offset(offset_x, 0)
+                    cc.update()
+                    if not db.visible:
+                        db.visible = True
+                        db.update()
+                else:
+                    cc.offset = ft.Offset(0, 0)
+                    cc.update()
+                    if db.visible:
+                        db.visible = False
+                        db.update()
+
+            def on_pan_end(e, cc=row_content, db=delete_bg, sw=swipe,
+                           tid=t["id"], cat=t["category_name"]):
+                delta = sw["last_x"] - sw["start_x"]
+                if delta < -80:
+                    self._confirm_delete(tid, cat)
+                cc.offset = ft.Offset(0, 0)
+                cc.update()
+                db.visible = False
+                db.update()
+
+            rows.append(
+                ft.GestureDetector(
+                    on_pan_start=on_pan_start,
+                    on_pan_update=on_pan_update,
+                    on_pan_end=on_pan_end,
+                    content=stack,
+                )
+            )
 
         return ft.Container(
             bgcolor="#1A1A24", border_radius=16,
@@ -122,115 +190,508 @@ class IncomePage(BasePage):
         )
 
     def _confirm_delete(self, transaction_id, category_name):
-        dlg = ft.AlertDialog(modal=True, title=ft.Text("Удалить доход?"))
+        page = self.page_ref
 
         def on_cancel(e):
-            _close_dialog(self.page_ref, dlg)
+            _close_dialog(page, dlg)
 
         def on_confirm(e):
+            _close_dialog(page, dlg)
             try:
-                delete_transaction(transaction_id)
+                self._ctrl.delete_transaction(transaction_id)
                 self.refresh()
-            finally:
-                _close_dialog(self.page_ref, dlg)
+            except Exception as ex:
+                print("delete error:", ex)
 
-        dlg.content = ft.Text(f'Доход «{category_name}» будет удалён.')
-        dlg.actions = [
-            ft.TextButton("Отмена", on_click=on_cancel),
-            ft.TextButton("Удалить", style=ft.ButtonStyle(color="#F44336"), on_click=on_confirm),
-        ]
-        _show_dialog(self.page_ref, dlg)
+        dlg = ft.AlertDialog(
+            modal=True,
+            title=ft.Text(
+                "Удалить доход?",
+                color="#000000",
+                font_family="Montserrat SemiBold",
+                size=24,
+            ),
+            content=ft.Text(
+                f"Доход «{category_name}» будет удалён.",
+                color=ft.Colors.with_opacity(0.6, "#000000"),
+                font_family="Montserrat Medium",
+                size=14,
+            ),
+            actions=[
+                ft.TextButton(
+                    "Отмена",
+                    on_click=on_cancel,
+                    style=ft.ButtonStyle(
+                        color="#483EB7",
+                        text_style=ft.TextStyle(
+                            font_family="Montserrat SemiBold", size=14),
+                    ),
+                ),
+                ft.TextButton(
+                    "Удалить",
+                    on_click=on_confirm,
+                    style=ft.ButtonStyle(
+                        color=ft.Colors.with_opacity(0.6, "#FF7E1C"),
+                        text_style=ft.TextStyle(
+                            font_family="Montserrat SemiBold", size=14),
+                    ),
+                ),
+            ],
+        )
+        page.overlay.append(dlg)
+        page.update()
+        page.show_dialog(dlg)
+
+    def _make_date_field(self, label, initial_value):
+        """Создаёт TextField с DatePicker для повторного использования."""
+        field = ft.TextField(
+            label=label,
+            value=initial_value,
+            read_only=True,
+            border_color="#6C63FF",
+            suffix_icon=ft.Icons.CALENDAR_MONTH,
+        )
+
+        def on_date_selected(e):
+            field.value = (
+                e.control.value.strftime("%d.%m.%Y")
+                if e.control.value
+                else initial_value
+            )
+            field.update()
+
+        date_picker = ft.DatePicker(
+            on_change=on_date_selected,
+            first_date=datetime.datetime(2000, 1, 1),
+            last_date=datetime.datetime(2030, 12, 31),
+        )
+        self.page.overlay.append(date_picker)
+
+        def open_date_picker(e):
+            self.page.dialog = date_picker
+            date_picker.open = True
+            self.page.update()
+
+        field.on_click = open_date_picker
+        return field
 
     def _open_salary_dialog(self, e):
-        amount_field = ft.TextField(label="Сумма зарплаты", keyboard_type=ft.KeyboardType.NUMBER,
-                                    border_color="#6C63FF", max_length=10)
-        date_field = ft.TextField(label="Дата", value=str(date.today()), border_color="#6C63FF")
-        cats = get_categories(type_='income')
-        salary_cat = next((c for c in cats if c['name'] == 'Зарплата'), cats[0] if cats else None)
+        cats = self._ctrl.get_categories()
+        salary_cat = next(
+            (c for c in cats if c.name == "Зарплата"), cats[0] if cats else None
+        )
 
-        dlg = ft.AlertDialog(modal=True, title=ft.Text("Указать зарплату"))
+        error_style = ft.TextStyle(
+            font_family="Montserrat Medium", size=10, color="#FF0000"
+        )
+
+        amount_field = ft.TextField(
+            label="Сумма зарплаты",
+            border_color="#6C63FF",
+            error_style=error_style,
+        )
+        date_field = self._make_date_field("Дата", date.today().strftime("%d.%m.%Y"))
+
+        # Валидация on_change
+        def validate_amount(e):
+            v = (amount_field.value or "").replace(",", ".")
+            if not v:
+                amount_field.error = "Введите сумму"
+            else:
+                try:
+                    amount_field.error = (
+                        None if parse_amount(amount_field.value) > 0
+                        else "Сумма должна быть больше нуля"
+                    )
+                except ValueError:
+                    amount_field.error = "Введите число, например: 50000"
+            amount_field.update()
+
+        amount_field.on_change = validate_amount
+
+        bs = ft.BottomSheet(open=False, content=ft.Container())
 
         def on_cancel(e):
-            _close_dialog(self.page_ref, dlg)
+            bs.open = False
+            self.page.update()
 
         def on_submit(e):
-            try:
-                if not amount_field.value or not salary_cat:
-                    return
-                amount = float(amount_field.value.replace(",", "."))
-                add_transaction(
-                    user_id=self._user_id,
-                    type_='income',
+            amount_field.error = None
+
+            amount = None
+            if not amount_field.value:
+                amount_field.error = "Введите сумму"
+            else:
+                try:
+                    amount = parse_amount(amount_field.value)
+                    if amount <= 0:
+                        amount_field.error = "Сумма должна быть больше нуля"
+                except ValueError:
+                    amount_field.error = "Введите число, например: 50000"
+
+            if amount_field.error:
+                amount_field.update()
+                return
+
+            parsed_date = parse_date(date_field.value)
+
+            existing = self._ctrl.get_salary()
+            if existing:
+                self._ctrl.update_transaction(
+                    existing["id"], amount,
+                    existing["category_id"], existing["description"], str(parsed_date)
+                )
+            else:
+                self._ctrl.add_transaction(
                     amount=amount,
-                    category_id=salary_cat['id'],
+                    category_id=salary_cat.id,
                     description="Зарплата",
-                    date=date_field.value,
+                    date=str(parsed_date),
                     is_recurring=1,
                 )
-                self.refresh()
-                pages = self.page_ref.data.get("pages", {})
-                if 0 in pages:
-                    pages[0].refresh()
-                self.page_ref.snack_bar = ft.SnackBar(ft.Text("Зарплата сохранена"), open=True)
-                self.page_ref.update()
-            except ValueError:
-                return
-            finally:
-                _close_dialog(self.page_ref, dlg)
+            self.rebuild()
+            pages = self.page_ref.data.get("pages", {})
+            if 0 in pages:
+                pages[0].rebuild()
+            bs.open = False
+            self.page.update()
+            self.page_ref.snack_bar = ft.SnackBar(ft.Text("Зарплата сохранена"), open=True)
+            self.page_ref.update()
 
-        dlg.content = ft.Column([amount_field, date_field], tight=True, spacing=12)
-        dlg.actions = [
-            ft.TextButton("Отмена", on_click=on_cancel),
-            ft.TextButton("Сохранить", on_click=on_submit),
-        ]
-        _show_dialog(self.page_ref, dlg)
+        bs.content = ft.Container(
+            padding=ft.Padding.only(left=20, right=20, top=24, bottom=32),
+            content=ft.Column(
+                tight=True,
+                spacing=16,
+                controls=[
+                    ft.Row(
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        controls=[
+                            ft.Text(
+                                "Указать зарплату",
+                                color="#000000",
+                                font_family="Montserrat SemiBold",
+                                size=24,
+                            ),
+                        ],
+                    ),
+                    amount_field,
+                    date_field,
+                    ft.Row(
+                        alignment=ft.MainAxisAlignment.END,
+                        controls=[
+                            ft.TextButton(
+                                "Отмена", on_click=on_cancel,
+                                style=ft.ButtonStyle(
+                                    color="#483EB7",
+                                    text_style=ft.TextStyle(
+                                        font_family="Montserrat SemiBold", size=14),
+                                ),
+                            ),
+                            ft.TextButton(
+                                "Сохранить", on_click=on_submit,
+                                style=ft.ButtonStyle(
+                                    color="#483EB7",
+                                    text_style=ft.TextStyle(
+                                        font_family="Montserrat SemiBold", size=14),
+                                ),
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+        )
+
+        self.page.overlay.append(bs)
+        bs.open = True
+        self.page.update()
 
     def _open_add_dialog(self, e):
-        cats = get_categories(type_='income')
-        category_dd = ft.Dropdown(
-            label="Категория", border_color="#6C63FF",
-            options=[ft.dropdown.Option(str(c['id']), c['name']) for c in cats],
-        )
-        amount_field = ft.TextField(label="Сумма", keyboard_type=ft.KeyboardType.NUMBER,
-                                    border_color="#6C63FF", max_length=10)
-        desc_field = ft.TextField(label="Описание (необязательно)", border_color="#6C63FF")
-        date_field = ft.TextField(label="Дата", value=str(date.today()), border_color="#6C63FF")
+        cats = self._ctrl.get_categories()
 
-        dlg = ft.AlertDialog(modal=True, title=ft.Text("Добавить доход"))
+        error_style = ft.TextStyle(
+            font_family="Montserrat Medium", size=10, color="#FF0000"
+        )
+
+        _other = next((c for c in cats if c.name == "Другое"), None)
+        category_dd = ft.Dropdown(
+            label="Категория",
+            border_color="#6C63FF",
+            options=[ft.dropdown.Option(str(c.id), c.name) for c in cats],
+            value=str(_other.id) if _other else None,
+            error_style=error_style,
+        )
+        amount_field = ft.TextField(
+            label="Сумма",
+            border_color="#6C63FF",
+            error_style=error_style,
+        )
+        desc_field = ft.TextField(
+            label="Описание (необязательно)",
+            border_color="#6C63FF",
+        )
+        date_field = self._make_date_field("Дата", date.today().strftime("%d.%m.%Y"))
+
+        # Валидация on_change
+        def validate_category(e):
+            category_dd.error = None if category_dd.value else "Выберите категорию"
+            category_dd.update()
+
+        def validate_amount(e):
+            v = (amount_field.value or "").replace(",", ".")
+            if not v:
+                amount_field.error = "Введите сумму"
+            else:
+                try:
+                    amount_field.error = (
+                        None if parse_amount(amount_field.value) > 0
+                        else "Сумма должна быть больше нуля"
+                    )
+                except ValueError:
+                    amount_field.error = "Введите число, например: 1000"
+            amount_field.update()
+
+        category_dd.on_change = validate_category
+        amount_field.on_change = validate_amount
+
+        bs = ft.BottomSheet(open=False, content=ft.Container())
 
         def on_cancel(e):
-            _close_dialog(self.page_ref, dlg)
+            bs.open = False
+            self.page.update()
 
         def on_submit(e):
-            try:
-                if not amount_field.value or not category_dd.value:
-                    return
-                amount = float(amount_field.value.replace(",", "."))
-                add_transaction(
-                    user_id=self._user_id,
-                    type_='income',
-                    amount=amount,
-                    category_id=int(category_dd.value),
-                    description=desc_field.value or None,
-                    date=date_field.value,
-                )
-                self.refresh()
-                pages = self.page_ref.data.get("pages", {})
-                if 0 in pages:
-                    pages[0].refresh()
-                self.page_ref.snack_bar = ft.SnackBar(ft.Text("Доход добавлен"), open=True)
-                self.page_ref.update()
-            except ValueError:
-                return
-            finally:
-                _close_dialog(self.page_ref, dlg)
+            category_dd.error = None
+            amount_field.error = None
 
-        dlg.content = ft.Column(
-            [category_dd, amount_field, desc_field, date_field],
-            tight=True, spacing=12,
+            if not category_dd.value:
+                category_dd.error = "Выберите категорию"
+
+            amount = None
+            if not amount_field.value:
+                amount_field.error = "Введите сумму"
+            else:
+                try:
+                    amount = parse_amount(amount_field.value)
+                    if amount <= 0:
+                        amount_field.error = "Сумма должна быть больше нуля"
+                except ValueError:
+                    amount_field.error = "Введите число, например: 1000"
+
+            if any(f.error for f in (category_dd, amount_field)):
+                category_dd.update()
+                amount_field.update()
+                return
+
+            parsed_date = parse_date(date_field.value)
+
+            self._ctrl.add_transaction(
+                amount=amount,
+                category_id=int(category_dd.value),
+                description=desc_field.value or None,
+                date=str(parsed_date),
+            )
+            self.rebuild()
+            pages = self.page_ref.data.get("pages", {})
+            if 0 in pages:
+                pages[0].rebuild()
+            bs.open = False
+            self.page.update()
+            self.page_ref.snack_bar = ft.SnackBar(ft.Text("Доход добавлен"), open=True)
+            self.page_ref.update()
+
+        bs.content = ft.Container(
+            padding=ft.Padding.only(left=20, right=20, top=24, bottom=32),
+            content=ft.Column(
+                tight=True,
+                spacing=16,
+                controls=[
+                    ft.Row(
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        controls=[
+                            ft.Text(
+                                "Добавить доход",
+                                color="#000000",
+                                font_family="Montserrat SemiBold",
+                                size=24,
+                            ),
+                        ],
+                    ),
+                    category_dd,
+                    amount_field,
+                    desc_field,
+                    date_field,
+                    ft.Row(
+                        alignment=ft.MainAxisAlignment.END,
+                        controls=[
+                            ft.TextButton(
+                                "Отмена", on_click=on_cancel,
+                                style=ft.ButtonStyle(
+                                    color="#483EB7",
+                                    text_style=ft.TextStyle(
+                                        font_family="Montserrat SemiBold", size=14),
+                                ),
+                            ),
+                            ft.TextButton(
+                                "Добавить", on_click=on_submit,
+                                style=ft.ButtonStyle(
+                                    color="#483EB7",
+                                    text_style=ft.TextStyle(
+                                        font_family="Montserrat SemiBold", size=14),
+                                ),
+                            ),
+                        ],
+                    ),
+                ],
+            ),
         )
-        dlg.actions = [
-            ft.TextButton("Отмена", on_click=on_cancel),
-            ft.TextButton("Добавить", on_click=on_submit),
-        ]
-        _show_dialog(self.page_ref, dlg)
+
+        self.page.overlay.append(bs)
+        bs.open = True
+        self.page.update()
+
+    def _open_edit_dialog(self, transaction):
+        cats = self._ctrl.get_categories()
+
+        error_style = ft.TextStyle(
+            font_family="Montserrat Medium", size=10, color="#FF0000"
+        )
+
+        category_dd = ft.Dropdown(
+            label="Категория",
+            border_color="#6C63FF",
+            options=[ft.dropdown.Option(str(c.id), c.name) for c in cats],
+            value=str(transaction["category_id"]),
+            error_style=error_style,
+        )
+        amount_field = ft.TextField(
+            label="Сумма",
+            value=str(int(transaction["amount"]) if transaction["amount"] == int(transaction["amount"]) else transaction["amount"]),
+            border_color="#6C63FF",
+            error_style=error_style,
+        )
+        desc_field = ft.TextField(
+            label="Описание (необязательно)",
+            value=transaction["description"] or "",
+            border_color="#6C63FF",
+        )
+        date_field = self._make_date_field(
+            "Дата",
+            datetime.datetime.strptime(transaction["date"], "%Y-%m-%d").strftime("%d.%m.%Y"),
+        )
+
+        def validate_category(e):
+            category_dd.error = None if category_dd.value else "Выберите категорию"
+            category_dd.update()
+
+        def validate_amount(e):
+            v = (amount_field.value or "").replace(",", ".")
+            if not v:
+                amount_field.error = "Введите сумму"
+            else:
+                try:
+                    amount_field.error = (
+                        None if parse_amount(amount_field.value) > 0
+                        else "Сумма должна быть больше нуля"
+                    )
+                except ValueError:
+                    amount_field.error = "Введите число, например: 1000"
+            amount_field.update()
+
+        category_dd.on_change = validate_category
+        amount_field.on_change = validate_amount
+
+        bs = ft.BottomSheet(open=False, content=ft.Container())
+
+        def on_cancel(e):
+            bs.open = False
+            self.page.update()
+
+        def on_submit(e):
+            category_dd.error = None
+            amount_field.error = None
+
+            if not category_dd.value:
+                category_dd.error = "Выберите категорию"
+
+            amount = None
+            if not amount_field.value:
+                amount_field.error = "Введите сумму"
+            else:
+                try:
+                    amount = parse_amount(amount_field.value)
+                    if amount <= 0:
+                        amount_field.error = "Сумма должна быть больше нуля"
+                except ValueError:
+                    amount_field.error = "Введите число, например: 1000"
+
+            if any(f.error for f in (category_dd, amount_field)):
+                category_dd.update()
+                amount_field.update()
+                return
+
+            parsed_date = parse_date(date_field.value)
+
+            self._ctrl.update_transaction(
+                transaction_id=transaction["id"],
+                amount=amount,
+                category_id=int(category_dd.value),
+                description=desc_field.value or None,
+                date=str(parsed_date),
+            )
+            self.rebuild()
+            pages = self.page_ref.data.get("pages", {})
+            if 0 in pages:
+                pages[0].rebuild()
+            bs.open = False
+            self.page.update()
+
+        bs.content = ft.Container(
+            padding=ft.Padding.only(left=20, right=20, top=24, bottom=32),
+            content=ft.Column(
+                tight=True,
+                spacing=16,
+                controls=[
+                    ft.Row(
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        controls=[
+                            ft.Text(
+                                "Редактировать доход",
+                                color="#000000",
+                                font_family="Montserrat SemiBold",
+                                size=24,
+                            ),
+                        ],
+                    ),
+                    category_dd,
+                    amount_field,
+                    desc_field,
+                    date_field,
+                    ft.Row(
+                        alignment=ft.MainAxisAlignment.END,
+                        controls=[
+                            ft.TextButton(
+                                "Отмена", on_click=on_cancel,
+                                style=ft.ButtonStyle(
+                                    color="#483EB7",
+                                    text_style=ft.TextStyle(
+                                        font_family="Montserrat SemiBold", size=14),
+                                ),
+                            ),
+                            ft.TextButton(
+                                "Сохранить", on_click=on_submit,
+                                style=ft.ButtonStyle(
+                                    color="#483EB7",
+                                    text_style=ft.TextStyle(
+                                        font_family="Montserrat SemiBold", size=14),
+                                ),
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+        )
+
+        self.page.overlay.append(bs)
+        bs.open = True
+        self.page.update()

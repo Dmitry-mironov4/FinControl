@@ -4,7 +4,8 @@ from components.dialogs import show_dialog as _show_dialog, close_dialog as _clo
 
 
 class SettingsPage(BasePage):
-    def __init__(self, page: ft.Page):
+    def __init__(self, page: ft.Page, ctrl):
+        self._ctrl = ctrl
         super().__init__(page, "Настройки")
 
     def build_body(self):
@@ -39,13 +40,7 @@ class SettingsPage(BasePage):
         ], spacing=8)
 
     def _open_profile_dialog(self, e):
-        from database import get_connection
-        user_id = self._user_id
-        with get_connection() as conn:
-            user = conn.execute(
-                "SELECT username, email, phone FROM users WHERE id=?", (user_id,)
-            ).fetchone()
-
+        user = self._ctrl.get_user()
         username_field = ft.TextField(
             label="Имя пользователя",
             value=user["username"] or "" if user else "",
@@ -59,15 +54,10 @@ class SettingsPage(BasePage):
             _close_dialog(self.page_ref, dlg)
 
         def on_submit(e):
-            try:
-                from database import get_connection as gc
-                with gc() as conn:
-                    conn.execute("UPDATE users SET username=? WHERE id=?",
-                                 (username_field.value.strip() or None, user_id))
-                self.page_ref.snack_bar = ft.SnackBar(ft.Text("Имя сохранено ✓"), open=True)
-                self.page_ref.update()
-            finally:
-                _close_dialog(self.page_ref, dlg)
+            self._ctrl.update_username(username_field.value.strip() or None)
+            _close_dialog(self.page_ref, dlg)
+            self.page_ref.snack_bar = ft.SnackBar(ft.Text("Имя сохранено ✓"), open=True)
+            self.page_ref.update()
 
         dlg.content = ft.Column([
             ft.Text(contact_hint, size=12, color="#888888") if contact_hint else ft.Container(),
@@ -88,13 +78,11 @@ class SettingsPage(BasePage):
             _close_dialog(self.page_ref, dlg)
 
         def on_submit(e):
-            try:
-                self.page_ref.data["_s_notifications"] = switch.value
-                msg = "Уведомления включены ✓" if switch.value else "Уведомления выключены"
-                self.page_ref.snack_bar = ft.SnackBar(ft.Text(msg), open=True)
-                self.page_ref.update()
-            finally:
-                _close_dialog(self.page_ref, dlg)
+            self.page_ref.data["_s_notifications"] = switch.value
+            msg = "Уведомления включены ✓" if switch.value else "Уведомления выключены"
+            _close_dialog(self.page_ref, dlg)
+            self.page_ref.snack_bar = ft.SnackBar(ft.Text(msg), open=True)
+            self.page_ref.update()
 
         dlg.content = ft.Column([
             ft.Text("Push-уведомления работают после сборки на устройстве.",
@@ -126,12 +114,10 @@ class SettingsPage(BasePage):
             _close_dialog(self.page_ref, dlg)
 
         def on_submit(e):
-            try:
-                self.page_ref.data["_s_currency"] = dd.value
-                self.page_ref.snack_bar = ft.SnackBar(ft.Text("Валюта сохранена ✓"), open=True)
-                self.page_ref.update()
-            finally:
-                _close_dialog(self.page_ref, dlg)
+            self.page_ref.data["_s_currency"] = dd.value
+            _close_dialog(self.page_ref, dlg)
+            self.page_ref.snack_bar = ft.SnackBar(ft.Text("Валюта сохранена ✓"), open=True)
+            self.page_ref.update()
 
         dlg.content = ft.Column([dd], tight=True)
         dlg.actions = [
@@ -143,8 +129,7 @@ class SettingsPage(BasePage):
     def _open_telegram_dialog(self, e):
         import webbrowser
         bot_username = "FinControlBot"
-        user_id = self._user_id
-        deep_link = f"https://t.me/f1nc0ntr0l_bot#"
+        deep_link = "https://t.me/f1nc0ntr0l_bot#"
         dlg = ft.AlertDialog(modal=True, title=ft.Text("Telegram-бот"))
 
         def on_cancel(e):
@@ -180,11 +165,7 @@ class SettingsPage(BasePage):
 
         def on_confirm(e):
             try:
-                from database import get_connection
-                with get_connection() as conn:
-                    conn.execute("DELETE FROM transactions")
-                    conn.execute("DELETE FROM goals")
-                    conn.execute("DELETE FROM subscriptions")
+                self._ctrl.reset_data()
                 self.page_ref.snack_bar = ft.SnackBar(ft.Text("Данные удалены"), open=True)
                 self.page_ref.update()
             finally:
@@ -198,7 +179,6 @@ class SettingsPage(BasePage):
         _show_dialog(self.page_ref, dlg)
 
     def _confirm_delete_account(self, e):
-        user_id = self._user_id
         dlg = ft.AlertDialog(modal=True, title=ft.Text("Удалить аккаунт?"))
 
         def on_cancel(e):
@@ -206,13 +186,7 @@ class SettingsPage(BasePage):
 
         def on_confirm(e):
             try:
-                from database import get_connection
-                with get_connection() as conn:
-                    conn.execute("DELETE FROM transactions WHERE user_id=?", (user_id,))
-                    conn.execute("DELETE FROM goals WHERE user_id=?", (user_id,))
-                    conn.execute("DELETE FROM subscriptions WHERE user_id=?", (user_id,))
-                    conn.execute("DELETE FROM users WHERE id=?", (user_id,))
-
+                self._ctrl.delete_account()
                 self.page_ref.snack_bar = ft.SnackBar(ft.Text("Аккаунт удален"), open=True)
                 self.page_ref.update()
                 self.page_ref.data["logout"]()
@@ -224,11 +198,8 @@ class SettingsPage(BasePage):
         )
         dlg.actions = [
             ft.TextButton("Отмена", on_click=on_cancel),
-            ft.TextButton(
-                "Удалить аккаунт",
-                style=ft.ButtonStyle(color="#FF5252"),
-                on_click=on_confirm,
-            ),
+            ft.TextButton("Удалить аккаунт", style=ft.ButtonStyle(color="#FF5252"),
+                          on_click=on_confirm),
         ]
         _show_dialog(self.page_ref, dlg)
 

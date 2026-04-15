@@ -18,7 +18,12 @@ BasePage определяет скелет экрана (заголовок + т
 """
 
 import flet as ft
+from datetime import date
 
+MONTH_NAMES = [
+    "январь", "февраль", "март", "апрель", "май", "июнь",
+    "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь",
+]
 
 class BasePage(ft.Container):
     """
@@ -103,10 +108,23 @@ class BasePage(ft.Container):
     def _user_id(self):
         return self.page_ref.data.get("user_id")
 
+    def rebuild(self):
+        """Перестраивает тело страницы без вызова update."""
+        self.content.controls[1] = self.build_body()
+
     def refresh(self):
         """Перестраивает тело страницы и обновляет UI."""
-        self.content.controls[1] = self.build_body()
+        self.rebuild()
         try:
             self.update()
         except RuntimeError:
             pass
+
+    def _is_current_month(self, value):
+        if not value:
+            return False
+        return str(value).startswith(date.today().strftime("%Y-%m"))
+
+    def _current_period_label(self):
+        today = date.today()
+        return f"{MONTH_NAMES[today.month - 1]} {today.year}"

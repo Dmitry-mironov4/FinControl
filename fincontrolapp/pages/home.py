@@ -1,8 +1,7 @@
 import flet as ft
 import os
-from datetime import date
 from components.base_page import BasePage
-from db_queries import get_balance, get_monthly_balance, get_transactions
+
 
 
 def _find_graph_asset_src() -> str | None:
@@ -26,7 +25,8 @@ GRAPH_ASSET_SRC = _find_graph_asset_src()
 
 class HomePage(BasePage):
 
-    def __init__(self, page: ft.Page):
+    def __init__(self, page, ctrl):
+        self._ctrl = ctrl
         super().__init__(page, "Главная")
 
     def build_header(self):
@@ -39,14 +39,13 @@ class HomePage(BasePage):
             center_title=False,
             bgcolor=ft.Colors.TRANSPARENT,
             elevation=0,
-            toolbar_height=30,
+            toolbar_height=50,
         )
 
     def build_body(self):
-        today = date.today()
-        balance = get_balance(self._user_id)
-        monthly = get_monthly_balance(self._user_id, today.year, today.month)
-        transactions = get_transactions(self._user_id, limit=5)
+        balance = self._ctrl.get_balance()
+        monthly = self._ctrl.get_monthly_balance()
+        transactions = self._ctrl.get_recent_transactions(limit=5)
 
         controls = [
             self._balance_card(balance, monthly),
@@ -73,24 +72,27 @@ class HomePage(BasePage):
                 self._graph_svg_preview(),
             ])
 
-        controls.extend([
-            ft.Text(
-                "Последние операции",
-                size=20,
-                font_family="Montserrat Semibold",
-                color="#000000",
-            ),
-            self._transactions_list(transactions),
-        ])
+        controls.append(
+            ft.GestureDetector(
+                on_tap=lambda e: self.page_ref.data["navigate"](7),
+                content=ft.Column(
+                    controls=[
+                        ft.Text(
+                            "Последние операции",
+                            size=20,
+                            font_family="Montserrat Semibold",
+                            color="#000000",
+                        ),
+                        self._transactions_list(transactions),
+                    ],
+                    spacing=20,
+                ),
+            )
+        )
 
         return ft.Column(controls=controls, spacing=20)
 
     def _balance_card(self, balance, monthly):
-        month_names = ["январь", "февраль", "март", "апрель", "май", "июнь",
-                       "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь"]
-        today = date.today()
-        month_label = f"{month_names[today.month - 1]} {today.year}"
-        monthly_net = (monthly['income'] or 0) - (monthly['expense'] or 0)
         return ft.Container(
             height=195,
             border_radius=24,
@@ -209,23 +211,23 @@ class HomePage(BasePage):
                                 ft.Container(
                                     width=36, height=36,
                                     border_radius=18,
-                                    bgcolor="#4CAF5022" if is_income else "#F4433622",
+                                    bgcolor=ft.Colors.with_opacity(0.6,"#FFFFFF") if is_income else ft.Colors.with_opacity(0.6,"#FFFFFF"),
                                     content=ft.Icon(
                                         ft.Icons.ARROW_UPWARD if is_income else ft.Icons.ARROW_DOWNWARD,
-                                        color="#4CAF50" if is_income else "#F44336",
+                                        color="#253A82" if is_income else ft.Colors.with_opacity(0.6,"#FF7E1C"),
                                         size=18,
                                     ),
                                     alignment=ft.Alignment(0, 0),
                                 ),
                                 ft.Column([
-                                    ft.Text(t['category_name'], size=14, color="#1A1A24", weight=ft.FontWeight.W_500),
-                                    ft.Text(t['description'] or t['date'], size=12, color="#888888"),
+                                    ft.Text(t['category_name'], size=15, color="#253A82", weight=ft.FontWeight.W_500,font_family="Montserrat SemiBold"),
+                                    ft.Text(t['description'] or t['date'], size=13, color=ft.Colors.with_opacity(0.6,"#253A82"),font_family="Montserrat SemiBold"),
                                 ], spacing=2),
                             ], spacing=12),
                             ft.Text(
                                 f"{'+ ' if is_income else '− '}{t['amount']:,.0f} ₽",
-                                color="#4CAF50" if is_income else "#F44336",
-                                size=14,
+                                color="#253A82" if is_income else ft.Colors.with_opacity(0.6,"#FF7E1C"),
+                                size=15, font_family="Montserrat SemiBold",
                                 weight=ft.FontWeight.W_600,
                             ),
                         ],
