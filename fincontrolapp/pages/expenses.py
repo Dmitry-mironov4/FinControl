@@ -254,14 +254,9 @@ class ExpensesPage(BasePage):
             try:
                 self._ctrl.delete_transaction(transaction_id)
                 self.refresh()
-<<<<<<< HEAD
                 self._show_success("Расход удалён")
             except Exception:
                 self._show_error("Не удалось удалить расход")
-=======
-            except Exception as ex:
-                print("delete error:", ex)
->>>>>>> d1ea96a (Analytics real data (#96))
 
         dlg = ft.AlertDialog(
             modal=True,
@@ -389,7 +384,6 @@ class ExpensesPage(BasePage):
         def on_submit(e):
             category_dd.error = None
             amount_field.error = None
-<<<<<<< HEAD
 
             if not category_dd.value:
                 category_dd.error = "Выберите категорию"
@@ -430,45 +424,6 @@ class ExpensesPage(BasePage):
             self.page.update()
             self._show_success("Расход добавлен")
 
-=======
-
-            if not category_dd.value:
-                category_dd.error = "Выберите категорию"
-
-            amount = None
-            if not amount_field.value:
-                amount_field.error = "Введите сумму"
-            else:
-                try:
-                    amount = parse_amount(amount_field.value)
-                    if amount <= 0:
-                        amount_field.error = "Сумма должна быть больше нуля"
-                except ValueError:
-                    amount_field.error = "Введите число, например: 500"
-
-            if any(f.error for f in (category_dd, amount_field)):
-                category_dd.update()
-                amount_field.update()
-                return
-
-            parsed_date = parse_date(date_field.value)
-
-            self._ctrl.add_transaction(
-                amount=amount,
-                category_id=int(category_dd.value),
-                description=desc_field.value or None,
-                date=str(parsed_date),
-            )
-            self.rebuild()
-            pages = self.page_ref.data.get("pages", {})
-            if 0 in pages:
-                pages[0].rebuild()
-            bs.open = False
-            self.page.update()
-            self.page_ref.snack_bar = ft.SnackBar(ft.Text("Расход добавлен"), open=True)
-            self.page_ref.update()
-
->>>>>>> d1ea96a (Analytics real data (#96))
         bs.content = ft.Container(
             padding=ft.Padding.only(left=20, right=20, top=24, bottom=32),
             content=ft.Column(
@@ -632,7 +587,6 @@ class ExpensesPage(BasePage):
 
             parsed_date = parse_date(date_field.value)
 
-<<<<<<< HEAD
             try:
                 self._ctrl.update_transaction(
                     transaction_id=transaction["id"],
@@ -644,25 +598,13 @@ class ExpensesPage(BasePage):
             except Exception:
                 self._show_error("Не удалось сохранить расход", close_bs=bs)
                 return
-=======
-            self._ctrl.update_transaction(
-                transaction_id=transaction["id"],
-                amount=amount,
-                category_id=int(category_dd.value),
-                description=desc_field.value or None,
-                date=str(parsed_date),
-            )
->>>>>>> d1ea96a (Analytics real data (#96))
             self.rebuild()
             pages = self.page_ref.data.get("pages", {})
             if 0 in pages:
                 pages[0].rebuild()
             bs.open = False
             self.page.update()
-<<<<<<< HEAD
             self._show_success("Расход сохранён")
-=======
->>>>>>> d1ea96a (Analytics real data (#96))
 
         bs.content = ft.Container(
             padding=ft.Padding.only(left=20, right=20, top=24, bottom=32),

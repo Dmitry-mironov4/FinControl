@@ -84,14 +84,9 @@ class TransactionsPage(BasePage):
             try:
                 self._ctrl.delete_transaction(transaction_id)
                 self.refresh()
-<<<<<<< HEAD
                 self._show_success("Транзакция удалена")
             except Exception:
                 self._show_error("Не удалось удалить транзакцию")
-=======
-            except Exception as ex:
-                print("delete error:", ex)
->>>>>>> d1ea96a (Analytics real data (#96))
 
         dlg = ft.AlertDialog(
             modal=True,
@@ -325,7 +320,6 @@ class TransactionsPage(BasePage):
         )
 
         def on_date_selected(e):
-            import datetime
             date_field.value = (
                 e.control.value.strftime("%d.%m.%Y") if e.control.value else date.today().strftime("%d.%m.%Y")
             )
@@ -368,15 +362,11 @@ class TransactionsPage(BasePage):
         category_dd.on_change = validate_category
 
         def load_categories(type_val):
-<<<<<<< HEAD
             try:
                 cats = self._ctrl.get_categories(type_=type_val)
             except Exception:
                 self._show_error("Не удалось загрузить категории")
                 return
-=======
-            cats = self._ctrl.get_categories(type_=type_val)
->>>>>>> d1ea96a (Analytics real data (#96))
             category_dd.options = [ft.dropdown.Option(str(c.id), c.name) for c in cats]
             _other = next((c for c in cats if c.name == "Другое"), None)
             category_dd.value = str(_other.id) if _other else None
@@ -395,7 +385,6 @@ class TransactionsPage(BasePage):
             category_dd.error = None
             amount_field.error = None
             date_field.error = None
-<<<<<<< HEAD
 
             if not category_dd.value:
                 category_dd.error = "Выберите категорию"
@@ -434,41 +423,6 @@ class TransactionsPage(BasePage):
             self.refresh()
             self._show_success("Транзакция добавлена")
 
-=======
-
-            if not category_dd.value:
-                category_dd.error = "Выберите категорию"
-
-            amount = None
-            if not amount_field.value:
-                amount_field.error = "Введите сумму"
-            else:
-                try:
-                    amount = parse_amount(amount_field.value)
-                    if amount <= 0:
-                        amount_field.error = "Сумма должна быть больше нуля"
-                except ValueError:
-                    amount_field.error = "Введите число, например: 500"
-
-            parsed_date = parse_date(date_field.value)
-
-            if any(f.error for f in (category_dd, amount_field)):
-                category_dd.update()
-                amount_field.update()
-                return
-
-            self._ctrl.add_transaction(
-                type_=type_field.value,
-                amount=amount,
-                category_id=int(category_dd.value),
-                description=desc_field.value or None,
-                date=str(parsed_date),
-            )
-            bs.open = False
-            self.page.update()
-            self.refresh()
-
->>>>>>> d1ea96a (Analytics real data (#96))
         bs.content = ft.Container(
             padding=ft.Padding.only(left=20, right=20, top=16, bottom=16),
             content=ft.Column(
@@ -617,15 +571,11 @@ class TransactionsPage(BasePage):
         category_dd.on_change = validate_category
 
         def load_categories(type_val, selected_id=None):
-<<<<<<< HEAD
             try:
                 cats = self._ctrl.get_categories(type_=type_val)
             except Exception:
                 self._show_error("Не удалось загрузить категории")
                 return
-=======
-            cats = self._ctrl.get_categories(type_=type_val)
->>>>>>> d1ea96a (Analytics real data (#96))
             category_dd.options = [ft.dropdown.Option(str(c.id), c.name) for c in cats]
             if selected_id and any(str(c.id) == str(selected_id) for c in cats):
                 category_dd.value = str(selected_id)
@@ -668,7 +618,6 @@ class TransactionsPage(BasePage):
                 amount_field.update()
                 return
 
-<<<<<<< HEAD
             try:
                 self._ctrl.update_transaction(
                     transaction_id=transaction["id"],
@@ -685,19 +634,6 @@ class TransactionsPage(BasePage):
             self.page.update()
             self.refresh()
             self._show_success("Транзакция сохранена")
-=======
-            self._ctrl.update_transaction(
-                transaction_id=transaction["id"],
-                type_=type_field.value,
-                amount=amount,
-                category_id=int(category_dd.value),
-                description=desc_field.value or None,
-                date=str(parsed_date),
-            )
-            bs.open = False
-            self.page.update()
-            self.refresh()
->>>>>>> d1ea96a (Analytics real data (#96))
 
         bs.content = ft.Container(
             padding=ft.Padding.only(left=20, right=20, top=16, bottom=16),

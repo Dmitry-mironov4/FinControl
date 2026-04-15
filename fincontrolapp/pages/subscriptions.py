@@ -185,14 +185,9 @@ class SubscriptionsPage(BasePage):
             try:
                 self._ctrl.delete_subscription(subscription_id)
                 self.refresh()
-<<<<<<< HEAD
                 self._show_success("Подписка удалена")
             except Exception:
                 self._show_error("Не удалось удалить подписку")
-=======
-            except Exception as ex:
-                print("delete error:", ex)
->>>>>>> d1ea96a (Analytics real data (#96))
 
         dlg = ft.AlertDialog(
             modal=True,
@@ -353,7 +348,6 @@ class SubscriptionsPage(BasePage):
             name_field.error = None
             amount_field.error = None
             day_field.error = None
-<<<<<<< HEAD
 
             name = (name_field.value or "").strip()
             if not name:
@@ -403,54 +397,6 @@ class SubscriptionsPage(BasePage):
             self.refresh()
             self._show_success("Подписка добавлена")
 
-=======
-
-            name = (name_field.value or "").strip()
-            if not name:
-                name_field.error = "Введите название"
-
-            amount = None
-            if not amount_field.value:
-                amount_field.error = "Введите сумму"
-            else:
-                try:
-                    amount = float(amount_field.value.replace(",", "."))
-                    if amount <= 0:
-                        amount_field.error = "Сумма должна быть больше нуля"
-                except ValueError:
-                    amount_field.error = "Введите число, например: 299.99"
-
-            charge_day = None
-            if not day_field.value:
-                day_field.error = "Введите день списания"
-            else:
-                try:
-                    charge_day = int(day_field.value)
-                    if not 1 <= charge_day <= 31:
-                        day_field.error = "День должен быть от 1 до 31"
-                except ValueError:
-                    day_field.error = "Введите целое число"
-
-            if any(f.error for f in (name_field, amount_field, day_field)):
-                name_field.update()
-                amount_field.update()
-                day_field.update()
-                return
-
-            self._ctrl.add_subscription(
-                name=name,
-                amount=amount,
-                charge_day=charge_day,
-                period=period_dd.value,
-                start_date=start_field.value,
-            )
-            bs.open = False
-            self.page.update()
-            self.refresh()
-            self.page_ref.snack_bar = ft.SnackBar(ft.Text("Подписка добавлена"), open=True)
-            self.page_ref.update()
-
->>>>>>> d1ea96a (Analytics real data (#96))
         bs.content = ft.Container(
             padding=ft.Padding.only(left=20, right=20, top=16, bottom=16),
             content=ft.Column(
@@ -651,7 +597,6 @@ class SubscriptionsPage(BasePage):
                 day_field.update()
                 return
 
-<<<<<<< HEAD
             try:
                 self._ctrl.update_subscription(
                     subscription_id=subscription["id"],
@@ -668,19 +613,6 @@ class SubscriptionsPage(BasePage):
             self.page.update()
             self.refresh()
             self._show_success("Подписка сохранена")
-=======
-            self._ctrl.update_subscription(
-                subscription_id=subscription["id"],
-                name=name,
-                amount=amount,
-                charge_day=charge_day,
-                period=period_dd.value,
-                start_date=start_field.value,
-            )
-            bs.open = False
-            self.page.update()
-            self.refresh()
->>>>>>> d1ea96a (Analytics real data (#96))
 
         bs.content = ft.Container(
             padding=ft.Padding.only(left=20, right=20, top=16, bottom=16),

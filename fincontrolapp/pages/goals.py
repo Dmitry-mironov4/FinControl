@@ -466,7 +466,6 @@ class GoalsPage(BasePage):
                 deadline_display.update()
                 return
 
-<<<<<<< HEAD
             try:
                 self._ctrl.add_goal(name=name, target_amount=amount, deadline=deadline)
             except Exception:
@@ -476,12 +475,6 @@ class GoalsPage(BasePage):
             self.page.update()
             self.refresh()
             self._show_success("Цель создана")
-=======
-            self._ctrl.add_goal(name=name, target_amount=amount, deadline=deadline)
-            bs.open = False
-            self.page.update()
-            self.refresh()
->>>>>>> d1ea96a (Analytics real data (#96))
 
         bs.content = ft.Container(
             padding=ft.Padding.only(left=20, right=20, top=24, bottom=32),
@@ -592,29 +585,18 @@ class GoalsPage(BasePage):
                 amount_field.update()
                 return
 
-<<<<<<< HEAD
             try:
                 self._ctrl.deposit(goal_id, amount)
             except Exception:
                 self._show_error("Не удалось пополнить цель", close_bs=bs)
                 return
-=======
-            self._ctrl.deposit(goal_id, amount)
->>>>>>> d1ea96a (Analytics real data (#96))
             bs.open = False
             self.page.update()
             self.rebuild()
             pages = self.page_ref.data.get("pages", {})
             if 0 in pages:
                 pages[0].rebuild()
-<<<<<<< HEAD
             self._show_success(f"Пополнено на {amount:,.0f} ₽")
-=======
-            self.page_ref.snack_bar = ft.SnackBar(
-                ft.Text(f"Пополнено на {amount:,.0f} ₽"), open=True
-            )
-            self.page_ref.update()
->>>>>>> d1ea96a (Analytics real data (#96))
 
         bs.content = ft.Container(
             padding=ft.Padding.only(left=20, right=20, top=24, bottom=32),
@@ -787,7 +769,6 @@ class GoalsPage(BasePage):
                 deadline_display.update()
                 return
 
-<<<<<<< HEAD
             try:
                 self._ctrl.update_goal(goal_id=goal["id"], name=name, target_amount=amount, deadline=deadline)
             except Exception:
@@ -797,12 +778,6 @@ class GoalsPage(BasePage):
             self.page.update()
             self.refresh()
             self._show_success("Цель сохранена")
-=======
-            self._ctrl.update_goal(goal_id=goal["id"], name=name, target_amount=amount, deadline=deadline)
-            bs.open = False
-            self.page.update()
-            self.refresh()
->>>>>>> d1ea96a (Analytics real data (#96))
 
         bs.content = ft.Container(
             padding=ft.Padding.only(left=20, right=20, top=24, bottom=32),
