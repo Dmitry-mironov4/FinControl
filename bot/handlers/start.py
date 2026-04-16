@@ -5,7 +5,7 @@ from aiogram.filters import Command
 
 from bot.keyboards.reply import phone_keyboard
 from bot.keyboards.inline import main_menu_keyboard
-from db_queries import get_user_by_telegram_id, create_user, update_user_phone, link_telegram_to_user_by_id, get_user_by_id
+from fincontrolapp.db_queries import get_user_by_telegram_id, create_user, update_user_phone, link_telegram_to_user_by_id, get_user_by_id
 
 router = Router()
 
@@ -89,7 +89,7 @@ async def handle_contact(message: Message):
             )
         else:
             # Создаем нового пользователя с telegram_id
-            new_user_id = create_user(telegram_id, username, phone)
+            create_user(telegram_id, username, phone)
             await message.answer(
                 f"Добро пожаловать, {first_name}!\n"
                 "Вы успешно зарегистрированы!",
