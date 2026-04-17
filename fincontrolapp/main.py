@@ -1,12 +1,12 @@
 import json
 import os
 import flet as ft
-from pages import HomePage, TransactionsPage, GoalsPage, SettingsPage, SubscriptionsPage, IncomePage, ExpensesPage, AnalyticsPage
+from pages import HomePage, TransactionsPage, GoalsPage, SettingsPage, SubscriptionsPage, IncomePage, ExpensesPage, AnalyticsPage, SimulatorPage
 from pages.auth import AuthPage
 from components import AppTheme
 from controllers import (HomeController, GoalsController, SubscriptionsController,
                          TransactionsController, ExpensesController, IncomeController,
-                         SettingsController)
+                         SettingsController, SimulatorController)
 from database import create_tables, get_connection
 
 
@@ -272,6 +272,7 @@ def main(page: ft.Page):
                 ("navigation/home.svg",         0),
                 ("navigation/analytics.svg",    1),
                 ("navigation/goals.svg",        2),
+                ("navigation/test.svg",         8),
                 ("navigation/settings.svg",     3),
             ]
 
@@ -326,6 +327,7 @@ def main(page: ft.Page):
             5: IncomePage(page, IncomeController(uid)),
             6: ExpensesPage(page, ExpensesController(uid)),
             7: TransactionsPage(page, TransactionsController(uid)),
+            8: SimulatorPage(page, SimulatorController()),
         }
 
         def logout():
