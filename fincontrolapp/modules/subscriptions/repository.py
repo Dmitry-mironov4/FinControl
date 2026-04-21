@@ -44,6 +44,40 @@ class SubscriptionRepository:
             (subscription_id,)
         )
 
+    def get_due_subscriptions(self, user_id: int, today: date) -> list:
+        """AUTO-2: подписки, которые нужно списать сегодня или раньше."""
+        rows = self.con.execute(
+            "SELECT * FROM subscriptions WHERE user_id=? AND is_paused=0",
+            (user_id,)
+        ).fetchall()
+        due = []
+        for row in rows:
+            if row['period'] == 'monthly':
+                charge_day = min(row['charge_day'], calendar.monthrange(today.year, today.month)[1])
+                if charge_day <= today.day:
+                    last = row['last_charged_at']
+                    charged_month = last[:7] if last else None  # 'YYYY-MM'
+                    if charged_month != f"{today.year:04d}-{today.month:02d}":
+                        due.append(row)
+            elif row['period'] == 'yearly' and row['start_date']:
+                try:
+                    sd = date.fromisoformat(row['start_date'])
+                    if sd.month == today.month and sd.day <= today.day:
+                        last = row['last_charged_at']
+                        charged_year = last[:4] if last else None
+                        if charged_year != str(today.year):
+                            due.append(row)
+                except ValueError:
+                    pass
+        return due
+
+    def mark_charged(self, subscription_id: int, charged_date: str):
+        """AUTO-2: записываем дату последнего списания."""
+        self.con.execute(
+            'UPDATE subscriptions SET last_charged_at=? WHERE id=?',
+            (charged_date, subscription_id)
+        )
+
     @staticmethod
     def calc_next_charge_date(charge_day: int, period: str,
                                start_date_str: str | None = None) -> date:
