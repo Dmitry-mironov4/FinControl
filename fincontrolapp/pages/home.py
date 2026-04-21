@@ -127,13 +127,14 @@ class HomePage(BasePage):
                                                 controls=[
                                                     ft.Icon(ft.Icons.ARROW_UPWARD, color="#2A4A00", size=16),
                                                     ft.Text(
-                                                        f"Доходы: {monthly['income']:,.0f} ₽",
+                                                        f"{monthly['income']:,.0f} ₽",
                                                         font_family="Montserrat Semibold",
                                                         color="#2A4A00",
                                                         size=14,
                                                     ),
                                                 ],
                                                 spacing=4,
+                                                tight=True,
                                             ),
                                         ),
                                         ft.Container(
@@ -144,17 +145,20 @@ class HomePage(BasePage):
                                                 controls=[
                                                     ft.Icon(ft.Icons.ARROW_DOWNWARD, color="#4A3A00", size=16),
                                                     ft.Text(
-                                                        f"Расходы: {monthly['expense']:,.0f} ₽",
+                                                        f"{monthly['expense']:,.0f} ₽",
                                                         font_family="Montserrat Semibold",
                                                         color="#4A3A00",
                                                         size=14,
                                                     ),
                                                 ],
                                                 spacing=4,
+                                                tight=True,
                                             ),
                                         ),
                                     ],
                                     spacing=8,
+                                    wrap=True,
+                                    run_spacing=8,
                                 ),
                             ],
                             spacing=7,

@@ -89,6 +89,16 @@ def create_tables():
     except Exception:
         pass  # колонка уже существует
 
+    # AUTO-2: миграция — is_paused и last_charged_at
+    try:
+        cursor.execute('ALTER TABLE subscriptions ADD COLUMN is_paused INTEGER DEFAULT 0')
+    except Exception:
+        pass
+    try:
+        cursor.execute('ALTER TABLE subscriptions ADD COLUMN last_charged_at DATE')
+    except Exception:
+        pass
+
     # стартовые категории
     cursor.execute("SELECT COUNT(*) FROM categories")
     if cursor.fetchone()[0] == 0:
@@ -116,6 +126,10 @@ def create_tables():
         cursor.execute("SELECT id FROM categories WHERE name='Накопления' AND type='expense'")
         if not cursor.fetchone():
             cursor.execute("INSERT INTO categories (name, type) VALUES ('Накопления', 'expense')")
+        # AUTO-2: категория Подписки
+        cursor.execute("SELECT id FROM categories WHERE name='Подписки' AND type='expense'")
+        if not cursor.fetchone():
+            cursor.execute("INSERT INTO categories (name, type) VALUES ('Подписки', 'expense')")
 
     conn.commit()
     conn.close()

@@ -225,8 +225,9 @@ class SubscriptionsPage(BasePage):
             try:
                 self._ctrl.delete_subscription(subscription_id)
                 self.refresh()
-            except Exception as ex:
-                print("delete error:", ex)
+                self._show_success("Подписка удалена")
+            except Exception:
+                self._show_error("Не удалось удалить подписку")
 
         dlg = ft.AlertDialog(
             modal=True,
@@ -425,18 +426,21 @@ class SubscriptionsPage(BasePage):
                 day_field.update()
                 return
 
-            self._ctrl.add_subscription(
-                name=name,
-                amount=amount,
-                charge_day=charge_day,
-                period=period_dd.value,
-                start_date=start_field.value,
-            )
+            try:
+                self._ctrl.add_subscription(
+                    name=name,
+                    amount=amount,
+                    charge_day=charge_day,
+                    period=period_dd.value,
+                    start_date=start_field.value,
+                )
+            except Exception:
+                self._show_error("Не удалось добавить подписку", close_bs=bs)
+                return
             bs.open = False
             self.page.update()
             self.refresh()
-            self.page_ref.snack_bar = ft.SnackBar(ft.Text("Подписка добавлена"), open=True)
-            self.page_ref.update()
+            self._show_success("Подписка добавлена")
 
         bs.content = ft.Container(
             padding=ft.Padding.only(left=20, right=20, top=16, bottom=16),
@@ -643,17 +647,22 @@ class SubscriptionsPage(BasePage):
                 day_field.update()
                 return
 
-            self._ctrl.update_subscription(
-                subscription_id=subscription["id"],
-                name=name,
-                amount=amount,
-                charge_day=charge_day,
-                period=period_dd.value,
-                start_date=start_field.value,
-            )
+            try:
+                self._ctrl.update_subscription(
+                    subscription_id=subscription["id"],
+                    name=name,
+                    amount=amount,
+                    charge_day=charge_day,
+                    period=period_dd.value,
+                    start_date=start_field.value,
+                )
+            except Exception:
+                self._show_error("Не удалось сохранить подписку", close_bs=bs)
+                return
             bs.open = False
             self.page.update()
             self.refresh()
+            self._show_success("Подписка сохранена")
 
         bs.content = ft.Container(
             padding=ft.Padding.only(left=20, right=20, top=16, bottom=16),
