@@ -1,6 +1,7 @@
 from datetime import date
 from modules.transactions.repository import TransactionRepository
 from modules.transactions.service import TransactionService
+from modules.categories.repository import CategoryRepository
 from database import get_connection
 
 
@@ -29,17 +30,9 @@ class HomeController:
 
     def save_initial_balance(self, amount: float) -> None:
         """Сохраняет или обновляет начальный баланс пользователя (upsert)."""
-        from datetime import date as _date
-        today = str(_date.today())
+        today = str(date.today())
         with get_connection() as con:
-            cat = con.execute(
-                "SELECT id FROM categories WHERE name='Начальный баланс'"
-            ).fetchone()
-            if not cat:
-                raise ValueError("Категория 'Начальный баланс' не найдена")
-            TransactionRepository(con).upsert_initial_balance(
-                user_id=self._user_id,
-                amount=amount,
-                category_id=cat['id'],
-                date=today,
-            )
+            TransactionService(
+                TransactionRepository(con),
+                CategoryRepository(con),
+            ).save_initial_balance(self._user_id, amount, today)
