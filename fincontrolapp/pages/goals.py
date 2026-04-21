@@ -32,7 +32,7 @@ class GoalsPage(BasePage):
                     content=ft.Container(
                         width=float("inf"),
                         height=48,
-                        border_radius=12,
+                        border_radius=24,
                         gradient=ft.RadialGradient(
                             colors=["#ffffff", "#88A2FF"],
                             center=ft.Alignment(0, -0.2),

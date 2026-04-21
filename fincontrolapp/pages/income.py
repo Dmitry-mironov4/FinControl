@@ -11,6 +11,19 @@ class IncomePage(BasePage):
         self._ctrl = ctrl
         super().__init__(page, "Доходы")
 
+    def build_header(self):
+        return ft.AppBar(
+            title=ft.Text(
+                "Доходы",
+                font_family="Montserrat Extrabold",
+                size=36,
+            ),
+            center_title=False,
+            bgcolor=ft.Colors.TRANSPARENT,
+            elevation=0,
+            toolbar_height=50,
+        )
+
     def build_body(self):
         period = self._current_period_label()
         salary = self._ctrl.get_salary()
@@ -22,19 +35,20 @@ class IncomePage(BasePage):
         return ft.Column([
             self._salary_card(salary),
             ft.Container(
-                bgcolor="#EEF3FF",
+                bgcolor="#FFF2EE",
                 border_radius=10,
+                
                 padding=ft.Padding.only(left=10, right=10, top=6, bottom=6),
                 content=ft.Row(
                     controls=[
-                        ft.Icon(ft.Icons.CALENDAR_MONTH, size=14, color="#5B6EC7"),
-                        ft.Text(f"Период: {period}", size=12, color="#5B6EC7"),
-                        ft.Text(f"Сумма: {month_total:,.0f} ₽", size=12, color="#2E7D32"),
+                        ft.Icon(ft.Icons.CALENDAR_MONTH, size=14, color="#6976EB"),
+                        ft.Text(f"Период: {period}", size=12,font_family="Montserrat SemiBold", color="#6976EB"),
+                        ft.Text(f"Сумма: {month_total:,.0f} ₽",font_family="Montserrat SemiBold", size=12, color="#483EB7"),
                     ],
                     alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                 ),
             ),
-            ft.Text("Дополнительные доходы", size=16,
+            ft.Text("Дополнительные доходы", size=16, font_family="Montserrat SemiBold",
                     weight=ft.FontWeight.W_600, color="#1A1A24"),
             self._income_list(additional),
             ft.GestureDetector(
@@ -42,9 +56,9 @@ class IncomePage(BasePage):
                 content=ft.Container(
                     width=float("inf"),
                     height=48,
-                    border_radius=12,
+                    border_radius=24,
                     gradient=ft.RadialGradient(
-                        colors=["#ffffff", "#4CAF50"],
+                        colors=["#ffffff", "#88A2FF"],
                         center=ft.Alignment(0, -0.2),
                         radius=4.0,
                         stops=[0.0, 0.8],
@@ -63,15 +77,21 @@ class IncomePage(BasePage):
     def _salary_card(self, salary):
         amount_text = f"{salary['amount']:,.0f} ₽" if salary else "Не указана"
         return ft.Container(
-            bgcolor="#1A1A24", border_radius=16, padding=16,
+                padding=16,
+                border_radius=16,
+                gradient=ft.LinearGradient(
+                    colors=["#ffffff", "#88A2FF"],
+                    begin=ft.Alignment(-1, -1),
+                    end=ft.Alignment(1, 1),
+                ),
             content=ft.Column([
-                ft.Text("Основная зарплата", size=14, color="#888888"),
-                ft.Text(amount_text, size=24,
-                        weight=ft.FontWeight.BOLD, color="#4CAF50"),
+                ft.Text("Основная зарплата", size=14, font_family="Montserrat SemiBold", color="#888888"),
+                ft.Text(amount_text, size=24, font_family="Montserrat SemiBold",
+                        weight=ft.FontWeight.BOLD, color=ft.Colors.with_opacity(0.8, "#000000")),
                 ft.ElevatedButton(
                     "Указать зарплату" if not salary else "Изменить зарплату",
                     icon=ft.Icons.EDIT,
-                    style=ft.ButtonStyle(bgcolor="#6C63FF", color="#FFFFFF"),
+                    style=ft.ButtonStyle(bgcolor="#E3FC87", text_style=ft.TextStyle(font_family="Montserrat SemiBold"), color="#000000"),
                     on_click=self._open_salary_dialog,
                 ),
             ], spacing=8),
@@ -80,22 +100,28 @@ class IncomePage(BasePage):
     def _income_list(self, incomes):
         if not incomes:
             return ft.Container(
-                bgcolor="#1A1A24", border_radius=16, padding=16,
-                content=ft.Text("Нет записей", color="#888888", size=14),
+                                padding=16,
+                border_radius=16,
+                gradient=ft.LinearGradient(
+                    colors=["#ffffff", "#88A2FF"],
+                    begin=ft.Alignment(-1, -1),
+                    end=ft.Alignment(1, 1),
+                ),
+                content=ft.Text("Нет записей", font_family="Montserrat SemiBold", color=ft.Colors.with_opacity(0.8, "#000000"), size=14),
             )
 
         rows = []
         for t in incomes:
             delete_bg = ft.Container(
-                border_radius=8,
+                border_radius=16,
                 padding=ft.Padding.only(right=16),
                 alignment=ft.Alignment(1, 0),
-                bgcolor="#F4433622",
+                bgcolor=ft.Colors.TRANSPARENT,
                 content=ft.Row(
                     alignment=ft.MainAxisAlignment.END,
                     controls=[
-                        ft.Icon(ft.Icons.DELETE_OUTLINE, color="#F44336", size=22),
-                        ft.Text("Удалить", color="#F44336", size=13),
+                        ft.Icon(ft.Icons.DELETE_OUTLINE, color=ft.Colors.with_opacity(0.8, "#FF7E1C"), size=22),
+                        ft.Text("Удалить", color=ft.Colors.with_opacity(0.8, "#FF7E1C"), size=13),
                     ],
                     spacing=4,
                 ),
@@ -103,32 +129,40 @@ class IncomePage(BasePage):
             )
 
             row_content = ft.Container(
-                padding=ft.Padding.symmetric(vertical=10),
-                bgcolor="#1A1A24",
+                padding=ft.Padding.only(left=16, right=8, top=10, bottom=10),
+                border_radius=16,
+                shadow=None,
+                border=ft.Border(),
+                gradient=ft.LinearGradient(
+                    colors=["#ffffff", "#88A2FF"],
+                    begin=ft.Alignment(-1, -1),
+                    end=ft.Alignment(1, 1),
+                ),
+
                 content=ft.Row(
                     alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                     controls=[
                         ft.Column([
-                            ft.Text(t["category_name"], size=14, color="#FFFFFF",
+                            ft.Text(t["category_name"], size=14, color="#000000", font_family="Montserrat SemiBold",
                                     weight=ft.FontWeight.W_500),
-                            ft.Text(t["description"] or t["date"],
-                                    size=12, color="#888888"),
+                            ft.Text(t["description"] or t["date"], font_family="Montserrat SemiBold",
+                                    size=12, color=ft.Colors.with_opacity(0.8, "#000000")),
                         ], spacing=2, expand=True),
                         ft.Row([
                             ft.Text(
                                 f"+ {t['amount']:,.0f} ₽",
-                                color="#4CAF50", size=14,
+                                color="#483EB7", size=14, font_family="Montserrat SemiBold",
                                 weight=ft.FontWeight.W_600,
                             ),
                             ft.IconButton(
                                 ft.Icons.EDIT_OUTLINED,
-                                icon_color="#555555",
+                                icon_color=ft.Colors.with_opacity(0.8, "#000000"),
                                 icon_size=18,
                                 on_click=lambda e, tr=t: self._open_edit_dialog(tr),
                             ),
                             ft.IconButton(
                                 ft.Icons.DELETE_OUTLINE,
-                                icon_color="#555555",
+                                icon_color=ft.Colors.with_opacity(0.8, "#000000"),
                                 icon_size=18,
                                 on_click=lambda e, tid=t["id"], cat=t["category_name"]: (
                                     self._confirm_delete(tid, cat)
@@ -139,7 +173,15 @@ class IncomePage(BasePage):
                 ),
             )
 
-            stack = ft.Stack(controls=[delete_bg, row_content])
+            stack = ft.Container(
+                border_radius=16,
+                bgcolor=ft.Colors.TRANSPARENT,
+                border=ft.Border(),
+                content=ft.Stack(
+                    controls=[delete_bg, row_content],
+                    clip_behavior=ft.ClipBehavior.HARD_EDGE,
+    ),
+)
 
             swipe = {"start_x": 0.0, "last_x": 0.0}
 
@@ -184,8 +226,8 @@ class IncomePage(BasePage):
             )
 
         return ft.Container(
-            bgcolor="#1A1A24", border_radius=16,
-            padding=ft.Padding.only(left=16, right=16, top=4, bottom=4),
+            border_radius=16,
+            padding=ft.Padding.only(top=4, bottom=4),
             content=ft.Column(rows, spacing=0),
         )
 
@@ -249,7 +291,8 @@ class IncomePage(BasePage):
             label=label,
             value=initial_value,
             read_only=True,
-            border_color="#6C63FF",
+            text_style=ft.TextStyle(font_family="Montserrat SemiBold", size=15),
+            border_color="#6976EB",
             suffix_icon=ft.Icons.CALENDAR_MONTH,
         )
 
@@ -288,7 +331,8 @@ class IncomePage(BasePage):
 
         amount_field = ft.TextField(
             label="Сумма зарплаты",
-            border_color="#6C63FF",
+            text_style=ft.TextStyle(font_family="Montserrat SemiBold", size=15),
+            border_color="#6976EB",
             error_style=error_style,
         )
         date_field = self._make_date_field("Дата", date.today().strftime("%d.%m.%Y"))
@@ -420,19 +464,21 @@ class IncomePage(BasePage):
         _other = next((c for c in cats if c.name == "Другое"), None)
         category_dd = ft.Dropdown(
             label="Категория",
-            border_color="#6C63FF",
+            text_style=ft.TextStyle(font_family="Montserrat SemiBold", size=15),
+            border_color="#6976EB", 
             options=[ft.dropdown.Option(str(c.id), c.name) for c in cats],
             value=str(_other.id) if _other else None,
             error_style=error_style,
         )
         amount_field = ft.TextField(
             label="Сумма",
-            border_color="#6C63FF",
+            text_style=ft.TextStyle(font_family="Montserrat SemiBold", size=15),
+            border_color="#6976EB",
             error_style=error_style,
         )
         desc_field = ft.TextField(
-            label="Описание (необязательно)",
-            border_color="#6C63FF",
+            label="Описание (необязательно)", 
+            border_color="#6976EB", text_style=ft.TextStyle(font_family="Montserrat SemiBold", size=10),
         )
         date_field = self._make_date_field("Дата", date.today().strftime("%d.%m.%Y"))
 
@@ -566,7 +612,8 @@ class IncomePage(BasePage):
 
         category_dd = ft.Dropdown(
             label="Категория",
-            border_color="#6C63FF",
+            text_style=ft.TextStyle(font_family="Montserrat SemiBold", size=15),
+            border_color="#6976EB",
             options=[ft.dropdown.Option(str(c.id), c.name) for c in cats],
             value=str(transaction["category_id"]),
             error_style=error_style,
@@ -574,13 +621,14 @@ class IncomePage(BasePage):
         amount_field = ft.TextField(
             label="Сумма",
             value=str(int(transaction["amount"]) if transaction["amount"] == int(transaction["amount"]) else transaction["amount"]),
-            border_color="#6C63FF",
+            text_style=ft.TextStyle(font_family="Montserrat SemiBold", size=15),
+            border_color="#6976EB",
             error_style=error_style,
         )
         desc_field = ft.TextField(
             label="Описание (необязательно)",
             value=transaction["description"] or "",
-            border_color="#6C63FF",
+            border_color="#6976EB", text_style=ft.TextStyle(font_family="Montserrat SemiBold", size=15),
         )
         date_field = self._make_date_field(
             "Дата",

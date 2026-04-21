@@ -13,17 +13,36 @@ class SubscriptionsPage(BasePage):
         self._ctrl = ctrl
         super().__init__(page, "Подписки")
 
+    def build_header(self):
+        return ft.AppBar(
+            title=ft.Text(
+                "Подписки",
+                font_family="Montserrat Extrabold",
+                size=36,
+            ),
+            center_title=False,
+            bgcolor=ft.Colors.TRANSPARENT,
+            elevation=0,
+            toolbar_height=50,
+        )
+
     def build_body(self):
         subscriptions = self._ctrl.get_subscriptions()
         monthly_total = self._ctrl.get_monthly_total()
 
         return ft.Column([
             ft.Container(
-                bgcolor="#1A1A24", border_radius=16, padding=16,
+                padding=16,
+                border_radius=16,
+                gradient=ft.LinearGradient(
+                    colors=["#ffffff", "#88A2FF"],
+                    begin=ft.Alignment(-1, -1),
+                    end=ft.Alignment(1, 1),
+                ),
                 content=ft.Column([
-                    ft.Text("Сумма подписок в месяц", size=14, color="#888888"),
-                    ft.Text(f"{monthly_total:,.0f} ₽", size=28,
-                            weight=ft.FontWeight.BOLD, color="#FF9800"),
+                    ft.Text("Сумма подписок в месяц", size=14,font_family="Montserrat SemiBold", color=ft.Colors.with_opacity(0.8, "#000000")),
+                    ft.Text(f"{monthly_total:,.0f} ₽", size=28,font_family="Montserrat SemiBold",
+                            weight=ft.FontWeight.BOLD, color="#000000"),
                 ], spacing=4),
             ),
             self._subscriptions_list(subscriptions),
@@ -32,9 +51,9 @@ class SubscriptionsPage(BasePage):
                 content=ft.Container(
                     width=float("inf"),
                     height=48,
-                    border_radius=12,
+                    border_radius=24,
                     gradient=ft.RadialGradient(
-                        colors=["#ffffff", "#FF9800"],
+                        colors=["#ffffff", "#88A2FF"],
                         center=ft.Alignment(0, -0.2),
                         radius=4.0,
                         stops=[0.0, 0.8],
@@ -53,8 +72,14 @@ class SubscriptionsPage(BasePage):
     def _subscriptions_list(self, subscriptions):
         if not subscriptions:
             return ft.Container(
-                bgcolor="#1A1A24", border_radius=16, padding=16,
-                content=ft.Text("Подписок нет", color="#888888", size=14),
+                padding=16,
+                border_radius=16,
+                gradient=ft.LinearGradient(
+                    colors=["#ffffff", "#88A2FF"],
+                    begin=ft.Alignment(-1, -1),
+                    end=ft.Alignment(1, 1),
+                ),
+                content=ft.Text("Подписок нет",font_family="Montserrat SemiBold", color=ft.Colors.with_opacity(0.8, "#000000"), size=14),
             )
 
         rows = []
@@ -67,15 +92,15 @@ class SubscriptionsPage(BasePage):
 
             # Фон корзины — виден при свайпе влево
             delete_bg = ft.Container(
-                border_radius=8,
+                border_radius=16,
                 padding=ft.Padding.only(right=16),
                 alignment=ft.Alignment(1, 0),
-                bgcolor="#F4433622",
+                bgcolor=ft.Colors.TRANSPARENT,
                 content=ft.Row(
                     alignment=ft.MainAxisAlignment.END,
                     controls=[
-                        ft.Icon(ft.Icons.DELETE_OUTLINE, color="#F44336", size=22),
-                        ft.Text("Удалить", color="#F44336", size=13),
+                        ft.Icon(ft.Icons.DELETE_OUTLINE, color=ft.Colors.with_opacity(0.8, "#FF7E1C"), size=22),
+                        ft.Text("Удалить", color=ft.Colors.with_opacity(0.8, "#FF7E1C"), size=13),
                     ],
                     spacing=4,
                 ),
@@ -83,37 +108,44 @@ class SubscriptionsPage(BasePage):
             )
 
             row_content = ft.Container(
-                padding=ft.Padding.symmetric(vertical=12),
-                bgcolor="#1A1A24",
+                padding=ft.Padding.only(left=16, right=8, top=10, bottom=10),
+                border_radius=16,
+                shadow=None,
+                border=ft.Border(),
+                gradient=ft.LinearGradient(
+                    colors=["#ffffff", "#88A2FF"],
+                    begin=ft.Alignment(-1, -1),
+                    end=ft.Alignment(1, 1),
+                ),
                 content=ft.Row(
                     alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                     controls=[
                         ft.Column([
-                            ft.Text(s["name"], size=14, color="#FFFFFF",
+                            ft.Text(s["name"], size=14, color="#000000",font_family="Montserrat SemiBold",
                                     weight=ft.FontWeight.W_500),
-                            ft.Text(f"Следующее: {next_label}",
-                                    size=12, color="#888888"),
+                            ft.Text(f"Следующее: {next_label}",font_family="Montserrat SemiBold",
+                                    size=12, color="#000000"),
                         ], spacing=2, expand=True),
                         ft.Row([
                             ft.Column([
                                 ft.Text(
                                     f"{s['amount']:,.0f} ₽",
-                                    color="#FF9800", size=14,
+                                    color="#483EB7", size=14,font_family="Montserrat SemiBold",
                                     weight=ft.FontWeight.W_600,
                                     text_align=ft.TextAlign.RIGHT,
                                 ),
-                                ft.Text(period_label, size=11, color="#888888",
+                                ft.Text(period_label, size=11, color=ft.Colors.with_opacity(0.8, "#000000"),font_family="Montserrat SemiBold",
                                         text_align=ft.TextAlign.RIGHT),
                             ], spacing=2,
                                 horizontal_alignment=ft.CrossAxisAlignment.END),
                             ft.IconButton(
                                 ft.Icons.EDIT_OUTLINED,
-                                icon_color="#555555", icon_size=18,
+                                icon_color=ft.Colors.with_opacity(0.8, "#000000"), icon_size=18,
                                 on_click=lambda e, sub=s: self._open_edit_dialog(sub),
                             ),
                             ft.IconButton(
                                 ft.Icons.DELETE_OUTLINE,
-                                icon_color="#555555", icon_size=18,
+                                icon_color=ft.Colors.with_opacity(0.8, "#000000"), icon_size=18,
                                 on_click=lambda e, sid=s["id"], sname=s["name"]: (
                                     self._confirm_delete(sid, sname)
                                 ),
@@ -123,7 +155,15 @@ class SubscriptionsPage(BasePage):
                 ),
             )
 
-            stack = ft.Stack(controls=[delete_bg, row_content])
+            stack = ft.Container(
+                border_radius=16,
+                bgcolor=ft.Colors.TRANSPARENT,
+                border=ft.Border(),
+                content=ft.Stack(
+                    controls=[delete_bg, row_content],
+                    clip_behavior=ft.ClipBehavior.HARD_EDGE,
+    ),
+)
 
             # Свайп влево через GestureDetector
             swipe = {"start_x": 0.0, "last_x": 0.0}
@@ -169,8 +209,8 @@ class SubscriptionsPage(BasePage):
             )
 
         return ft.Container(
-            bgcolor="#1A1A24", border_radius=16,
-            padding=ft.Padding.only(left=16, right=16, top=4, bottom=4),
+            border_radius=16,
+            padding=ft.Padding.only(top=4, bottom=4),
             content=ft.Column(rows, spacing=0),
         )
 
@@ -235,22 +275,26 @@ class SubscriptionsPage(BasePage):
 
         name_field = ft.TextField(
             label="Название",
-            border_color="#6C63FF",
+            border_color="#6976EB",
+            text_style=ft.TextStyle(font_family="Montserrat SemiBold", size=15),
             error_style=error_style,
         )
         amount_field = ft.TextField(
             label="Сумма",
-            border_color="#6C63FF",
+            border_color="#6976EB",
+            text_style=ft.TextStyle(font_family="Montserrat SemiBold", size=15),
             error_style=error_style,
         )
         day_field = ft.TextField(
             label="День списания (1–31)",
-            border_color="#6C63FF",
+            border_color="#6976EB",
+            text_style=ft.TextStyle(font_family="Montserrat SemiBold", size=15),
             error_style=error_style,
         )
         period_dd = ft.Dropdown(
             label="Период",
-            border_color="#6C63FF",
+            text_style=ft.TextStyle(font_family="Montserrat SemiBold", size=15),
+            border_color="#6976EB",
             options=[
                 ft.dropdown.Option("monthly", "Ежемесячно"),
                 ft.dropdown.Option("yearly", "Ежегодно"),
@@ -263,7 +307,8 @@ class SubscriptionsPage(BasePage):
             label="Дата начала",
             value=str(date.today()),
             read_only=True,
-            border_color="#6C63FF",
+            text_style=ft.TextStyle(font_family="Montserrat SemiBold", size=15),
+            border_color="#6976EB",
             suffix_icon=ft.Icons.CALENDAR_MONTH,
             error_style=error_style,
         )
@@ -463,24 +508,28 @@ class SubscriptionsPage(BasePage):
         name_field = ft.TextField(
             label="Название",
             value=subscription["name"],
-            border_color="#6C63FF",
+            text_style=ft.TextStyle(font_family="Montserrat SemiBold", size=15),
+            border_color="#6976EB",
             error_style=error_style,
         )
         amount_field = ft.TextField(
             label="Сумма",
             value=str(int(subscription["amount"]) if subscription["amount"] == int(subscription["amount"]) else subscription["amount"]),
-            border_color="#6C63FF",
+            border_color="#6976EB",
+            text_style=ft.TextStyle(font_family="Montserrat SemiBold", size=15),
             error_style=error_style,
         )
         day_field = ft.TextField(
             label="День списания (1–31)",
             value=str(subscription["charge_day"]),
-            border_color="#6C63FF",
+            border_color="#6976EB",
+            text_style=ft.TextStyle(font_family="Montserrat SemiBold", size=15),
             error_style=error_style,
         )
         period_dd = ft.Dropdown(
             label="Период",
-            border_color="#6C63FF",
+            border_color="#6976EB",
+            text_style=ft.TextStyle(font_family="Montserrat SemiBold", size=15),
             options=[
                 ft.dropdown.Option("monthly", "Ежемесячно"),
                 ft.dropdown.Option("yearly", "Ежегодно"),
@@ -492,7 +541,8 @@ class SubscriptionsPage(BasePage):
             label="Дата начала",
             value=subscription["start_date"],
             read_only=True,
-            border_color="#6C63FF",
+            border_color="#6976EB",
+            text_style=ft.TextStyle(font_family="Montserrat SemiBold", size=15),
             suffix_icon=ft.Icons.CALENDAR_MONTH,
             error_style=error_style,
         )

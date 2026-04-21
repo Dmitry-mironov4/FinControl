@@ -103,12 +103,14 @@ def main(page: ft.Page):
 
         amount_field = ft.TextField(
             label="Сумма на счёте",
+            text_style=ft.TextStyle(font_family="Montserrat Medium"),
+            label_style=ft.TextStyle(font_family="Montserrat Medium"),
             keyboard_type=ft.KeyboardType.NUMBER,
             prefix_icon=ft.Icons.ACCOUNT_BALANCE_WALLET_OUTLINED,
-            border_color="#6C63FF",
+            border_color="#6976EB",
         )
 
-        dlg = ft.AlertDialog(modal=True, title=ft.Text("Начальный баланс"))
+        dlg = ft.AlertDialog(modal=True, title=ft.Text("Начальный баланс",font_family="Montserrat SemiBold"))
 
         def on_skip(e):
             _close_dialog(page, dlg)
@@ -179,14 +181,14 @@ def main(page: ft.Page):
                 ))
 
         dlg.content = ft.Column([
-            ft.Text("Сколько денег у тебя сейчас?", color="#888888", size=14),
-            ft.Text("Это поможет балансу сразу отображать реальную сумму.",
-                    color="#555555", size=12),
+            ft.Text("Сколько денег у тебя сейчас?",font_family="Montserrat SemiBold", color="#000000", size=14),
+            ft.Text("Это поможет балансу сразу отображать реальную сумму.", font_family="Montserrat SemiBold",
+                    color=ft.Colors.with_opacity(0.6, "#000000"), size=12),
             amount_field,
         ], tight=True, spacing=12)
         dlg.actions = [
-            ft.TextButton("Пропустить", on_click=on_skip),
-            ft.TextButton("Сохранить", on_click=on_submit),
+            ft.TextButton("Пропустить",style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_skip),
+            ft.TextButton("Сохранить",style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_submit),
         ]
         _show_dialog(page, dlg)
 
