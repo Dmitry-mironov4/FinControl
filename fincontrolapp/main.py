@@ -128,14 +128,16 @@ def main(page: ft.Page):
                 amount = float(raw.replace(",", "."))
             except ValueError:
                 _close_dialog(page, dlg)
-                page.show_dialog(ft.SnackBar(
+                page.snack_bar = ft.SnackBar(
                     content=ft.Text("Введите корректную сумму", color="#FFFFFF", font_family="Montserrat Medium", size=14),
                     bgcolor="#F44336",
                     shape=ft.RoundedRectangleBorder(radius=12),
                     behavior=ft.SnackBarBehavior.FLOATING,
                     margin=ft.Margin.only(left=16, right=16, bottom=80),
                     duration=3000,
-                ))
+                    open=True,
+                )
+                page.update()
                 return
 
             if amount <= 0:
@@ -176,23 +178,27 @@ def main(page: ft.Page):
                             """,
                             (user_id, amount, cat['id'], str(date.today())),
                         )
-                page.show_dialog(ft.SnackBar(
+                page.snack_bar = ft.SnackBar(
                     content=ft.Text("Баланс сохранён", color="#FFFFFF", font_family="Montserrat Medium", size=14),
                     bgcolor="#4CAF50",
                     shape=ft.RoundedRectangleBorder(radius=12),
                     behavior=ft.SnackBarBehavior.FLOATING,
                     margin=ft.Margin.only(left=16, right=16, bottom=80),
                     duration=2500,
-                ))
+                    open=True,
+                )
+                page.update()
             except Exception:
-                page.show_dialog(ft.SnackBar(
+                page.snack_bar = ft.SnackBar(
                     content=ft.Text("Не удалось сохранить баланс", color="#FFFFFF", font_family="Montserrat Medium", size=14),
                     bgcolor="#F44336",
                     shape=ft.RoundedRectangleBorder(radius=12),
                     behavior=ft.SnackBarBehavior.FLOATING,
                     margin=ft.Margin.only(left=16, right=16, bottom=80),
                     duration=3000,
-                ))
+                    open=True,
+                )
+                page.update()
             finally:
                 _close_dialog(page, dlg)
                 home = page.data.get("pages", {}).get(0)
