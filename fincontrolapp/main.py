@@ -98,8 +98,6 @@ def main(page: ft.Page):
             _show_initial_balance_dialog(user_id)
 
     def _show_initial_balance_dialog(user_id: int):
-        from datetime import date
-
         amount_field = ft.TextField(
             label="Сумма на счёте",
             text_style=ft.TextStyle(font_family="Montserrat Medium"),
@@ -145,39 +143,7 @@ def main(page: ft.Page):
                 return
 
             try:
-                with get_connection() as conn:
-                    cat = conn.execute(
-                        "SELECT id FROM categories WHERE name='Начальный баланс'"
-                    ).fetchone()
-                    if not cat:
-                        return
-
-                    # LIMIT 1 нужен, чтобы не создавать дубликаты при повторном открытии диалога
-                    existing = conn.execute(
-                        """
-                        SELECT id FROM transactions
-                        WHERE user_id=?
-                            AND category_id=?
-                        LIMIT 1
-                        """,
-                        (user_id, cat['id']),
-                    ).fetchone()
-                    if existing:
-                        conn.execute(
-                            """UPDATE transactions
-                            SET amount=?, date=?
-                            WHERE id=?
-                            """,
-                            (amount, str(date.today()), existing['id']),
-                        )
-                    else:
-                        conn.execute(
-                            """
-                            INSERT INTO transactions (user_id, type, amount, category_id, description, date)
-                            VALUES (?, 'income', ?, ?, 'Начальный баланс', ?)
-                            """,
-                            (user_id, amount, cat['id'], str(date.today())),
-                        )
+                HomeController(user_id).save_initial_balance(amount)
                 page.snack_bar = ft.SnackBar(
                     content=ft.Text("Баланс сохранён", color="#FFFFFF", font_family="Montserrat Medium", size=14),
                     bgcolor="#4CAF50",
