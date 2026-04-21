@@ -1,6 +1,7 @@
 from datetime import date
 from modules.transactions.repository import TransactionRepository
 from modules.transactions.service import TransactionService
+from modules.categories.repository import CategoryRepository
 from database import get_connection
 
 
@@ -26,3 +27,12 @@ class HomeController:
             return TransactionService(TransactionRepository(con)).get_transactions(
                 self._user_id, limit=limit
             )
+
+    def save_initial_balance(self, amount: float) -> None:
+        """Сохраняет или обновляет начальный баланс пользователя (upsert)."""
+        today = str(date.today())
+        with get_connection() as con:
+            TransactionService(
+                TransactionRepository(con),
+                CategoryRepository(con),
+            ).save_initial_balance(self._user_id, amount, today)

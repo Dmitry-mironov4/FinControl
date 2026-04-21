@@ -98,17 +98,16 @@ def main(page: ft.Page):
             _show_initial_balance_dialog(user_id)
 
     def _show_initial_balance_dialog(user_id: int):
-        from datetime import date
-        from db_queries import add_transaction
-
         amount_field = ft.TextField(
             label="Сумма на счёте",
+            text_style=ft.TextStyle(font_family="Montserrat Medium"),
+            label_style=ft.TextStyle(font_family="Montserrat Medium"),
             keyboard_type=ft.KeyboardType.NUMBER,
             prefix_icon=ft.Icons.ACCOUNT_BALANCE_WALLET_OUTLINED,
-            border_color="#6C63FF",
+            border_color="#6976EB",
         )
 
-        dlg = ft.AlertDialog(modal=True, title=ft.Text("Начальный баланс"))
+        dlg = ft.AlertDialog(modal=True, title=ft.Text("Начальный баланс",font_family="Montserrat SemiBold"))
 
         def on_skip(e):
             _close_dialog(page, dlg)
@@ -127,14 +126,16 @@ def main(page: ft.Page):
                 amount = float(raw.replace(",", "."))
             except ValueError:
                 _close_dialog(page, dlg)
-                page.show_dialog(ft.SnackBar(
+                page.snack_bar = ft.SnackBar(
                     content=ft.Text("Введите корректную сумму", color="#FFFFFF", font_family="Montserrat Medium", size=14),
                     bgcolor="#F44336",
                     shape=ft.RoundedRectangleBorder(radius=12),
                     behavior=ft.SnackBarBehavior.FLOATING,
                     margin=ft.Margin.only(left=16, right=16, bottom=80),
                     duration=3000,
-                ))
+                    open=True,
+                )
+                page.update()
                 return
 
             if amount <= 0:
@@ -142,51 +143,43 @@ def main(page: ft.Page):
                 return
 
             try:
-                with get_connection() as conn:
-                    cat = conn.execute(
-                        "SELECT id FROM categories WHERE name='Начальный баланс'"
-                    ).fetchone()
-                if cat:
-                    add_transaction(
-                        user_id=user_id,
-                        type_='income',
-                        amount=amount,
-                        category_id=cat['id'],
-                        description="Начальный баланс",
-                        date=str(date.today()),
-                    )
-                    pages = page.data.get("pages")
-                    if pages:
-                        pages[0].refresh()
-                _close_dialog(page, dlg)
-                page.show_dialog(ft.SnackBar(
+                HomeController(user_id).save_initial_balance(amount)
+                page.snack_bar = ft.SnackBar(
                     content=ft.Text("Баланс сохранён", color="#FFFFFF", font_family="Montserrat Medium", size=14),
                     bgcolor="#4CAF50",
                     shape=ft.RoundedRectangleBorder(radius=12),
                     behavior=ft.SnackBarBehavior.FLOATING,
                     margin=ft.Margin.only(left=16, right=16, bottom=80),
                     duration=2500,
-                ))
+                    open=True,
+                )
+                page.update()
             except Exception:
-                _close_dialog(page, dlg)
-                page.show_dialog(ft.SnackBar(
+                page.snack_bar = ft.SnackBar(
                     content=ft.Text("Не удалось сохранить баланс", color="#FFFFFF", font_family="Montserrat Medium", size=14),
                     bgcolor="#F44336",
                     shape=ft.RoundedRectangleBorder(radius=12),
                     behavior=ft.SnackBarBehavior.FLOATING,
                     margin=ft.Margin.only(left=16, right=16, bottom=80),
                     duration=3000,
-                ))
+                    open=True,
+                )
+                page.update()
+            finally:
+                _close_dialog(page, dlg)
+                home = page.data.get("pages", {}).get(0)
+                if home:
+                    home.rebuild()
 
         dlg.content = ft.Column([
-            ft.Text("Сколько денег у тебя сейчас?", color="#888888", size=14),
-            ft.Text("Это поможет балансу сразу отображать реальную сумму.",
-                    color="#555555", size=12),
+            ft.Text("Сколько денег у тебя сейчас?",font_family="Montserrat SemiBold", color="#000000", size=14),
+            ft.Text("Это поможет балансу сразу отображать реальную сумму.", font_family="Montserrat SemiBold",
+                    color=ft.Colors.with_opacity(0.6, "#000000"), size=12),
             amount_field,
         ], tight=True, spacing=12)
         dlg.actions = [
-            ft.TextButton("Пропустить", on_click=on_skip),
-            ft.TextButton("Сохранить", on_click=on_submit),
+            ft.TextButton("Пропустить",style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_skip),
+            ft.TextButton("Сохранить",style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_submit),
         ]
         _show_dialog(page, dlg)
 
