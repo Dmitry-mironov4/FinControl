@@ -87,24 +87,3 @@ class TransactionRepository:
             ORDER BY date DESC LIMIT 1''',
             (user_id,)
         ).fetchone()
-
-    def upsert_initial_balance(self, user_id: int, amount: float, category_id: int, date: str) -> None:
-        """Обновляет начальный баланс если запись существует, иначе создаёт новую.
-
-        Гарантирует отсутствие дублей при повторном открытии диалога начального баланса.
-        """
-        existing = self.con.execute(
-            "SELECT id FROM transactions WHERE user_id=? AND category_id=? LIMIT 1",
-            (user_id, category_id),
-        ).fetchone()
-        if existing:
-            self.con.execute(
-                "UPDATE transactions SET amount=?, date=? WHERE id=?",
-                (amount, date, existing['id']),
-            )
-        else:
-            self.con.execute(
-                """INSERT INTO transactions (user_id, type, amount, category_id, description, date)
-                   VALUES (?, 'income', ?, ?, 'Начальный баланс', ?)""",
-                (user_id, amount, category_id, date),
-            )

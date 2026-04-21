@@ -13,9 +13,3 @@ class CategoryRepository:
             params.append(type_)
         cursor = self.con.execute(query, tuple(params))
         return [Category(id=row['id'], name=row['name'], type=row['type']) for row in cursor.fetchall()]
-
-    def get_by_name(self, name: str) -> Category | None:
-        row = self.con.execute('SELECT * FROM categories WHERE name = ?', (name,)).fetchone()
-        if row is None:
-            return None
-        return Category(id=row['id'], name=row['name'], type=row['type'])
