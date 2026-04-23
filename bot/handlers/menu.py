@@ -4,12 +4,13 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 
 from bot.keyboards.inline import main_menu_keyboard, operations_keyboard, subscriptions_keyboard, profile_keyboard
-from bot.utils.formatters import format_balance, fmt_amount, format_transaction
+from bot.utils.formatters import format_balance, fmt_amount, format_transaction, MONTH_NAMES, MONTH_SHORT
 from bot.handlers.add_dialog import AddTransaction
 from bot.handlers.subscriptions import _next_charge_date
 from fincontrolapp.db_queries import (
     get_user_by_telegram_id,
     get_balance,
+    get_monthly_summary,
     get_last_transactions,
     get_subscriptions,
     get_goals,
@@ -18,17 +19,42 @@ from fincontrolapp.db_queries import (
 router = Router()
 
 
+def _fmt_tx_line(t) -> str:
+    """📈 22 апр  +5 000 ₽  Зарплата"""
+    try:
+        tx_date = datetime.date.fromisoformat(t["date"])
+        date_str = f"{tx_date.day} {MONTH_SHORT[tx_date.month]}"
+    except (ValueError, TypeError):
+        date_str = str(t["date"] or "")
+
+    amount_str = fmt_amount(float(t["amount"]))
+    category = t["category_name"] or ""
+    emoji, sign = ("📈", "+") if t["type"] == "income" else ("📉", "−")
+    return f"{emoji} {date_str}  {sign}{amount_str} ₽  {category}"
+
+
 @router.callback_query(F.data == "menu_balance")
 async def menu_balance(callback: CallbackQuery):
     user = get_user_by_telegram_id(callback.from_user.id)
     if not user:
         await callback.answer("Сначала запустите /start", show_alert=True)
         return
+
+    month_name = MONTH_NAMES[datetime.date.today().month].capitalize()
     balance = get_balance(user["id"])
-    await callback.message.edit_text(
-        format_balance(balance),
-        reply_markup=main_menu_keyboard(),
+    summary = get_monthly_summary(user["id"])
+    income = summary["income"]
+    expenses = summary["expenses"]
+    savings_rate = round((income - expenses) / income * 100) if income > 0 else 0
+
+    text = (
+        f"💰 Баланс: {fmt_amount(balance)} ₽\n"
+        f"─────────────────\n"
+        f"📈 Доходы ({month_name}):   {fmt_amount(income)} ₽\n"
+        f"📉 Расходы ({month_name}):  {fmt_amount(expenses)} ₽\n"
+        f"💼 Норма сбережений:  {savings_rate}%"
     )
+    await callback.message.edit_text(text, reply_markup=main_menu_keyboard())
     await callback.answer()
 
 
@@ -38,17 +64,24 @@ async def menu_operations(callback: CallbackQuery):
     if not user:
         await callback.answer("Сначала запустите /start", show_alert=True)
         return
-    await callback.message.edit_text(
-        "Операции:",
-        reply_markup=operations_keyboard(),
-    )
+
+    txs = get_last_transactions(user["id"], limit=10)
+    if not txs:
+        text = "📭 Операций пока нет."
+    else:
+        lines = [_fmt_tx_line(t) for t in txs]
+        text = "🗂 Последние операции:\n\n" + "\n".join(lines)
+
+    await callback.message.edit_text(text, reply_markup=operations_keyboard())
     await callback.answer()
 
 
-@router.callback_query(F.data == "back_to_menu")
-async def back_to_menu(callback: CallbackQuery):
+@router.callback_query(F.data == "back_to_main")
+async def back_to_main(callback: CallbackQuery):
+    user = get_user_by_telegram_id(callback.from_user.id)
+    name = user["username"] if user else callback.from_user.first_name
     await callback.message.edit_text(
-        "Главное меню:",
+        f"👋 Привет, {name}! Выберите раздел:",
         reply_markup=main_menu_keyboard(),
     )
     await callback.answer()
@@ -73,12 +106,21 @@ async def menu_profile(callback: CallbackQuery):
     if not user:
         await callback.answer("Сначала запустите /start", show_alert=True)
         return
-    name = user.get("username") or user.get("first_name") or "пользователь"
-    phone = user.get("phone") or "не указан"
-    await callback.message.edit_text(
-        f"👤 Профиль\n\nИмя: {name}\nТелефон: {phone}",
-        reply_markup=profile_keyboard("menu"),
+
+    name = user["username"] or callback.from_user.first_name or "—"
+    try:
+        created_date = datetime.date.fromisoformat(str(user["created_at"])[:10])
+        created_str = f"{created_date.day} {MONTH_SHORT[created_date.month]} {created_date.year}"
+    except Exception:
+        created_str = "—"
+
+    text = (
+        f"👤 Профиль\n"
+        f"─────────────────\n"
+        f"Имя:         {name}\n"
+        f"В системе с: {created_str}"
     )
+    await callback.message.edit_text(text, reply_markup=profile_keyboard("menu"))
     await callback.answer()
 
 
@@ -121,7 +163,7 @@ async def op_history(callback: CallbackQuery):
     lines = ["Последние 10 операций:"]
     for t in transactions:
         lines.append(format_transaction(t))
-    await callback.message.answer("\n".join(lines), reply_markup=main_menu_keyboard())
+    await callback.message.edit_text("\n".join(lines), reply_markup=operations_keyboard())
     await callback.answer()
 
 
@@ -141,11 +183,11 @@ async def sub_active(callback: CallbackQuery):
         )
         await callback.answer()
         return
-    total = sum(float(s["amount"]) for s in subs)
+    total = sum(float(s["amount"]) / 12 if s["period"] == "yearly" else float(s["amount"]) for s in subs)
     lines = ["📋 Активные подписки:", ""]
     for s in subs:
         next_date = _next_charge_date(s["charge_day"])
-        period = "/год" if s.get("period") == "yearly" else "/мес"
+        period = "/год" if s["period"] == "yearly" else "/мес"
         lines.append(f"• {s['name']} — {fmt_amount(float(s['amount']))}₽{period} · спишется {next_date}")
     lines += ["", f"Итого в месяц: {fmt_amount(total)}₽"]
     await callback.message.edit_text(
@@ -153,11 +195,6 @@ async def sub_active(callback: CallbackQuery):
         reply_markup=subscriptions_keyboard("menu"),
     )
     await callback.answer()
-
-
-@router.callback_query(F.data == "sub_add")
-async def sub_add(callback: CallbackQuery):
-    await callback.answer("Добавление подписок — в приложении FinControl", show_alert=True)
 
 
 # --- Профиль ---
@@ -168,9 +205,9 @@ async def profile_data(callback: CallbackQuery):
     if not user:
         await callback.answer("Сначала запустите /start", show_alert=True)
         return
-    name = user.get("username") or user.get("first_name") or "не указано"
-    phone = user.get("phone") or "не указан"
-    created = user.get("created_at", "")
+    name = user["username"] or user["first_name"] or "не указано"
+    phone = user["phone"] or "не указан"
+    created = user["created_at"] or ""
     if created:
         try:
             d = datetime.date.fromisoformat(created[:10])
@@ -207,15 +244,7 @@ async def profile_goals(callback: CallbackQuery):
         else:
             lines.append("   ✅ Цель достигнута!")
         lines.append("")
-    await callback.message.answer("\n".join(lines).rstrip(), reply_markup=profile_keyboard("menu"))
+    await callback.message.edit_text("\n".join(lines).rstrip(), reply_markup=profile_keyboard("menu"))
     await callback.answer()
 
 
-@router.callback_query(F.data.in_({"profile_categories", "profile_settings", "profile_cards"}))
-async def profile_stubs(callback: CallbackQuery):
-    stubs = {
-        "profile_categories": "Управление категориями — в приложении FinControl",
-        "profile_settings": "Настройки — в приложении FinControl",
-        "profile_cards": "Карты — в приложении FinControl",
-    }
-    await callback.answer(stubs[callback.data], show_alert=True)

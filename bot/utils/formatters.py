@@ -1,5 +1,14 @@
 import datetime
 
+MONTH_NAMES = [
+    "", "январь", "февраль", "март", "апрель", "май", "июнь",
+    "июль", "август", "сентябрь", "октябрь", "ноябрь", "декабрь",
+]
+MONTH_SHORT = [
+    "", "янв", "фев", "мар", "апр", "май", "июн",
+    "июл", "авг", "сен", "окт", "ноя", "дек",
+]
+
 
 def fmt_amount(n: float) -> str:
     return f"{n:,.0f}".replace(",", " ")
@@ -25,11 +34,11 @@ def format_transaction(t: dict) -> str:
         else:
             date_str = tx_date.strftime("%d.%m")
     except (ValueError, TypeError):
-        date_str = str(t.get("date", ""))
+        date_str = str(t["date"] or "")
 
     amount = float(t["amount"])
-    category = t.get("category_name", "")
-    description = t.get("description") or ""
+    category = t["category_name"] or ""
+    description = t["description"] or ""
 
     if t["type"] == "income":
         emoji = "📈"

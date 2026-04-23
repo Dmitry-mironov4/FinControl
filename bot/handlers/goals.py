@@ -65,7 +65,7 @@ async def cmd_goals(message: Message):
         lines.append(f"🎯 {g['name']}")
         lines.append(f"   {bar} {pct:.0f}% · {fmt_amount(current)} / {fmt_amount(target)}₽")
         if remaining > 0:
-            deadline = _format_deadline(g.get("deadline"))
+            deadline = _format_deadline(g["deadline"])
             lines.append(f"   Осталось: {fmt_amount(remaining)}₽{deadline}")
         else:
             lines.append("   ✅ Цель достигнута!")

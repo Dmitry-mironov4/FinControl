@@ -5,14 +5,9 @@ from aiogram.filters import Command
 from aiogram.types import Message
 
 from fincontrolapp.db_queries import get_user_by_telegram_id, get_subscriptions
-from bot.utils.formatters import fmt_amount
+from bot.utils.formatters import fmt_amount, MONTH_SHORT
 
 router = Router()
-
-MONTH_NAMES = [
-    "", "янв", "фев", "мар", "апр", "май", "июн",
-    "июл", "авг", "сен", "окт", "ноя", "дек"
-]
 
 
 def _next_charge_date(charge_day: int) -> str:
@@ -31,7 +26,7 @@ def _next_charge_date(charge_day: int) -> str:
         day_next = min(charge_day, last_day_next)
         candidate = datetime.date(next_year, next_month, day_next)
 
-    return f"{candidate.day} {MONTH_NAMES[candidate.month]}"
+    return f"{candidate.day} {MONTH_SHORT[candidate.month]}"
 
 
 @router.message(Command("subscriptions"))
@@ -49,11 +44,11 @@ async def cmd_subscriptions(message: Message):
         )
         return
 
-    total = sum(float(s["amount"]) for s in subs)
+    total = sum(float(s["amount"]) / 12 if s["period"] == "yearly" else float(s["amount"]) for s in subs)
     lines = ["📋 Активные подписки:", ""]
     for s in subs:
         next_date = _next_charge_date(s["charge_day"])
-        period = "/год" if s.get("period") == "yearly" else "/мес"
+        period = "/год" if s["period"] == "yearly" else "/мес"
         lines.append(f"• {s['name']} — {fmt_amount(float(s['amount']))}₽{period} · спишется {next_date}")
 
     lines.append("")

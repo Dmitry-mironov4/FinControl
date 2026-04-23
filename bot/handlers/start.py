@@ -34,12 +34,22 @@ async def cmd_start(message: Message):
         user_from_app = get_user_by_id(user_id_from_app)
 
         if user_from_app:
+            # Проверяем, не привязан ли аккаунт уже к другому Telegram
+            existing_tg = user_from_app['telegram_id']
+            if existing_tg and existing_tg != telegram_id:
+                await message.answer(
+                    "Этот аккаунт уже привязан к другому Telegram.\n"
+                    "Если это ошибка, обратитесь в поддержку."
+                )
+                return
+
             # Привязываем telegram_id
             success = link_telegram_to_user_by_id(user_id_from_app, telegram_id)
 
             if success:
+                username = user_from_app['username'] or message.from_user.first_name
                 await message.answer(
-                    "Аккаунт успешно привязан!\n\n",
+                    f"Аккаунт {username} успешно привязан!",
                     reply_markup=main_menu_keyboard()
                 )
             else:
