@@ -36,8 +36,8 @@ MONTH_NAMES = ["Янв", "Фев", "Мар", "Апр", "Май", "Июн",
                "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек"]
 
 CATEGORY_COLORS = [
-    "#FF9800", "#2196F3", "#795548", "#00BCD4",
-    "#F44336", "#607D8B", "#4CAF50", "#9C27B0",
+    "#FFC549", "#483EB7", "#FF7684", "#00B487",
+    "#C80D00", "#6DD0F0", "#775Aff", "#9C27B0",
 ]
 
 # Минимум месяцев с данными для отображения графиков
@@ -176,6 +176,19 @@ class AnalyticsPage(BasePage):
         self.user_id = user_id
         self.selected_year = datetime.now().year
         super().__init__(page, "Аналитика")
+
+    def build_header(self):
+        return ft.AppBar(
+            title=ft.Text(
+                "Аналитика",
+                font_family="Montserrat Extrabold",
+                size=36,
+            ),
+            center_title=False,
+            bgcolor=ft.Colors.TRANSPARENT,
+            elevation=0,
+            toolbar_height=50,
+        )
 
     # ── Построение тела ──────────────────────────────────────────────────────
 
