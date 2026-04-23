@@ -84,8 +84,9 @@ class TransactionsPage(BasePage):
             try:
                 self._ctrl.delete_transaction(transaction_id)
                 self.refresh()
-            except Exception as ex:
-                print("delete error:", ex)
+                self._show_success("Транзакция удалена")
+            except Exception:
+                self._show_error("Не удалось удалить транзакцию")
 
         dlg = ft.AlertDialog(
             modal=True,
@@ -362,7 +363,11 @@ class TransactionsPage(BasePage):
         category_dd.on_change = validate_category
 
         def load_categories(type_val):
-            cats = self._ctrl.get_categories(type_=type_val)
+            try:
+                cats = self._ctrl.get_categories(type_=type_val)
+            except Exception:
+                self._show_error("Не удалось загрузить категории")
+                return
             category_dd.options = [ft.dropdown.Option(str(c.id), c.name) for c in cats]
             _other = next((c for c in cats if c.name == "Другое"), None)
             category_dd.value = str(_other.id) if _other else None
@@ -403,16 +408,21 @@ class TransactionsPage(BasePage):
                 amount_field.update()
                 return
 
-            self._ctrl.add_transaction(
-                type_=type_field.value,
-                amount=amount,
-                category_id=int(category_dd.value),
-                description=desc_field.value or None,
-                date=str(parsed_date),
-            )
+            try:
+                self._ctrl.add_transaction(
+                    type_=type_field.value,
+                    amount=amount,
+                    category_id=int(category_dd.value),
+                    description=desc_field.value or None,
+                    date=str(parsed_date),
+                )
+            except Exception:
+                self._show_error("Не удалось добавить транзакцию", close_bs=bs)
+                return
             bs.open = False
             self.page.update()
             self.refresh()
+            self._show_success("Транзакция добавлена")
 
         bs.content = ft.Container(
             padding=ft.Padding.only(left=20, right=20, top=16, bottom=16),
@@ -562,7 +572,11 @@ class TransactionsPage(BasePage):
         category_dd.on_change = validate_category
 
         def load_categories(type_val, selected_id=None):
-            cats = self._ctrl.get_categories(type_=type_val)
+            try:
+                cats = self._ctrl.get_categories(type_=type_val)
+            except Exception:
+                self._show_error("Не удалось загрузить категории")
+                return
             category_dd.options = [ft.dropdown.Option(str(c.id), c.name) for c in cats]
             if selected_id and any(str(c.id) == str(selected_id) for c in cats):
                 category_dd.value = str(selected_id)
@@ -605,17 +619,22 @@ class TransactionsPage(BasePage):
                 amount_field.update()
                 return
 
-            self._ctrl.update_transaction(
-                transaction_id=transaction["id"],
-                type_=type_field.value,
-                amount=amount,
-                category_id=int(category_dd.value),
-                description=desc_field.value or None,
-                date=str(parsed_date),
-            )
+            try:
+                self._ctrl.update_transaction(
+                    transaction_id=transaction["id"],
+                    type_=type_field.value,
+                    amount=amount,
+                    category_id=int(category_dd.value),
+                    description=desc_field.value or None,
+                    date=str(parsed_date),
+                )
+            except Exception:
+                self._show_error("Не удалось сохранить транзакцию", close_bs=bs)
+                return
             bs.open = False
             self.page.update()
             self.refresh()
+            self._show_success("Транзакция сохранена")
 
         bs.content = ft.Container(
             padding=ft.Padding.only(left=20, right=20, top=16, bottom=16),
