@@ -149,28 +149,25 @@ class SettingsPage(BasePage):
  
     def _open_telegram_dialog(self, e):
         import webbrowser
-        bot_username = "FinControlBot"
-        deep_link = "https://t.me/f1nc0ntr0l_bot#"
+        user_id = self._ctrl._user_id
+        if user_id is None:
+            self._show_error("Не удалось получить данные пользователя")
+            return
+        deep_link = f"https://t.me/f1nc0ntr0l_bot?start={user_id}"
         dlg = ft.AlertDialog(modal=True, title=ft.Text("Telegram-бот", font_family="Montserrat SemiBold"))
- 
+
         def on_cancel(e):
             _close_dialog(self.page_ref, dlg)
- 
+
         def on_open(e):
             try:
                 webbrowser.open(deep_link)
             finally:
                 _close_dialog(self.page_ref, dlg)
- 
+
         dlg.content = ft.Column([
-            ft.Text("Открой бота и нажми /start — он привяжется к твоему аккаунту.",
+            ft.Text("Нажми «Открыть Telegram» — бот автоматически привяжет твой аккаунт.",
                     size=13, color=ft.Colors.with_opacity(0.6, "#000000"), font_family="Montserrat SemiBold"),
-            ft.Container(
-                bgcolor="#6976EB", border_radius=10,
-                padding=ft.padding.symmetric(horizontal=12, vertical=10),
-                content=ft.Text(f"@{bot_username}", size=14, color="#000000",
-                                weight=ft.FontWeight.W_600, font_family="Montserrat SemiBold"),
-            ),
         ], tight=True, spacing=12)
         dlg.actions = [
             ft.TextButton("Отмена",style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_cancel),
