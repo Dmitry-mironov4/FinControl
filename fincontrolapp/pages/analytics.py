@@ -81,19 +81,29 @@ def get_monthly_summary(user_id: int, year: int) -> list[dict]:
                FROM transactions
                WHERE user_id = ? AND strftime('%Y', date) = ?
                GROUP BY m
-               ORDER BY m""",
+               ORDER BY m ASC""",
             (user_id, str(year)),
         ).fetchall()
 
-    result = []
+    # собираем словарь {номер_месяца: данные} из того, что есть в БД
+    db_data = {}
     for r in rows:
-        idx = int(r["m"]) - 1
-        result.append({
-            "month":   MONTH_NAMES[idx],
+        db_data[int(r["m"])] = {
             "income":  r["income"]  or 0.0,
             "expense": r["expense"] or 0.0,
+        }
+
+    # проходим по всем 12 месяцам — пропущенные получают нули
+    result = []
+    for month_num in range(1, 13):
+        d = db_data.get(month_num, {"income": 0.0, "expense": 0.0})
+        result.append({
+            "month":   MONTH_NAMES[month_num - 1],
+            "income":  d["income"],
+            "expense": d["expense"],
         })
     return result
+
 
 
 def get_expense_breakdown_by_year(user_id: int, year: int) -> list[dict]:
@@ -165,7 +175,8 @@ def _stub(message: str) -> ft.Container:
 
 
 def _has_enough_data(monthly: list[dict]) -> bool:
-    return len(monthly) >= MIN_MONTHS
+    non_zero = sum(1 for d in monthly if d["income"] > 0 or d["expense"] > 0)
+    return non_zero >= MIN_MONTHS
 
 
 # ─── AnalyticsPage ───────────────────────────────────────────────────────────
