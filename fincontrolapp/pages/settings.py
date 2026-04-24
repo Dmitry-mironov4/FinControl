@@ -205,7 +205,7 @@ class SettingsPage(BasePage):
 
         def on_cancel(e):
             _close_dialog(self.page_ref, dlg)
-
+ 
         def on_submit(e):
             try:
                 self._ctrl.update_username(username_field.value.strip() or None)
@@ -215,6 +215,7 @@ class SettingsPage(BasePage):
             _close_dialog(self.page_ref, dlg)
             self.page_ref.snack_bar = ft.SnackBar(ft.Text("Имя сохранено ✓", font_family="Montserrat SemiBold"), open=True)
             self.page_ref.update()
+
 
         dlg.content = ft.Column([
             ft.Text(contact_hint, size=12, color=ft.Colors.with_opacity(0.6, "#000000"),
@@ -226,7 +227,7 @@ class SettingsPage(BasePage):
             ft.TextButton("Сохранить", style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_submit),
         ]
         _show_dialog(self.page_ref, dlg)
-
+ 
     def _open_notifications_dialog(self, e):
         enabled = self.page_ref.data.get("_s_notifications", False)
         switch = ft.Switch(value=enabled, active_color="#6976EB")
@@ -237,13 +238,14 @@ class SettingsPage(BasePage):
 
         def on_cancel(e):
             _close_dialog(self.page_ref, dlg)
-
+ 
         def on_submit(e):
             self.page_ref.data["_s_notifications"] = switch.value
             msg = "Уведомления включены" if switch.value else "Уведомления выключены"
             _close_dialog(self.page_ref, dlg)
             self.page_ref.snack_bar = ft.SnackBar(ft.Text(msg, font_family="Montserrat SemiBold"), open=True)
             self.page_ref.update()
+
 
         dlg.content = ft.Column([
             ft.Text("Push-уведомления работают после сборки на устройстве.",
@@ -255,7 +257,7 @@ class SettingsPage(BasePage):
             ft.TextButton("Сохранить", style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_submit),
         ]
         _show_dialog(self.page_ref, dlg)
-
+ 
     def _open_currency_dialog(self, e):
         currencies = [
             ("RUB", "₽  Российский рубль"),
@@ -271,12 +273,13 @@ class SettingsPage(BasePage):
 
         def on_cancel(e):
             _close_dialog(self.page_ref, dlg)
-
+ 
         def on_submit(e):
             self.page_ref.data["_s_currency"] = dd.value
             _close_dialog(self.page_ref, dlg)
             self.page_ref.snack_bar = ft.SnackBar(ft.Text("Валюта сохранена ✓", font_family="Montserrat SemiBold"), open=True)
             self.page_ref.update()
+
 
         dlg.content = ft.Column([dd], tight=True)
         dlg.actions = [
@@ -284,11 +287,14 @@ class SettingsPage(BasePage):
             ft.TextButton("Сохранить", style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_submit),
         ]
         _show_dialog(self.page_ref, dlg)
-
+ 
     def _open_telegram_dialog(self, e):
         import webbrowser
-        bot_username = "FinControlBot"
-        deep_link = "https://t.me/f1nc0ntr0l_bot#"
+        user_id = self._ctrl._user_id
+        if user_id is None:
+            self._show_error("Не удалось получить данные пользователя")
+            return
+        deep_link = f"https://t.me/f1nc0ntr0l_bot?start={user_id}"
         dlg = ft.AlertDialog(modal=True, title=ft.Text("Telegram-бот", font_family="Montserrat SemiBold"))
 
         def on_cancel(e):
@@ -301,27 +307,21 @@ class SettingsPage(BasePage):
                 _close_dialog(self.page_ref, dlg)
 
         dlg.content = ft.Column([
-            ft.Text("Открой бота и нажми /start — он привяжется к твоему аккаунту.",
+            ft.Text("Нажми «Открыть Telegram» — бот автоматически привяжет твой аккаунт.",
                     size=13, color=ft.Colors.with_opacity(0.6, "#000000"), font_family="Montserrat SemiBold"),
-            ft.Container(
-                bgcolor="#6976EB", border_radius=10,
-                padding=ft.padding.symmetric(horizontal=12, vertical=10),
-                content=ft.Text(f"@{bot_username}", size=14, color="#000000",
-                                weight=ft.FontWeight.W_600, font_family="Montserrat SemiBold"),
-            ),
         ], tight=True, spacing=12)
         dlg.actions = [
-            ft.TextButton("Отмена", style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_cancel),
-            ft.TextButton("Открыть Telegram", style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_open),
+            ft.TextButton("Отмена",style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_cancel),
+            ft.TextButton("Открыть Telegram",style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_open),
         ]
         _show_dialog(self.page_ref, dlg)
-
+ 
     def _confirm_reset(self, e):
         dlg = ft.AlertDialog(modal=True, title=ft.Text("Сбросить данные?", font_family="Montserrat SemiBold"))
 
         def on_cancel(e):
             _close_dialog(self.page_ref, dlg)
-
+ 
         def on_confirm(e):
             try:
                 self._ctrl.reset_data()
@@ -338,13 +338,13 @@ class SettingsPage(BasePage):
                 text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_confirm),
         ]
         _show_dialog(self.page_ref, dlg)
-
+ 
     def _confirm_delete_account(self, e):
         dlg = ft.AlertDialog(modal=True, title=ft.Text("Удалить аккаунт?", font_family="Montserrat SemiBold"))
 
         def on_cancel(e):
             _close_dialog(self.page_ref, dlg)
-
+ 
         def on_confirm(e):
             try:
                 self._ctrl.delete_account()
@@ -355,7 +355,7 @@ class SettingsPage(BasePage):
                 self._show_error("Не удалось удалить аккаунт")
             finally:
                 _close_dialog(self.page_ref, dlg)
-
+ 
         dlg.content = ft.Text(
             "Профиль, транзакции, цели и подписки будут удалены без возможности восстановления.",
             font_family="Montserrat SemiBold", color=ft.Colors.with_opacity(0.6, "#000000"))

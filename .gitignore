@@ -10,3 +10,4 @@ build/
 .md
 .vscode/
 desktop.ini 
+.env

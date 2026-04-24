@@ -41,6 +41,7 @@ class IncomePage(BasePage):
             ft.Container(
                 bgcolor="#FFF2EE",
                 border_radius=10,
+                
                 padding=ft.Padding.only(left=10, right=10, top=6, bottom=6),
                 content=ft.Row(
                     controls=[
