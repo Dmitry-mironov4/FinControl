@@ -29,7 +29,7 @@ class TransactionRepository:
         if category_id:
             query += ' AND t.category_id = ?'
             params.append(category_id)
-        query += ' ORDER BY t.date DESC'
+        query += ' ORDER BY t.date DESC, t.id DESC'
         if limit:
             query += ' LIMIT ?'
             params.append(limit)
@@ -69,3 +69,21 @@ class TransactionRepository:
             (user_id, start_date, end_date)
         ).fetchone()
         return row
+    
+    def get_recurring_income_for_month(self, user_id: int, year: int, month: int):
+        # Проверяет, была ли уже добавлена recurring-зарплата за указанный месяц
+        return self.con.execute(
+            '''SELECT id FROM transactions
+            WHERE user_id = ? AND type='income' AND is_recurring=1
+            AND strftime('%Y-%m', date) = ?''',
+            (user_id, f"{year:04d}-{month:02d}")
+        ).fetchall()
+
+    def get_last_recurring_income(self, user_id: int):
+        # Возвращает последнюю зарплату (шаблон) для копирования суммы, категории и описания
+        return self.con.execute(
+            '''SELECT amount, category_id, description FROM transactions
+            WHERE user_id = ? AND type='income' AND is_recurring=1
+            ORDER BY date DESC LIMIT 1''',
+            (user_id,)
+        ).fetchone()

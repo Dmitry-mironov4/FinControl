@@ -67,8 +67,13 @@ class BasePage(ft.Container):
         # scroll=AUTO на внешней колонке — скроллится весь экран целиком,
         # включая заголовок. Дочерние build_body() НЕ должны задавать
         # собственный scroll, иначе получится скролл внутри скролла.
+        try:
+            body = self.build_body()
+        except Exception as _e:
+            print("build_body init error:", _e)
+            body = ft.Text("Ошибка загрузки", color="#F44336")
         self.content = ft.Column(
-            controls=[self.build_header(), self.build_body()],
+            controls=[self.build_header(), body],
             expand=True,
             spacing=16,
             scroll=ft.ScrollMode.AUTO,
@@ -108,9 +113,45 @@ class BasePage(ft.Container):
     def _user_id(self):
         return self.page_ref.data.get("user_id")
 
+    def _show_success(self, msg: str):
+        """Показывает snackbar с сообщением об успехе."""
+        self.page_ref.show_dialog(
+            ft.SnackBar(
+                content=ft.Text(msg, color="#FFFFFF", font_family="Montserrat Medium", size=14),
+                bgcolor="#4CAF50",
+                shape=ft.RoundedRectangleBorder(radius=12),
+                behavior=ft.SnackBarBehavior.FLOATING,
+                margin=ft.Margin.only(left=16, right=16, bottom=80),
+                duration=2500,
+            )
+        )
+
+    def _show_error(self, msg: str = "Произошла ошибка", close_bs=None):
+        """Показывает snackbar с сообщением об ошибке.
+        close_bs — BottomSheet для закрытия перед показом snackbar.
+        """
+        if close_bs is not None:
+            close_bs.open = False
+            self.page_ref.update()
+        self.page_ref.show_dialog(
+            ft.SnackBar(
+                content=ft.Text(msg, color="#FFFFFF", font_family="Montserrat Medium", size=14),
+                bgcolor="#F44336",
+                shape=ft.RoundedRectangleBorder(radius=12),
+                behavior=ft.SnackBarBehavior.FLOATING,
+                margin=ft.Margin.only(left=16, right=16, bottom=80),
+                duration=3000,
+            )
+        )
+
     def rebuild(self):
         """Перестраивает тело страницы без вызова update."""
-        self.content.controls[1] = self.build_body()
+        try:
+            self.content.controls[1] = self.build_body()
+        except Exception as _e:
+            print("build_body error:", _e)
+            self.content.controls[1] = ft.Text("Ошибка загрузки", color="#F44336")
+            self._show_error("Не удалось загрузить данные")
 
     def refresh(self):
         """Перестраивает тело страницы и обновляет UI."""

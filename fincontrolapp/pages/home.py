@@ -72,20 +72,51 @@ class HomePage(BasePage):
                 self._graph_svg_preview(),
             ])
 
+        # ── Последние операции с видимым affordance ──────────────────────
         controls.append(
             ft.GestureDetector(
                 on_tap=lambda e: self.page_ref.data["navigate"](7),
                 content=ft.Column(
                     controls=[
-                        ft.Text(
-                            "Последние операции",
-                            size=20,
-                            font_family="Montserrat Semibold",
-                            color="#000000",
+                        ft.Row(
+                            alignment=ft.MainAxisAlignment.START,
+                            spacing = 8,
+                            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                            controls=[
+                                ft.Text(
+                                    "Последние операции",
+                                    size=20,
+                                    font_family="Montserrat Semibold",
+                                    color="#000000",
+                                ),
+                                # Кнопка «Все →» — явный сигнал, что можно тапнуть
+                                ft.Container(
+                                    border_radius=20,
+                                    padding=ft.padding.symmetric(horizontal=10, vertical=5),
+                                    gradient=ft.LinearGradient(
+                                        colors=["#ffffff", "#88A2FF"],
+                                        begin=ft.Alignment(-1, -1),
+                                        end=ft.Alignment(1, 1),
+                                    ),
+                                    content=ft.Row(
+                                        spacing=2,
+                                        tight=True,
+                                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                                        controls=[
+                                            
+                                            ft.Icon(
+                                                ft.Icons.ARROW_FORWARD_IOS_ROUNDED,
+                                                size=16,
+                                                color="#483EB7",
+                                            ),
+                                        ],
+                                    ),
+                                ),
+                            ],
                         ),
                         self._transactions_list(transactions),
                     ],
-                    spacing=20,
+                    spacing=12,
                 ),
             )
         )
@@ -127,13 +158,14 @@ class HomePage(BasePage):
                                                 controls=[
                                                     ft.Icon(ft.Icons.ARROW_UPWARD, color="#2A4A00", size=16),
                                                     ft.Text(
-                                                        f"Доходы: {monthly['income']:,.0f} ₽",
+                                                        f"{monthly['income']:,.0f} ₽",
                                                         font_family="Montserrat Semibold",
                                                         color="#2A4A00",
                                                         size=14,
                                                     ),
                                                 ],
                                                 spacing=4,
+                                                tight=True,
                                             ),
                                         ),
                                         ft.Container(
@@ -144,17 +176,20 @@ class HomePage(BasePage):
                                                 controls=[
                                                     ft.Icon(ft.Icons.ARROW_DOWNWARD, color="#4A3A00", size=16),
                                                     ft.Text(
-                                                        f"Расходы: {monthly['expense']:,.0f} ₽",
+                                                        f"{monthly['expense']:,.0f} ₽",
                                                         font_family="Montserrat Semibold",
                                                         color="#4A3A00",
                                                         size=14,
                                                     ),
                                                 ],
                                                 spacing=4,
+                                                tight=True,
                                             ),
                                         ),
                                     ],
                                     spacing=8,
+                                    wrap=True,
+                                    run_spacing=8,
                                 ),
                             ],
                             spacing=7,
@@ -211,22 +246,22 @@ class HomePage(BasePage):
                                 ft.Container(
                                     width=36, height=36,
                                     border_radius=18,
-                                    bgcolor=ft.Colors.with_opacity(0.6,"#FFFFFF") if is_income else ft.Colors.with_opacity(0.6,"#FFFFFF"),
+                                    bgcolor=ft.Colors.with_opacity(0.6, "#FFFFFF"),
                                     content=ft.Icon(
                                         ft.Icons.ARROW_UPWARD if is_income else ft.Icons.ARROW_DOWNWARD,
-                                        color="#253A82" if is_income else ft.Colors.with_opacity(0.6,"#FF7E1C"),
+                                        color="#253A82" if is_income else ft.Colors.with_opacity(0.6, "#FF7E1C"),
                                         size=18,
                                     ),
                                     alignment=ft.Alignment(0, 0),
                                 ),
                                 ft.Column([
-                                    ft.Text(t['category_name'], size=15, color="#253A82", weight=ft.FontWeight.W_500,font_family="Montserrat SemiBold"),
-                                    ft.Text(t['description'] or t['date'], size=13, color=ft.Colors.with_opacity(0.6,"#253A82"),font_family="Montserrat SemiBold"),
+                                    ft.Text(t['category_name'], size=15, color="#253A82", weight=ft.FontWeight.W_500, font_family="Montserrat SemiBold"),
+                                    ft.Text(t['description'] or t['date'], size=13, color=ft.Colors.with_opacity(0.6, "#253A82"), font_family="Montserrat SemiBold"),
                                 ], spacing=2),
                             ], spacing=12),
                             ft.Text(
                                 f"{'+ ' if is_income else '− '}{t['amount']:,.0f} ₽",
-                                color="#253A82" if is_income else ft.Colors.with_opacity(0.6,"#FF7E1C"),
+                                color="#253A82" if is_income else ft.Colors.with_opacity(0.6, "#FF7E1C"),
                                 size=15, font_family="Montserrat SemiBold",
                                 weight=ft.FontWeight.W_600,
                             ),

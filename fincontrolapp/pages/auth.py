@@ -20,6 +20,22 @@ def verify_password(stored: str, provided: str) -> bool:
         return False
 
 
+# ── Shared style constants (same as other pages) ─────────────────────────────
+
+_CARD_GRADIENT = ft.LinearGradient(
+    colors=["#ffffff", "#88A2FF"],
+    begin=ft.Alignment(-2, -1),
+    end=ft.Alignment(1, 2),
+)
+
+_BTN_GRADIENT = ft.RadialGradient(
+    colors=["#ffffff", "#88A2FF"],
+    center=ft.Alignment(0, -0.2),
+    radius=4.0,
+    stops=[0.0, 0.8],
+)
+
+
 class AuthPage(ft.Container):
     def __init__(self, page: ft.Page, on_success):
         super().__init__(expand=True)
@@ -29,34 +45,32 @@ class AuthPage(ft.Container):
         self._method = 'email'  # 'email' | 'phone'
         self.bgcolor = "transparent"
         self.padding = ft.Padding(24, 60, 24, 24)
-        self._error_text = ft.Text("", color="#F44336", size=13)
+        self._error_text = ft.Text(
+            "", color=ft.Colors.with_opacity(0.8, "#FF7E1C"),
+            size=13, font_family="Montserrat SemiBold",
+        )
         self.content = self._build()
 
-    # ─── Построение UI ────────────────────────────────────────────────────────
+    # ── Build UI ──────────────────────────────────────────────────────────────
 
     def _build(self):
-        is_email = self._method == 'email'
-        is_register = self._mode == 'register'
+        is_email     = self._method == 'email'
+        is_register  = self._mode == 'register'
 
-        self._contact_field = ft.TextField(
+        self._contact_field = self._field(
             label="Email" if is_email else "Номер телефона",
-            keyboard_type=ft.KeyboardType.EMAIL if is_email else ft.KeyboardType.PHONE,
-            prefix_icon=ft.Icons.EMAIL_OUTLINED if is_email else ft.Icons.PHONE_OUTLINED,
-            border_color="#6C63FF",
+            icon=ft.Icons.EMAIL_OUTLINED if is_email else ft.Icons.PHONE_OUTLINED,
+            keyboard=ft.KeyboardType.EMAIL if is_email else ft.KeyboardType.PHONE,
         )
-        self._password_field = ft.TextField(
+        self._password_field = self._field(
             label="Пароль",
+            icon=ft.Icons.LOCK_OUTLINED,
             password=True,
-            can_reveal_password=True,
-            prefix_icon=ft.Icons.LOCK_OUTLINED,
-            border_color="#6C63FF",
         )
-        self._confirm_field = ft.TextField(
+        self._confirm_field = self._field(
             label="Подтвердите пароль",
+            icon=ft.Icons.LOCK_OUTLINED,
             password=True,
-            can_reveal_password=True,
-            prefix_icon=ft.Icons.LOCK_OUTLINED,
-            border_color="#6C63FF",
         ) if is_register else None
 
         fields = [self._contact_field, self._password_field]
@@ -68,38 +82,91 @@ class AuthPage(ft.Container):
             scroll=ft.ScrollMode.AUTO,
             spacing=0,
             controls=[
-                # Лого
-                ft.Icon(ft.Icons.ACCOUNT_BALANCE_WALLET, size=64, color="#6C63FF"),
-                ft.Container(height=8),
-                ft.Text("FinControl", size=32, weight=ft.FontWeight.BOLD, color="#FFFFFF"),
-                ft.Text("Управляй своими финансами", size=14, color="#888888"),
-                ft.Container(height=32),
-
-                # Карточка формы
+                # ── Логотип ──────────────────────────────────────────────────
                 ft.Container(
-                    bgcolor="#1A1A24",
+                    width=80, 
+                    border_radius=22,
+                    alignment=ft.Alignment(0, 0),
+                    padding=0,
+                    margin=0,
+                    content=ft.Image(
+                             src="logo.svg",   # путь относительно папки assets/
+                             width=80,
+                             height=80,
+                             fit="contain",
+                        ),
+                
+                ),
+                ft.Row(
+                       spacing=0,
+                       tight=True,
+                       controls=[
+                ft.Text(
+                    "Fin",
+                    size=32,
+                    font_family="Montserrat Extrabold",
+                    color="#6976EB",
+                    weight=ft.FontWeight.W_800,
+                ),
+                ft.Text(
+                    "Control",
+                    size=32,
+                    font_family="Montserrat Extrabold",
+                    color="#000000",
+                    weight=ft.FontWeight.W_800,
+                ),
+                       ],
+                ),
+                ft.Text(
+                    "Управляй своими финансами",
+                    size=14,
+                    font_family="Montserrat SemiBold",
+                    color=ft.Colors.with_opacity(0.45, "#000000"),
+                ),
+                ft.Container(height=28),
+
+                # ── Карточка формы ───────────────────────────────────────────
+                ft.Container(
                     border_radius=24,
-                    padding=24,
+                    padding=20,
                     width=float("inf"),
+                    gradient=_CARD_GRADIENT,
                     content=ft.Column([
                         ft.Text(
                             "Вход" if self._mode == 'login' else "Регистрация",
-                            size=20, weight=ft.FontWeight.BOLD, color="#FFFFFF",
+                            size=20,
+                            font_family="Montserrat Semibold",
+                            color="#000000",
+                            weight=ft.FontWeight.W_700,
                         ),
-                        ft.Container(height=4),
+                        ft.Container(height=2),
+
                         # Переключатель email / телефон
                         ft.Row([
-                            self._method_btn("Email", "email"),
-                            self._method_btn("Телефон", "phone"),
+                            self._method_chip("Email",   "email"),
+                            self._method_chip("Телефон", "phone"),
                         ], spacing=8),
-                        ft.Container(height=4),
+
+                        ft.Container(height=2),
                         *fields,
                         self._error_text,
-                        ft.ElevatedButton(
-                            "Войти" if self._mode == 'login' else "Зарегистрироваться",
-                            style=ft.ButtonStyle(bgcolor="#6C63FF", color="#FFFFFF"),
+
+                        # Кнопка submit
+                        ft.Container(
                             width=float("inf"),
+                            height=48,
+                            border_radius=24,
+                            border=ft.border.all(1.5, ft.Colors.with_opacity(0.09, "#483EB7")),
+                            bgcolor=ft.Colors.with_opacity(0.08, "#483EB7"),
+                            alignment=ft.Alignment(0, 0),
+                            ink=True,
                             on_click=self._on_submit,
+                            content=ft.Text(
+                                "Войти" if self._mode == 'login' else "Зарегистрироваться",
+                                font_family="Montserrat SemiBold",
+                                size=16,
+                                color="#000000",
+                            ),
                         ),
                     ], spacing=12),
                 ),
@@ -112,35 +179,79 @@ class AuthPage(ft.Container):
                     controls=[
                         ft.Text(
                             "Уже есть аккаунт? " if is_register else "Нет аккаунта? ",
-                            color="#888888", size=13,
+                            color=ft.Colors.with_opacity(0.5, "#000000"),
+                            size=13,
+                            font_family="Montserrat SemiBold",
                         ),
-                        ft.TextButton(
-                            "Войти" if is_register else "Зарегистрироваться",
-                            style=ft.ButtonStyle(color="#6C63FF"),
-                            on_click=lambda e: self._toggle_mode(),
+                        ft.GestureDetector(
+                            on_tap=lambda e: self._toggle_mode(),
+                            content=ft.Text(
+                                "Войти" if is_register else "Зарегистрироваться",
+                                size=13,
+                                font_family="Montserrat SemiBold",
+                                color="#6976EB",
+                            ),
                         ),
                     ],
                 ),
             ],
         )
 
-    def _rebuild(self):
-        self._error_text = ft.Text("", color="#F44336", size=13)
-        self.content = self._build()
-        self.page_ref.update()
+    # ── Field factory  ───────────────────────────
 
-    def _method_btn(self, label, value):
-        active = self._method == value
-        return ft.ElevatedButton(
-            label,
-            style=ft.ButtonStyle(
-                bgcolor="#6C63FF" if active else "#2A2A35",
-                color="#FFFFFF",
+    def _field(self, label: str, icon=None, password: bool = False,
+               keyboard=ft.KeyboardType.TEXT) -> ft.TextField:
+        return ft.TextField(
+            label=label,
+            password=password,
+            can_reveal_password=password,
+            keyboard_type=keyboard,
+            prefix_icon=icon,
+            border_color="#6976EB",
+            focused_border_color="#5D6BE8",
+            border_radius=16,
+            bgcolor=ft.Colors.with_opacity(0.3, "#FFFFFF"),
+            label_style=ft.TextStyle(
+                font_family="Montserrat SemiBold", color="#888888",
             ),
-            on_click=lambda e, v=value: self._set_method(v),
+            text_style=ft.TextStyle(
+                font_family="Montserrat SemiBold", size=15, color="#000000",
+            ),
+            error_style=ft.TextStyle(
+                font_family="Montserrat Medium", size=10,
+                color=ft.Colors.with_opacity(0.8, "#FF7E1C"),
+            ),
         )
 
-    # ─── Обработчики ──────────────────────────────────────────────────────────
+    # ── Method chip  ────────────
+
+    def _method_chip(self, label: str, value: str) -> ft.Container:
+        active = self._method == value
+        return ft.Container(
+            content=ft.Text(
+                label,
+                font_family="Montserrat SemiBold",
+                size=13,
+                color="#000000" if active else ft.Colors.with_opacity(0.6, "#000000"),
+            ),
+            padding=ft.padding.symmetric(horizontal=16, vertical=8),
+            border_radius=20,
+            border=ft.border.all(1.5, ft.Colors.with_opacity(0.09, "#6976EB")),
+            bgcolor=ft.Colors.with_opacity(0.4, "#6976EB") if active else None,
+            
+            on_click=lambda e, v=value: self._set_method(v),
+            ink=True,
+        )
+
+    # ── Handlers ──────────────────────────────────────────────────────────────
+
+    def _rebuild(self):
+        self._error_text = ft.Text(
+            "", color=ft.Colors.with_opacity(0.8, "#FF7E1C"),
+            size=13, font_family="Montserrat SemiBold",
+        )
+        self.content = self._build()
+        self.page_ref.update()
 
     def _set_method(self, method):
         self._method = method
@@ -155,7 +266,7 @@ class AuthPage(ft.Container):
         self.page_ref.update()
 
     def _on_submit(self, e):
-        contact = (self._contact_field.value or "").strip()
+        contact  = (self._contact_field.value or "").strip()
         password = self._password_field.value or ""
 
         if not contact or not password:
@@ -177,7 +288,7 @@ class AuthPage(ft.Container):
     def _register(self, contact, password):
         is_email = self._method == 'email'
         with get_connection() as conn:
-            field = "email" if is_email else "phone"
+            field    = "email" if is_email else "phone"
             existing = conn.execute(
                 f"SELECT id FROM users WHERE {field}=?", (contact,)
             ).fetchone()
@@ -187,9 +298,9 @@ class AuthPage(ft.Container):
                 return
 
             pwd_hash = hash_password(password)
-            cursor = conn.execute(
+            cursor   = conn.execute(
                 f"INSERT INTO users ({field}, password_hash) VALUES (?, ?)",
-                (contact, pwd_hash)
+                (contact, pwd_hash),
             )
             user_id = cursor.lastrowid
 
@@ -197,7 +308,7 @@ class AuthPage(ft.Container):
 
     def _login(self, contact, password):
         is_email = self._method == 'email'
-        field = "email" if is_email else "phone"
+        field    = "email" if is_email else "phone"
         with get_connection() as conn:
             user = conn.execute(
                 f"SELECT id, password_hash FROM users WHERE {field}=?", (contact,)

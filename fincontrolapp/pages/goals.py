@@ -32,7 +32,7 @@ class GoalsPage(BasePage):
                     content=ft.Container(
                         width=float("inf"),
                         height=48,
-                        border_radius=12,
+                        border_radius=24,
                         gradient=ft.RadialGradient(
                             colors=["#ffffff", "#88A2FF"],
                             center=ft.Alignment(0, -0.2),
@@ -320,7 +320,10 @@ class GoalsPage(BasePage):
             try:
                 self._ctrl.delete_goal(goal_id)
                 self.refresh()
-            finally:
+                _close_dialog(self.page_ref, dlg)
+                self._show_success("Цель удалена")
+            except Exception:
+                self._show_error("Не удалось удалить цель")
                 _close_dialog(self.page_ref, dlg)
 
         dlg.content = ft.Text(
@@ -463,10 +466,15 @@ class GoalsPage(BasePage):
                 deadline_display.update()
                 return
 
-            self._ctrl.add_goal(name=name, target_amount=amount, deadline=deadline)
+            try:
+                self._ctrl.add_goal(name=name, target_amount=amount, deadline=deadline)
+            except Exception:
+                self._show_error("Не удалось создать цель", close_bs=bs)
+                return
             bs.open = False
             self.page.update()
             self.refresh()
+            self._show_success("Цель создана")
 
         bs.content = ft.Container(
             padding=ft.Padding.only(left=20, right=20, top=24, bottom=32),
@@ -577,7 +585,11 @@ class GoalsPage(BasePage):
                 amount_field.update()
                 return
 
-            self._ctrl.deposit(goal_id, amount)
+            try:
+                self._ctrl.deposit(goal_id, amount)
+            except Exception:
+                self._show_error("Не удалось пополнить цель", close_bs=bs)
+                return
             bs.open = False
             self.page.update()
             self.rebuild()
@@ -760,10 +772,15 @@ class GoalsPage(BasePage):
                 deadline_display.update()
                 return
 
-            self._ctrl.update_goal(goal_id=goal["id"], name=name, target_amount=amount, deadline=deadline)
+            try:
+                self._ctrl.update_goal(goal_id=goal["id"], name=name, target_amount=amount, deadline=deadline)
+            except Exception:
+                self._show_error("Не удалось сохранить цель", close_bs=bs)
+                return
             bs.open = False
             self.page.update()
             self.refresh()
+            self._show_success("Цель сохранена")
 
         bs.content = ft.Container(
             padding=ft.Padding.only(left=20, right=20, top=24, bottom=32),
