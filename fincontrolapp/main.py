@@ -6,9 +6,8 @@ from pages.auth import AuthPage
 from components import AppTheme
 from controllers import (HomeController, GoalsController, SubscriptionsController,
                          TransactionsController, ExpensesController, IncomeController,
-                         SettingsController)
-from components import show_dialog, close_dialog, build_nav
                          SettingsController, SimulatorController)
+from components import show_dialog, close_dialog
 from database import create_tables, get_connection
 
 
@@ -113,18 +112,18 @@ def main(page: ft.Page):
 
         def on_submit(e):
             if not user_id:
-                _close_dialog(page, dlg)
+                close_dialog(page, dlg)
                 return
 
             raw = (amount_field.value or "").replace(" ", "").strip()
             if not raw:
-                _close_dialog(page, dlg)
+                close_dialog(page, dlg)
                 return
 
             try:
                 amount = float(raw.replace(",", "."))
             except ValueError:
-                _close_dialog(page, dlg)
+                close_dialog(page, dlg)
                 page.show_dialog(ft.SnackBar(
                     content=ft.Text("Введите корректную сумму", color="#FFFFFF", font_family="Montserrat Medium", size=14),
                     bgcolor="#F44336",
@@ -136,7 +135,7 @@ def main(page: ft.Page):
                 return
 
             if amount <= 0:
-                _close_dialog(page, dlg)
+                close_dialog(page, dlg)
                 return
 
             try:
@@ -322,7 +321,7 @@ def main(page: ft.Page):
             pages[index].refresh()
             content.content = pages[index]
             content.update()
-            nav_container.content = build_nav(index, navigate)
+            nav_container.content = build_nav(index)
             nav_container.update()
 
         uid = page.data["user_id"]
@@ -351,7 +350,7 @@ def main(page: ft.Page):
         )
 
         content.content = pages[0]
-        nav_container.content = build_nav(0, navigate)
+        nav_container.content = build_nav(0)
 
         inner.content = ft.Column(
             controls=[content, nav_container],

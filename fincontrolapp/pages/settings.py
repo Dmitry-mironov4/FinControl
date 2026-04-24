@@ -294,7 +294,7 @@ class SettingsPage(BasePage):
         if user_id is None:
             self._show_error("Не удалось получить данные пользователя")
             return
-        deep_link = f"https://t.me/f1nc0ntr0l_bot?start={user_id}"
+        deep_link = f"https://t.me/F1nC0ntrolBot?start={user_id}"
         dlg = ft.AlertDialog(modal=True, title=ft.Text("Telegram-бот", font_family="Montserrat SemiBold"))
 
         def on_cancel(e):
