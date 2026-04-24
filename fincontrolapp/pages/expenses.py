@@ -464,7 +464,8 @@ class ExpensesPage(BasePage):
                 pages[0].rebuild()
             bs.open = False
             self.page.update()
-            self._show_success("Расход добавлен")
+            self.page_ref.snack_bar = ft.SnackBar(ft.Text("Расход добавлен", font_family="Montserrat SemiBold"), open=True)
+            self.page_ref.update()
 
         bs.content = ft.Container(
             padding=ft.Padding.only(left=20, right=20, top=24, bottom=32),

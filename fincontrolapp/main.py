@@ -1,13 +1,14 @@
 import json
 import os
 import flet as ft
-from pages import HomePage, TransactionsPage, GoalsPage, SettingsPage, SubscriptionsPage, IncomePage, ExpensesPage, AnalyticsPage
+from pages import HomePage, TransactionsPage, GoalsPage, SettingsPage, SubscriptionsPage, IncomePage, ExpensesPage, AnalyticsPage, SimulatorPage
 from pages.auth import AuthPage
 from components import AppTheme
 from controllers import (HomeController, GoalsController, SubscriptionsController,
                          TransactionsController, ExpensesController, IncomeController,
-                         SettingsController)
+                         SettingsController, SimulatorController)
 from database import create_tables, get_connection
+from components.dialogs import close_dialog 
 
 
 
@@ -148,37 +149,47 @@ def main(page: ft.Page):
                     cat = conn.execute(
                         "SELECT id FROM categories WHERE name='Начальный баланс'"
                     ).fetchone()
-                if cat:
-                    add_transaction(
-                        user_id=user_id,
-                        type_='income',
-                        amount=amount,
-                        category_id=cat['id'],
-                        description="Начальный баланс",
-                        date=str(date.today()),
-                    )
-                    pages = page.data.get("pages")
-                    if pages:
-                        pages[0].refresh()
-                _close_dialog(page, dlg)
-                page.show_dialog(ft.SnackBar(
-                    content=ft.Text("Баланс сохранён", color="#FFFFFF", font_family="Montserrat Medium", size=14),
-                    bgcolor="#4CAF50",
-                    shape=ft.RoundedRectangleBorder(radius=12),
-                    behavior=ft.SnackBarBehavior.FLOATING,
-                    margin=ft.Margin.only(left=16, right=16, bottom=80),
-                    duration=2500,
-                ))
+                    if not cat:
+                        return 
+                    
+                    # LIMIT 1 нужен, чтобы не создавать дубликаты при повторном открытии диалога
+                    existing = conn.execute(
+                        """
+                        SELECT id FROM transactions
+                        WHERE user_id=? 
+                            AND category_id=? 
+                        LIMIT 1 
+                        """, 
+                        (user_id, cat['id']),
+                    ).fetchone()
+                    if existing:
+                        conn.execute(
+                            """UPDATE transactions 
+                            SET amount=?, date=? 
+                            WHERE id=?
+                            """,
+                            (amount, str(date.today()), existing['id']),
+                        )
+                    else:
+                        conn.execute(
+                            """
+                            INSERT INTO transactions (user_id, type, amount, category_id, description, date)
+                            VALUES (?, 'income', ?, ?, 'Начальный баланс', ?)
+                            """,
+                            (user_id, amount, cat['id'], str(date.today())),
+                        )
+            except ValueError:
+                page.snack_bar = ft.SnackBar(ft.Text("Введите корректную сумму",font_family="Montserrat Medium"), open=True)
+                page.update()
+                return
             except Exception:
-                _close_dialog(page, dlg)
-                page.show_dialog(ft.SnackBar(
-                    content=ft.Text("Не удалось сохранить баланс", color="#FFFFFF", font_family="Montserrat Medium", size=14),
-                    bgcolor="#F44336",
-                    shape=ft.RoundedRectangleBorder(radius=12),
-                    behavior=ft.SnackBarBehavior.FLOATING,
-                    margin=ft.Margin.only(left=16, right=16, bottom=80),
-                    duration=3000,
-                ))
+                page.snack_bar = ft.SnackBar(ft.Text("Не удалось сохранить баланс",font_family="Montserrat Medium"), open=True)
+                page.update()
+            finally:
+                close_dialog(page, dlg)
+                home = page.data.get("pages", {}).get(0)
+                if home:
+                    home.rebuild()
 
         dlg.content = ft.Column([
             ft.Text("Сколько денег у тебя сейчас?",font_family="Montserrat SemiBold", color="#000000", size=14),
@@ -274,6 +285,7 @@ def main(page: ft.Page):
                 ("navigation/home.svg",         0),
                 ("navigation/analytics.svg",    1),
                 ("navigation/goals.svg",        2),
+                ("navigation/test.svg",         8),
                 ("navigation/settings.svg",     3),
             ]
 
@@ -328,6 +340,7 @@ def main(page: ft.Page):
             5: IncomePage(page, IncomeController(uid)),
             6: ExpensesPage(page, ExpensesController(uid)),
             7: TransactionsPage(page, TransactionsController(uid)),
+            8: SimulatorPage(page, SimulatorController()),
         }
 
         def logout():

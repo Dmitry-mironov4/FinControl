@@ -7,6 +7,37 @@ from components.dialogs import close_dialog as _close_dialog
 MONTH_SHORT = ["янв", "фев", "мар", "апр", "май", "июн",
                "июл", "авг", "сен", "окт", "ноя", "дек"]
 
+# Иконки популярных сервисов по ключевым словам в названии
+SERVICE_ICONS = {
+    "spotify": (ft.Icons.MUSIC_NOTE, "#1DB954"),
+    "netflix": (ft.Icons.MOVIE, "#E50914"),
+    "youtube": (ft.Icons.PLAY_CIRCLE, "#FF0000"),
+    "apple": (ft.Icons.APPLE, "#555555"),
+    "google": (ft.Icons.LANGUAGE, "#4285F4"),
+    "yandex": (ft.Icons.SEARCH, "#FF0000"),
+    "vk": (ft.Icons.PEOPLE, "#0077FF"),
+    "telegram": (ft.Icons.TELEGRAM, "#2CA5E0"),
+    "icloud": (ft.Icons.CLOUD, "#3C8DBC"),
+    "xbox": (ft.Icons.SPORTS_ESPORTS, "#107C10"),
+    "playstation": (ft.Icons.SPORTS_ESPORTS, "#003791"),
+    "steam": (ft.Icons.VIDEOGAME_ASSET, "#1B2838"),
+    "amazon": (ft.Icons.SHOPPING_CART, "#FF9900"),
+    "курс": (ft.Icons.SCHOOL, "#6C63FF"),
+    "gym": (ft.Icons.FITNESS_CENTER, "#FF5722"),
+    "зал": (ft.Icons.FITNESS_CENTER, "#FF5722"),
+    "фитнес": (ft.Icons.FITNESS_CENTER, "#FF5722"),
+}
+
+def _get_service_icon(name: str):
+    name_lower = name.lower()
+    for key, (icon, color) in SERVICE_ICONS.items():
+        if key in name_lower:
+            return icon, color
+    return ft.Icons.SUBSCRIPTIONS, "#483EB7"
+
+def _days_until(next_date) -> int:
+    return (next_date - date.today()).days
+
 
 class SubscriptionsPage(BasePage):
     def __init__(self, page: ft.Page, ctrl):
@@ -107,11 +138,24 @@ class SubscriptionsPage(BasePage):
                 visible=False,
             )
 
+            svc_icon, svc_color = _get_service_icon(s["name"])
+            days_left = _days_until(next_date)
+            urgent = days_left <= 3
+            next_color = ft.Colors.with_opacity(0.8, "#FF7E1C") if urgent else ft.Colors.with_opacity(0.7, "#000000")
+            next_text = f"⚠ через {days_left} дн." if urgent else f"Следующее: {next_label}"
+            # Годовая стоимость для месячных подписок
+            yearly_text = f"{s['amount'] * 12:,.0f} ₽/год" if s["period"] == "monthly" else None
+
             row_content = ft.Container(
                 padding=ft.Padding.only(left=16, right=8, top=10, bottom=10),
                 border_radius=16,
                 shadow=None,
-                border=ft.Border(),
+                border=ft.Border(
+                    top=ft.BorderSide(1.5, ft.Colors.with_opacity(0.5, "#FF7E1C")),
+                    bottom=ft.BorderSide(1.5, ft.Colors.with_opacity(0.5, "#FF7E1C")),
+                    left=ft.BorderSide(1.5, ft.Colors.with_opacity(0.5, "#FF7E1C")),
+                    right=ft.BorderSide(1.5, ft.Colors.with_opacity(0.5, "#FF7E1C")),
+                ) if urgent else ft.Border(),
                 gradient=ft.LinearGradient(
                     colors=["#ffffff", "#88A2FF"],
                     begin=ft.Alignment(-1, -1),
@@ -120,23 +164,40 @@ class SubscriptionsPage(BasePage):
                 content=ft.Row(
                     alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                     controls=[
-                        ft.Column([
-                            ft.Text(s["name"], size=14, color="#000000",font_family="Montserrat SemiBold",
-                                    weight=ft.FontWeight.W_500),
-                            ft.Text(f"Следующее: {next_label}",font_family="Montserrat SemiBold",
-                                    size=12, color="#000000"),
-                        ], spacing=2, expand=True),
+                        ft.Row([
+                            ft.Container(
+                                width=36, height=36, border_radius=18,
+                                bgcolor=ft.Colors.with_opacity(0.7, "#FFFFFF"),
+                                alignment=ft.Alignment(0, 0),
+                                content=ft.Icon(svc_icon, color=svc_color, size=20),
+                            ),
+                            ft.Column([
+                                ft.Text(s["name"], size=14, color="#000000",
+                                        font_family="Montserrat SemiBold",
+                                        weight=ft.FontWeight.W_500),
+                                ft.Text(next_text, font_family="Montserrat SemiBold",
+                                        size=12, color=next_color),
+                            ], spacing=2, expand=True),
+                        ], spacing=10, expand=True),
                         ft.Row([
                             ft.Column([
                                 ft.Text(
                                     f"{s['amount']:,.0f} ₽",
-                                    color="#483EB7", size=14,font_family="Montserrat SemiBold",
+                                    color="#483EB7", size=14,
+                                    font_family="Montserrat SemiBold",
                                     weight=ft.FontWeight.W_600,
                                     text_align=ft.TextAlign.RIGHT,
                                 ),
-                                ft.Text(period_label, size=11, color=ft.Colors.with_opacity(0.8, "#000000"),font_family="Montserrat SemiBold",
+                                ft.Text(period_label, size=11,
+                                        color=ft.Colors.with_opacity(0.8, "#000000"),
+                                        font_family="Montserrat SemiBold",
                                         text_align=ft.TextAlign.RIGHT),
-                            ], spacing=2,
+                                *([ft.Text(yearly_text, size=10,
+                                           color=ft.Colors.with_opacity(0.5, "#000000"),
+                                           font_family="Montserrat Medium",
+                                           text_align=ft.TextAlign.RIGHT)]
+                                  if yearly_text else []),
+                            ], spacing=1,
                                 horizontal_alignment=ft.CrossAxisAlignment.END),
                             ft.IconButton(
                                 ft.Icons.EDIT_OUTLINED,

@@ -22,35 +22,174 @@ class SettingsPage(BasePage):
         )
 
     def build_body(self):
+        user = self._ctrl.get_user()
+        username = (user["username"] or "User") if user else "User"
+        contact = (user["email"] or user["phone"] or "") if user else ""
+    
+        # Инициалы из имени
+        parts = username.strip().split()
+        initials = (parts[0][0] + (parts[1][0] if len(parts) > 1 else "")).upper()
+
+        avatar_block = ft.Container(
+    padding=ft.padding.symmetric(horizontal=16, vertical=12),
+    border_radius=18,
+    border=ft.border.all(1.5, ft.Colors.with_opacity(0.06, "#483EB7")),
+    bgcolor=ft.Colors.with_opacity(0.04, "#483EB7"),
+    content=ft.Row([
+        ft.Container(
+            width=64, height=64,
+            border_radius=32,
+            gradient=ft.LinearGradient(
+                colors=["#ffffff", "#88A2FF"],
+                begin=ft.Alignment(-1, -1),
+                end=ft.Alignment(1, 1),
+            ),
+            alignment=ft.Alignment(0, 0),
+            content=ft.Text(
+                initials,
+                size=24,
+                font_family="Montserrat SemiBold",
+                color="#483EB7",
+                weight=ft.FontWeight.BOLD,
+            ),
+        ),
+        ft.Column([
+            ft.Text(
+                username,
+                size=18,
+                font_family="Montserrat SemiBold",
+                color="#000000",
+                weight=ft.FontWeight.W_600,
+            ),
+            ft.Text(
+                contact,
+                size=13,
+                font_family="Montserrat SemiBold",
+                color=ft.Colors.with_opacity(0.5, "#000000"),
+            ) if contact else ft.Container(),
+        ], spacing=2),
+    ], spacing=16, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+)
+
         return ft.Column([
-            self._setting_item(ft.Icons.PERSON_OUTLINE, "Профиль", "Настройте своё имя",
-                on_click=self._open_profile_dialog),
-            self._setting_item(ft.Icons.NOTIFICATIONS_OUTLINED, "Уведомления", "Напоминания о расходах",
-                on_click=self._open_notifications_dialog),
-            self._setting_item(ft.Icons.CURRENCY_RUBLE, "Валюта", "Рубль (₽)",
-                on_click=self._open_currency_dialog),
-            self._setting_item(ft.Icons.TELEGRAM, "Telegram-бот", "Подключить бота",
-                on_click=self._open_telegram_dialog),
-            self._setting_item(
-                ft.Icons.ACCOUNT_BALANCE_WALLET_OUTLINED, "Изменить баланс",
-                "Скорректировать текущий баланс",
-                on_click=lambda e: self.page_ref.data["show_balance_dialog"](),
+            avatar_block,
+            # ── Группа: Аккаунт ──────────────────────────────────────────
+            self._section_header("Аккаунт"),
+            self._group([
+                self._setting_item(ft.Icons.PERSON_OUTLINE, "Профиль", "Настройте своё имя",
+                    on_click=self._open_profile_dialog),
+                self._setting_item(ft.Icons.NOTIFICATIONS_OUTLINED, "Уведомления", "Напоминания о расходах",
+                    on_click=self._open_notifications_dialog, divider=True),
+                self._setting_item(ft.Icons.CURRENCY_RUBLE, "Валюта", "Рубль (₽)",
+                    on_click=self._open_currency_dialog, divider=True),
+                self._setting_item(ft.Icons.TELEGRAM, "Telegram-бот", "Подключить бота",
+                    on_click=self._open_telegram_dialog, divider=True),
+            ]),
+
+            # ── Группа: Баланс ───────────────────────────────────────────
+            self._section_header("Баланс"),
+            self._group([
+                self._setting_item(
+                    ft.Icons.ACCOUNT_BALANCE_WALLET_OUTLINED, "Изменить баланс",
+                    "Скорректировать текущий баланс",
+                    on_click=lambda e: self.page_ref.data["show_balance_dialog"](),
+                ),
+            ]),
+
+            # ── Группа: Опасная зона ─────────────────────────────────────
+            self._section_header("Опасная зона"),
+            self._group([
+                self._setting_item(
+                    ft.Icons.DELETE_OUTLINE, "Сбросить данные",
+                    "Удалить все транзакции, цели, подписки",
+                    color=ft.Colors.with_opacity(0.8, "#FF7E1C"), on_click=self._confirm_reset,
+                ),
+                self._setting_item(
+                    ft.Icons.NO_ACCOUNTS_OUTLINED, "Удалить аккаунт",
+                    "Полностью удалить профиль и все данные",
+                    color=ft.Colors.with_opacity(0.8, "#FF7E1C"), on_click=self._confirm_delete_account,
+                    divider=True,
+                ),
+                self._setting_item(
+                    ft.Icons.LOGOUT, "Выйти из аккаунта", "Сменить пользователя",
+                    color=ft.Colors.with_opacity(0.8, "#FF7E1C"),
+                    on_click=lambda e: self.page_ref.data["logout"](),
+                    divider=True,
+                ),
+            ]),
+        ], spacing=4)
+
+    # ── Вспомогательные методы ───────────────────────────────────────────
+
+    def _section_header(self, label: str) -> ft.Container:
+        """Заголовок группы (серый текст, как 'Account' / 'Preferences' на картинке)."""
+        return ft.Container(
+            padding=ft.padding.only(left=4, top=12, bottom=4),
+            content=ft.Text(
+                label,
+                size=12,
+                color=ft.Colors.with_opacity(0.45, "#000000"),
+                font_family="Montserrat SemiBold",
+                weight=ft.FontWeight.W_600,
             ),
-            self._setting_item(
-                ft.Icons.DELETE_OUTLINE, "Сбросить данные",
-                "Удалить все транзакции, цели, подписки",
-                color=ft.Colors.with_opacity(0.8, "#FF7E1C"), on_click=self._confirm_reset,
+        )
+
+    def _group(self, items: list) -> ft.Container:
+        """Обёртка группы — белая карточка с закруглёнными углами."""
+        return ft.Container(
+            gradient=ft.RadialGradient(
+                colors=["#ffffff", "#88A2FF"],
+                center=ft.Alignment(0.3, 0.9),
+                radius=7.0,
+                stops=[0.0, 0.8],
             ),
-            self._setting_item(
-                ft.Icons.NO_ACCOUNTS_OUTLINED, "Удалить аккаунт",
-                "Полностью удалить профиль и все данные",
-                color=ft.Colors.with_opacity(0.8, "#FF7E1C"), on_click=self._confirm_delete_account,
-            ),
-            self._setting_item(
-                ft.Icons.LOGOUT, "Выйти из аккаунта", "Сменить пользователя",
-                color=ft.Colors.with_opacity(0.8, "#FF7E1C"), on_click=lambda e: self.page_ref.data["logout"](),
-            ),
-        ], spacing=8)
+            border_radius=12,
+            clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
+            content=ft.Column(items, spacing=0, tight=True),
+        )
+
+    def _setting_item(self, icon, title, subtitle, color="#000000",
+                      on_click=None, divider: bool = False):
+        """
+        Один пункт настроек внутри группы.
+        divider=True добавляет тонкую разделительную линию сверху.
+        """
+        row = ft.Container(
+            padding=ft.padding.symmetric(horizontal=16, vertical=14),
+            ink=True,
+            on_click=on_click,
+            content=ft.Row([
+                ft.Icon(icon, color=color, size=22),
+                ft.Column([
+                    ft.Text(
+                        title,
+                        size=15,
+                        color=color,
+                        font_family="Montserrat SemiBold",
+                        weight=ft.FontWeight.W_600,
+                    ),
+                    ft.Text(
+                        subtitle,
+                        size=12,
+                        color=ft.Colors.with_opacity(0.6, "#000000"),
+                        font_family="Montserrat SemiBold",
+                    ),
+                ], spacing=2, expand=True),
+                ft.Icon(ft.Icons.CHEVRON_RIGHT,
+                        color=ft.Colors.with_opacity(0.45, "#000000"), size=20),
+            ], spacing=12),
+        )
+
+        if not divider:
+            return row
+
+        return ft.Column([
+            ft.Divider(height=1, thickness=0.5,
+                       color=ft.Colors.with_opacity(0.12, "#000000")),
+            row,
+        ], spacing=0, tight=True)
+
+    # ── Диалоги (без изменений) ──────────────────────────────────────────
 
     def _open_profile_dialog(self, e):
         user = self._ctrl.get_user()
@@ -62,9 +201,8 @@ class SettingsPage(BasePage):
             border_color="#6976EB",
         )
         contact_hint = (user["email"] or user["phone"] or "") if user else ""
- 
         dlg = ft.AlertDialog(modal=True, title=ft.Text("Профиль", font_family="Montserrat SemiBold"))
- 
+
         def on_cancel(e):
             _close_dialog(self.page_ref, dlg)
  
@@ -75,26 +213,29 @@ class SettingsPage(BasePage):
                 self._show_error("Не удалось сохранить имя")
                 return
             _close_dialog(self.page_ref, dlg)
-            self._show_success("Имя сохранено")
+            self.page_ref.snack_bar = ft.SnackBar(ft.Text("Имя сохранено ✓", font_family="Montserrat SemiBold"), open=True)
+            self.page_ref.update()
 
 
         dlg.content = ft.Column([
-            ft.Text(contact_hint, size=12, color=ft.Colors.with_opacity(0.6, "#000000"), font_family="Montserrat SemiBold") if contact_hint else ft.Container(),
+            ft.Text(contact_hint, size=12, color=ft.Colors.with_opacity(0.6, "#000000"),
+                    font_family="Montserrat SemiBold") if contact_hint else ft.Container(),
             username_field,
         ], tight=True, spacing=12)
         dlg.actions = [
-            ft.TextButton("Отмена",style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_cancel),
-            ft.TextButton("Сохранить",style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_submit),
+            ft.TextButton("Отмена", style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_cancel),
+            ft.TextButton("Сохранить", style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_submit),
         ]
         _show_dialog(self.page_ref, dlg)
  
     def _open_notifications_dialog(self, e):
         enabled = self.page_ref.data.get("_s_notifications", False)
         switch = ft.Switch(value=enabled, active_color="#6976EB")
-        switch_row = ft.Row([switch,ft.Text("Напоминания о расходах", font_family="Montserrat SemiBold", size=13, color=ft.Colors.with_opacity(0.6, "#000000")),
-        ], spacing=8)
+        switch_row = ft.Row([switch, ft.Text("Напоминания о расходах",
+            font_family="Montserrat SemiBold", size=13,
+            color=ft.Colors.with_opacity(0.6, "#000000"))], spacing=8)
         dlg = ft.AlertDialog(modal=True, title=ft.Text("Уведомления", font_family="Montserrat SemiBold"))
- 
+
         def on_cancel(e):
             _close_dialog(self.page_ref, dlg)
  
@@ -102,7 +243,8 @@ class SettingsPage(BasePage):
             self.page_ref.data["_s_notifications"] = switch.value
             msg = "Уведомления включены" if switch.value else "Уведомления выключены"
             _close_dialog(self.page_ref, dlg)
-            self._show_success(msg)
+            self.page_ref.snack_bar = ft.SnackBar(ft.Text(msg, font_family="Montserrat SemiBold"), open=True)
+            self.page_ref.update()
 
 
         dlg.content = ft.Column([
@@ -111,8 +253,8 @@ class SettingsPage(BasePage):
             switch_row,
         ], tight=True, spacing=12)
         dlg.actions = [
-            ft.TextButton("Отмена",style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_cancel),
-            ft.TextButton("Сохранить",style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_submit),
+            ft.TextButton("Отмена", style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_cancel),
+            ft.TextButton("Сохранить", style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_submit),
         ]
         _show_dialog(self.page_ref, dlg)
  
@@ -125,25 +267,24 @@ class SettingsPage(BasePage):
             ("BYN", "Br  Белорусский рубль"),
         ]
         current = self.page_ref.data.get("_s_currency", "RUB")
-        dd = ft.Dropdown(
-            label="Валюта", value=current, border_color="#6976EB",
-            options=[ft.dropdown.Option(code, label) for code, label in currencies],
-        )
+        dd = ft.Dropdown(label="Валюта", value=current, border_color="#6976EB",
+            options=[ft.dropdown.Option(code, label) for code, label in currencies])
         dlg = ft.AlertDialog(modal=True, title=ft.Text("Валюта", font_family="Montserrat SemiBold"))
- 
+
         def on_cancel(e):
             _close_dialog(self.page_ref, dlg)
  
         def on_submit(e):
             self.page_ref.data["_s_currency"] = dd.value
             _close_dialog(self.page_ref, dlg)
-            self._show_success("Валюта изменена")
+            self.page_ref.snack_bar = ft.SnackBar(ft.Text("Валюта сохранена ✓", font_family="Montserrat SemiBold"), open=True)
+            self.page_ref.update()
 
 
         dlg.content = ft.Column([dd], tight=True)
         dlg.actions = [
-            ft.TextButton("Отмена",style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_cancel),
-            ft.TextButton("Сохранить",style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_submit),
+            ft.TextButton("Отмена", style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_cancel),
+            ft.TextButton("Сохранить", style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_submit),
         ]
         _show_dialog(self.page_ref, dlg)
  
@@ -177,35 +318,38 @@ class SettingsPage(BasePage):
  
     def _confirm_reset(self, e):
         dlg = ft.AlertDialog(modal=True, title=ft.Text("Сбросить данные?", font_family="Montserrat SemiBold"))
- 
+
         def on_cancel(e):
             _close_dialog(self.page_ref, dlg)
  
         def on_confirm(e):
             try:
                 self._ctrl.reset_data()
+                self.page_ref.snack_bar = ft.SnackBar(ft.Text("Данные удалены", font_family="Montserrat SemiBold"), open=True)
+                self.page_ref.update()
+            finally:
                 _close_dialog(self.page_ref, dlg)
-                self._show_success("Данные сброшены")
-            except Exception:
-                self._show_error("Не удалось сбросить данные")
-                _close_dialog(self.page_ref, dlg)
- 
-        dlg.content = ft.Text("Все транзакции, цели и подписки будут удалены. Отменить нельзя.", color=ft.Colors.with_opacity(0.6, "#000000"),font_family="Montserrat SemiBold")
+
+        dlg.content = ft.Text("Все транзакции, цели и подписки будут удалены. Отменить нельзя.",
+            color=ft.Colors.with_opacity(0.6, "#000000"), font_family="Montserrat SemiBold")
         dlg.actions = [
-            ft.TextButton("Отмена", style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")),on_click=on_cancel),
-            ft.TextButton("Удалить", style=ft.ButtonStyle(color=ft.Colors.with_opacity(0.8, "#FF7E1C"),text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_confirm),
+            ft.TextButton("Отмена", style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_cancel),
+            ft.TextButton("Удалить", style=ft.ButtonStyle(color=ft.Colors.with_opacity(0.8, "#FF7E1C"),
+                text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_confirm),
         ]
         _show_dialog(self.page_ref, dlg)
  
     def _confirm_delete_account(self, e):
         dlg = ft.AlertDialog(modal=True, title=ft.Text("Удалить аккаунт?", font_family="Montserrat SemiBold"))
- 
+
         def on_cancel(e):
             _close_dialog(self.page_ref, dlg)
  
         def on_confirm(e):
             try:
                 self._ctrl.delete_account()
+                self.page_ref.snack_bar = ft.SnackBar(ft.Text("Аккаунт удален", font_family="Montserrat SemiBold"), open=True)
+                self.page_ref.update()
                 self.page_ref.data["logout"]()
             except Exception:
                 self._show_error("Не удалось удалить аккаунт")
@@ -213,42 +357,12 @@ class SettingsPage(BasePage):
                 _close_dialog(self.page_ref, dlg)
  
         dlg.content = ft.Text(
-            "Профиль, транзакции, цели и подписки будут удалены без возможности восстановления."
-        , font_family="Montserrat SemiBold",color=ft.Colors.with_opacity(0.6, "#000000"))
+            "Профиль, транзакции, цели и подписки будут удалены без возможности восстановления.",
+            font_family="Montserrat SemiBold", color=ft.Colors.with_opacity(0.6, "#000000"))
         dlg.actions = [
-            ft.TextButton("Отмена",style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_cancel),
-            ft.TextButton("Удалить аккаунт", style=ft.ButtonStyle(text_style=ft.TextStyle(font_family="Montserrat SemiBold"),color=ft.Colors.with_opacity(0.8, "#FF7E1C")),
-                          on_click=on_confirm),
+            ft.TextButton("Отмена", style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_cancel),
+            ft.TextButton("Удалить аккаунт", style=ft.ButtonStyle(
+                text_style=ft.TextStyle(font_family="Montserrat SemiBold"),
+                color=ft.Colors.with_opacity(0.8, "#FF7E1C")), on_click=on_confirm),
         ]
         _show_dialog(self.page_ref, dlg)
-
-    def _setting_item(self, icon, title, subtitle, color="#000000", on_click=None):
-        return ft.Container(
-            gradient=ft.RadialGradient(
-                colors=["#ffffff", "#88A2FF"],
-                center=ft.Alignment(0.3, 0.9),
-                radius=5.0,
-                stops=[0.0, 0.8],
-            ),
-            border_radius=12, padding=16, ink=True,
-            on_click=on_click,
-            content=ft.Row([
-                ft.Icon(icon, color=color, size=24),
-                ft.Column([
-                    ft.Text(
-                        title,
-                        size=15,
-                        color=color,
-                        font_family="Montserrat SemiBold",
-                        weight=ft.FontWeight.W_600,
-                    ),
-                    ft.Text(
-                        subtitle,
-                        size=12,
-                        color=ft.Colors.with_opacity(0.6, "#000000"),
-                        font_family="Montserrat SemiBold",
-                    ),
-                ], spacing=2, expand=True),
-                ft.Icon(ft.Icons.CHEVRON_RIGHT, color=ft.Colors.with_opacity(0.6, "#000000"), size=20),
-            ], spacing=12),
-        )
