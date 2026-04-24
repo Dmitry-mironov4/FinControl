@@ -708,22 +708,230 @@ class SubscriptionsPage(BasePage):
                 day_field.update()
                 return
 
-            try:
-                self._ctrl.update_subscription(
-                    subscription_id=subscription["id"],
-                    name=name,
-                    amount=amount,
-                    charge_day=charge_day,
-                    period=period_dd.value,
-                    start_date=start_field.value,
-                )
-            except Exception:
-                self._show_error("Не удалось сохранить подписку", close_bs=bs)
-                return
+            self._ctrl.add_subscription(
+                name=name,
+                amount=amount,
+                charge_day=charge_day,
+                period=period_dd.value,
+                start_date=start_field.value,
+            )
             bs.open = False
             self.page.update()
             self.refresh()
-            self._show_success("Подписка сохранена")
+            self.page_ref.snack_bar = ft.SnackBar(ft.Text("Подписка добавлена"), open=True)
+            self.page_ref.update()
+
+        bs.content = ft.Container(
+            padding=ft.Padding.only(left=20, right=20, top=16, bottom=16),
+            content=ft.Column(
+                tight=True,
+                spacing=8,
+                scroll=ft.ScrollMode.AUTO,
+                controls=[
+                    ft.Row(
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        controls=[
+                            ft.Text(
+                                "Добавить подписку",
+                                color="#000000",
+                                font_family="Montserrat SemiBold",
+                                size=24,
+                            ),
+                        ],
+                    ),
+                    name_field,
+                    amount_field,
+                    start_field,
+                    day_field,
+                    period_dd,
+                    ft.Row(
+                        alignment=ft.MainAxisAlignment.END,
+                        controls=[
+                            ft.TextButton(
+                                "Отмена",
+                                on_click=on_cancel,
+                                style=ft.ButtonStyle(
+                                    color="#483EB7",
+                                    text_style=ft.TextStyle(
+                                        font_family="Montserrat SemiBold", size=14
+                                    ),
+                                ),
+                            ),
+                            ft.TextButton(
+                                "Добавить",
+                                on_click=on_submit,
+                                style=ft.ButtonStyle(
+                                    color="#483EB7",
+                                    text_style=ft.TextStyle(
+                                        font_family="Montserrat SemiBold", size=14
+                                    ),
+                                ),
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+        )
+
+        self.page.overlay.append(bs)
+        bs.open = True
+        self.page.update()
+
+    def _open_edit_dialog(self, subscription):
+        error_style = ft.TextStyle(
+            font_family="Montserrat Medium",
+            size=10,
+            color="#FF0000",
+        )
+
+        name_field = ft.TextField(
+            label="Название",
+            value=subscription["name"],
+            border_color="#6C63FF",
+            error_style=error_style,
+        )
+        amount_field = ft.TextField(
+            label="Сумма",
+            value=str(int(subscription["amount"]) if subscription["amount"] == int(subscription["amount"]) else subscription["amount"]),
+            border_color="#6C63FF",
+            error_style=error_style,
+        )
+        day_field = ft.TextField(
+            label="День списания (1–31)",
+            value=str(subscription["charge_day"]),
+            border_color="#6C63FF",
+            error_style=error_style,
+        )
+        period_dd = ft.Dropdown(
+            label="Период",
+            border_color="#6C63FF",
+            options=[
+                ft.dropdown.Option("monthly", "Ежемесячно"),
+                ft.dropdown.Option("yearly", "Ежегодно"),
+            ],
+            value=subscription["period"],
+        )
+
+        start_field = ft.TextField(
+            label="Дата начала",
+            value=subscription["start_date"],
+            read_only=True,
+            border_color="#6C63FF",
+            suffix_icon=ft.Icons.CALENDAR_MONTH,
+            error_style=error_style,
+        )
+
+        def on_date_selected(e):
+            start_field.value = (
+                e.control.value.strftime("%Y-%m-%d") if e.control.value else subscription["start_date"]
+            )
+            start_field.update()
+
+        date_picker = ft.DatePicker(
+            on_change=on_date_selected,
+            first_date=datetime.datetime(2000, 1, 1),
+            last_date=datetime.datetime(2030, 12, 31),
+        )
+        self.page.overlay.append(date_picker)
+
+        def open_date_picker(e):
+            self.page.dialog = date_picker
+            date_picker.open = True
+            self.page.update()
+
+        start_field.on_click = open_date_picker
+
+        def validate_name(e):
+            name_field.error = (
+                None if (name_field.value or "").strip() else "Введите название"
+            )
+            name_field.update()
+
+        def validate_amount(e):
+            v = (amount_field.value or "").replace(",", ".")
+            if not v:
+                amount_field.error = "Введите сумму"
+            else:
+                try:
+                    amount_field.error = (
+                        None if float(v) > 0 else "Сумма должна быть больше нуля"
+                    )
+                except ValueError:
+                    amount_field.error = "Введите число, например: 299.99"
+            amount_field.update()
+
+        def validate_day(e):
+            v = (day_field.value or "").strip()
+            if not v:
+                day_field.error = "Введите день списания"
+            else:
+                try:
+                    d = int(v)
+                    day_field.error = (
+                        None if 1 <= d <= 31 else "День должен быть от 1 до 31"
+                    )
+                except ValueError:
+                    day_field.error = "Введите целое число"
+            day_field.update()
+
+        name_field.on_change = validate_name
+        amount_field.on_change = validate_amount
+        day_field.on_change = validate_day
+
+        bs = ft.BottomSheet(open=False, content=ft.Container())
+
+        def on_cancel(e):
+            bs.open = False
+            self.page.update()
+
+        def on_submit(e):
+            name_field.error = None
+            amount_field.error = None
+            day_field.error = None
+
+            name = (name_field.value or "").strip()
+            if not name:
+                name_field.error = "Введите название"
+
+            amount = None
+            if not amount_field.value:
+                amount_field.error = "Введите сумму"
+            else:
+                try:
+                    amount = float(amount_field.value.replace(",", "."))
+                    if amount <= 0:
+                        amount_field.error = "Сумма должна быть больше нуля"
+                except ValueError:
+                    amount_field.error = "Введите число, например: 299.99"
+
+            charge_day = None
+            if not day_field.value:
+                day_field.error = "Введите день списания"
+            else:
+                try:
+                    charge_day = int(day_field.value)
+                    if not 1 <= charge_day <= 31:
+                        day_field.error = "День должен быть от 1 до 31"
+                except ValueError:
+                    day_field.error = "Введите целое число"
+
+            if any(f.error for f in (name_field, amount_field, day_field)):
+                name_field.update()
+                amount_field.update()
+                day_field.update()
+                return
+
+            self._ctrl.update_subscription(
+                subscription_id=subscription["id"],
+                name=name,
+                amount=amount,
+                charge_day=charge_day,
+                period=period_dd.value,
+                start_date=start_field.value,
+            )
+            bs.open = False
+            self.page.update()
+            self.refresh()
 
         bs.content = ft.Container(
             padding=ft.Padding.only(left=20, right=20, top=16, bottom=16),

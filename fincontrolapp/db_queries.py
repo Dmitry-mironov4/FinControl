@@ -277,7 +277,7 @@ def update_transaction(transaction_id, amount, date):
         )
 
 
-# ─── БАЛАНС ───────────────────────────────────────────────────────────────────
+# ─── БАЛАНС (для Home) ────────────────────────────────────────────────────────
 
 def get_balance(user_id):
     with get_connection() as conn:
@@ -319,7 +319,7 @@ def get_monthly_data(user_id, months=6):
                       SUM(CASE WHEN type='income' THEN amount ELSE 0 END) as income,
                       SUM(CASE WHEN type='expense' THEN amount ELSE 0 END) as expense
                FROM transactions WHERE user_id = ?
-               GROUP BY month ORDER BY month DESC LIMIT ?''',
+               GROUP BY month ORDER BY month ASC LIMIT ?''',
             (user_id, months)
         ).fetchall()
 

@@ -6,9 +6,11 @@ from pages.auth import AuthPage
 from components import AppTheme
 from controllers import (HomeController, GoalsController, SubscriptionsController,
                          TransactionsController, ExpensesController, IncomeController,
+                         SettingsController)
+from components import show_dialog, close_dialog, build_nav
                          SettingsController, SimulatorController)
 from database import create_tables, get_connection
-from components.dialogs import close_dialog 
+
 
 
 
@@ -39,12 +41,6 @@ def _clear_session():
         pass
 
 
-def _show_dialog(page, dlg):
-    page.show_dialog(dlg)
-
-
-def _close_dialog(page, dlg):
-    page.pop_dialog()
 
 
 def main(page: ft.Page):
@@ -100,8 +96,7 @@ def main(page: ft.Page):
 
     def _show_initial_balance_dialog(user_id: int):
         from datetime import date
-        from db_queries import add_transaction
-
+        
         amount_field = ft.TextField(
             label="Сумма на счёте",
             text_style=ft.TextStyle(font_family="Montserrat Medium"),
@@ -114,7 +109,7 @@ def main(page: ft.Page):
         dlg = ft.AlertDialog(modal=True, title=ft.Text("Начальный баланс",font_family="Montserrat SemiBold"))
 
         def on_skip(e):
-            _close_dialog(page, dlg)
+            close_dialog(page, dlg)
 
         def on_submit(e):
             if not user_id:
@@ -201,7 +196,7 @@ def main(page: ft.Page):
             ft.TextButton("Пропустить",style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_skip),
             ft.TextButton("Сохранить",style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_submit),
         ]
-        _show_dialog(page, dlg)
+        show_dialog(page, dlg)
 
     def show_auth():
         inner.content = AuthPage(page, on_success=on_auth_success)
@@ -327,7 +322,7 @@ def main(page: ft.Page):
             pages[index].refresh()
             content.content = pages[index]
             content.update()
-            nav_container.content = build_nav(index)
+            nav_container.content = build_nav(index, navigate)
             nav_container.update()
 
         uid = page.data["user_id"]
@@ -356,7 +351,7 @@ def main(page: ft.Page):
         )
 
         content.content = pages[0]
-        nav_container.content = build_nav(0)
+        nav_container.content = build_nav(0, navigate)
 
         inner.content = ft.Column(
             controls=[content, nav_container],

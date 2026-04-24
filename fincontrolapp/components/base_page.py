@@ -169,3 +169,18 @@ class BasePage(ft.Container):
     def _current_period_label(self):
         today = date.today()
         return f"{MONTH_NAMES[today.month - 1]} {today.year}"
+
+    def _show_error(self, msg: str, close_bs=None):
+        if close_bs is not None:
+            close_bs.open = False
+            self.page_ref.update()
+        self.page_ref.open(ft.SnackBar(
+            content=ft.Text(msg, color="#FFFFFF"),
+            bgcolor="#F44336",
+        ))
+
+    def _show_success(self, msg: str):
+        self.page_ref.open(ft.SnackBar(
+            content=ft.Text(msg, color="#FFFFFF"),
+            bgcolor="#4CAF50",
+        ))

@@ -45,6 +45,27 @@ class TransactionsPage(BasePage):
         return ft.Column([
             self._filter_row(),
             self._transactions_list(transactions),
+            ft.GestureDetector(
+                on_tap=self._open_add_dialog,
+                content=ft.Container(
+                    width=float("inf"),
+                    height=48,
+                    border_radius=12,
+                    gradient=ft.RadialGradient(
+                        colors=["#ffffff", "#6C63FF"],
+                        center=ft.Alignment(0, -0.2),
+                        radius=4.0,
+                        stops=[0.0, 0.8],
+                    ),
+                    alignment=ft.Alignment(0, 0),
+                    content=ft.Text(
+                        "＋ Добавить",
+                        color=ft.Colors.BLACK,
+                        font_family="Montserrat SemiBold",
+                        size=16,
+                    ),
+                ),
+            ),
         ], spacing=16)
 
     # ── Фильтр ──────────────────────────────────────────────────────────────
@@ -423,6 +444,7 @@ class TransactionsPage(BasePage):
 
         date_field.on_click = open_date_picker
 
+        # Валидация on_change
         def validate_amount(e):
             v = (amount_field.value or "").replace(",", ".")
             if not v:
@@ -467,6 +489,7 @@ class TransactionsPage(BasePage):
         def on_submit(e):
             category_dd.error = None
             amount_field.error = None
+            date_field.error = None
 
             if not category_dd.value:
                 category_dd.error = "Выберите категорию"
@@ -481,6 +504,8 @@ class TransactionsPage(BasePage):
                         amount_field.error = "Сумма должна быть больше нуля"
                 except ValueError:
                     amount_field.error = "Введите число, например: 500"
+
+            parsed_date = parse_date(date_field.value)
 
             if any(f.error for f in (category_dd, amount_field)):
                 category_dd.update()
@@ -498,7 +523,219 @@ class TransactionsPage(BasePage):
                     date=str(parsed_date),
                 )
             except Exception:
-                self._show_error("Не удалось добавить транзакцию")
+                self._show_error("Не удалось добавить транзакцию", close_bs=bs)
+                return
+            bs.open = False
+            self.page.update()
+            self.refresh()
+            self._show_success("Транзакция добавлена")
+
+        bs.content = ft.Container(
+            padding=ft.Padding.only(left=20, right=20, top=16, bottom=16),
+            content=ft.Column(
+                tight=True,
+                spacing=8,
+                scroll=ft.ScrollMode.AUTO,
+                controls=[
+                    ft.Row(
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        controls=[
+                            ft.Text(
+                                "Добавить транзакцию",
+                                color="#000000",
+                                font_family="Montserrat SemiBold",
+                                size=24,
+                            ),
+                        ],
+                    ),
+                    type_field,
+                    category_dd,
+                    amount_field,
+                    desc_field,
+                    date_field,
+                    ft.Row(
+                        alignment=ft.MainAxisAlignment.END,
+                        controls=[
+                            ft.TextButton(
+                                "Отмена",
+                                on_click=on_cancel,
+                                style=ft.ButtonStyle(
+                                    color="#483EB7",
+                                    text_style=ft.TextStyle(
+                                        font_family="Montserrat SemiBold", size=14
+                                    ),
+                                ),
+                            ),
+                            ft.TextButton(
+                                "Добавить",
+                                on_click=on_submit,
+                                style=ft.ButtonStyle(
+                                    color="#483EB7",
+                                    text_style=ft.TextStyle(
+                                        font_family="Montserrat SemiBold", size=14
+                                    ),
+                                ),
+                            ),
+                        ],
+                    ),
+                ],
+            ),
+        )
+
+        self.page.overlay.append(bs)
+        bs.open = True
+        self.page.update()
+
+    def _open_edit_dialog(self, transaction):
+        error_style = ft.TextStyle(
+            font_family="Montserrat Medium",
+            size=10,
+            color="#FF0000",
+        )
+
+        # Форматируем дату из ISO (YYYY-MM-DD) в DD.MM.YYYY для отображения
+        raw_date = transaction["date"]
+        try:
+            d = datetime.datetime.strptime(raw_date, "%Y-%m-%d").date()
+            display_date = d.strftime("%d.%m.%Y")
+        except Exception:
+            display_date = raw_date
+
+        type_field = ft.Dropdown(
+            label="Тип",
+            border_color="#6C63FF",
+            options=[
+                ft.dropdown.Option("income", "Доход"),
+                ft.dropdown.Option("expense", "Расход"),
+            ],
+            value=transaction["type"],
+        )
+        category_dd = ft.Dropdown(
+            label="Категория",
+            border_color="#6C63FF",
+            options=[],
+            error_style=error_style,
+        )
+        amount_field = ft.TextField(
+            label="Сумма",
+            value=str(int(transaction["amount"]) if transaction["amount"] == int(transaction["amount"]) else transaction["amount"]),
+            border_color="#6C63FF",
+            error_style=error_style,
+        )
+        desc_field = ft.TextField(
+            label="Описание (необязательно)",
+            value=transaction["description"] or "",
+            border_color="#6C63FF",
+        )
+        date_field = ft.TextField(
+            label="Дата",
+            value=display_date,
+            read_only=True,
+            border_color="#6C63FF",
+            suffix_icon=ft.Icons.CALENDAR_MONTH,
+            error_style=error_style,
+        )
+
+        def on_date_selected(e):
+            date_field.value = (
+                e.control.value.strftime("%d.%m.%Y") if e.control.value else display_date
+            )
+            date_field.update()
+
+        date_picker = ft.DatePicker(
+            on_change=on_date_selected,
+            first_date=datetime.datetime(2000, 1, 1),
+            last_date=datetime.datetime(2030, 12, 31),
+        )
+        self.page.overlay.append(date_picker)
+
+        def open_date_picker(e):
+            self.page.dialog = date_picker
+            date_picker.open = True
+            self.page.update()
+
+        date_field.on_click = open_date_picker
+
+        def validate_amount(e):
+            v = (amount_field.value or "").replace(",", ".")
+            if not v:
+                amount_field.error = "Введите сумму"
+            else:
+                try:
+                    amount_field.error = (
+                        None if parse_amount(amount_field.value) > 0
+                        else "Сумма должна быть больше нуля"
+                    )
+                except ValueError:
+                    amount_field.error = "Введите число, например: 500"
+            amount_field.update()
+
+        def validate_category(e):
+            category_dd.error = None if category_dd.value else "Выберите категорию"
+            category_dd.update()
+
+        amount_field.on_change = validate_amount
+        category_dd.on_change = validate_category
+
+        def load_categories(type_val, selected_id=None):
+            try:
+                cats = self._ctrl.get_categories(type_=type_val)
+            except Exception:
+                self._show_error("Не удалось загрузить категории")
+                return
+            category_dd.options = [ft.dropdown.Option(str(c.id), c.name) for c in cats]
+            if selected_id and any(str(c.id) == str(selected_id) for c in cats):
+                category_dd.value = str(selected_id)
+            else:
+                _other = next((c for c in cats if c.name == "Другое"), None)
+                category_dd.value = str(_other.id) if _other else None
+            self.page_ref.update()
+
+        type_field.on_change = lambda e: load_categories(type_field.value)
+        load_categories(transaction["type"], transaction["category_id"])
+
+        bs = ft.BottomSheet(open=False, content=ft.Container())
+
+        def on_cancel(e):
+            bs.open = False
+            self.page.update()
+
+        def on_submit(e):
+            category_dd.error = None
+            amount_field.error = None
+
+            if not category_dd.value:
+                category_dd.error = "Выберите категорию"
+
+            amount = None
+            if not amount_field.value:
+                amount_field.error = "Введите сумму"
+            else:
+                try:
+                    amount = parse_amount(amount_field.value)
+                    if amount <= 0:
+                        amount_field.error = "Сумма должна быть больше нуля"
+                except ValueError:
+                    amount_field.error = "Введите число, например: 500"
+
+            parsed_date = parse_date(date_field.value)
+
+            if any(f.error for f in (category_dd, amount_field)):
+                category_dd.update()
+                amount_field.update()
+                return
+
+            try:
+                self._ctrl.update_transaction(
+                    transaction_id=transaction["id"],
+                    type_=type_field.value,
+                    amount=amount,
+                    category_id=int(category_dd.value),
+                    description=desc_field.value or None,
+                    date=str(parsed_date),
+                )
+            except Exception:
+                self._show_error("Не удалось сохранить транзакцию", close_bs=bs)
                 return
             bs.open = False
             self.page.update()

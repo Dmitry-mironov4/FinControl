@@ -596,7 +596,10 @@ class GoalsPage(BasePage):
             pages = self.page_ref.data.get("pages", {})
             if 0 in pages:
                 pages[0].rebuild()
-            self._show_success(f"Пополнено на {amount:,.0f} ₽")
+            self.page_ref.snack_bar = ft.SnackBar(
+                ft.Text(f"Пополнено на {amount:,.0f} ₽"), open=True
+            )
+            self.page_ref.update()
 
         bs.content = ft.Container(
             padding=ft.Padding.only(left=20, right=20, top=24, bottom=32),
