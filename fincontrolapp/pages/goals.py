@@ -2,6 +2,7 @@ import flet as ft
 import datetime
 from components.base_page import BasePage
 from components.dialogs import show_dialog as _show_dialog, close_dialog as _close_dialog
+from utils import get_currency_symbol
 
 
 class GoalsPage(BasePage):
@@ -184,13 +185,13 @@ class GoalsPage(BasePage):
                             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                             controls=[
                                 ft.Text(
-                                    f"{current:,.0f} ₽",
+                                    f"{current:,.0f} {get_currency_symbol(self.page_ref)}",
                                     size=13,
                                     color="rgba(37, 58, 130, 0.4)",
                                     font_family="Montserrat SemiBold",
                                 ),
                                 ft.Text(
-                                    f"из {target:,.0f} ₽",
+                                    f"из {target:,.0f} {get_currency_symbol(self.page_ref)}",
                                     size=13,
                                     color="rgba(37, 58, 130, 0.4)",
                                     font_family="Montserrat SemiBold",
@@ -597,7 +598,7 @@ class GoalsPage(BasePage):
             if 0 in pages:
                 pages[0].rebuild()
             self.page_ref.snack_bar = ft.SnackBar(
-                ft.Text(f"Пополнено на {amount:,.0f} ₽"), open=True
+                ft.Text(f"Пополнено на {amount:,.0f} {get_currency_symbol(self.page_ref)}"), open=True
             )
             self.page_ref.update()
 

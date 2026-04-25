@@ -28,6 +28,7 @@ from flet_charts import (
 from datetime import datetime
 from database import get_connection
 from components.base_page import BasePage
+from utils import get_currency_symbol
 
 
 # ─── Константы ───────────────────────────────────────────────────────────────
@@ -324,8 +325,10 @@ class AnalyticsPage(BasePage):
         savings       = total_income - total_expense
         savings_pct   = round(savings / total_income * 100) if total_income else 0
 
+        sym = get_currency_symbol(self.page_ref)
+
         def fmt(v: float) -> str:
-            return f"{int(v):,}".replace(",", " ") + " ₽"
+            return f"{int(v):,}".replace(",", " ") + f" {sym}"
 
         def tile(label, value, color, icon):
             return ft.Container(
@@ -373,6 +376,7 @@ class AnalyticsPage(BasePage):
      incomes  = [d["income"] for d in monthly]
      expenses = [d["expense"] for d in monthly]
      n        = len(months)
+     sym      = get_currency_symbol(self.page_ref)
 
      bar_w   = 20
      max_val = max(max(incomes), max(expenses), 1)
@@ -387,14 +391,14 @@ class AnalyticsPage(BasePage):
                     width=bar_w,
                     color=ft.Colors.with_opacity(0.6, "#23CF01"),
                     border_radius=3,
-                    tooltip=f"↑ {incomes[i]:,.0f} ₽",
+                    tooltip=f"↑ {incomes[i]:,.0f} {sym}",
                 ),
                 BarChartRod(
                     from_y=0, to_y=expenses[i],
                     width=bar_w,
                     color=ft.Colors.with_opacity(0.6, "#FF7E1C"),
                     border_radius=3,
-                    tooltip=f"↓ {expenses[i]:,.0f} ₽",
+                    tooltip=f"↓ {expenses[i]:,.0f} {sym}",
                 ),
             ],
         )

@@ -1,6 +1,7 @@
 import flet as ft
 import os
 from components.base_page import BasePage
+from utils import get_currency_symbol
 
 
 
@@ -143,7 +144,7 @@ class HomePage(BasePage):
                                     color="rgba(0,0,0,0.3)",
                                 ),
                                 ft.Text(
-                                    f"{balance['balance']:,.0f} ₽",
+                                    f"{balance['balance']:,.0f} {get_currency_symbol(self.page_ref)}",
                                     font_family="Montserrat Semibold",
                                     size=36,
                                     color="#000000",
@@ -158,7 +159,7 @@ class HomePage(BasePage):
                                                 controls=[
                                                     ft.Icon(ft.Icons.ARROW_UPWARD, color="#2A4A00", size=16),
                                                     ft.Text(
-                                                        f"{monthly['income']:,.0f} ₽",
+                                                        f"{monthly['income']:,.0f} {get_currency_symbol(self.page_ref)}",
                                                         font_family="Montserrat Semibold",
                                                         color="#2A4A00",
                                                         size=14,
@@ -176,7 +177,7 @@ class HomePage(BasePage):
                                                 controls=[
                                                     ft.Icon(ft.Icons.ARROW_DOWNWARD, color="#4A3A00", size=16),
                                                     ft.Text(
-                                                        f"{monthly['expense']:,.0f} ₽",
+                                                        f"{monthly['expense']:,.0f} {get_currency_symbol(self.page_ref)}",
                                                         font_family="Montserrat Semibold",
                                                         color="#4A3A00",
                                                         size=14,
@@ -260,7 +261,7 @@ class HomePage(BasePage):
                                 ], spacing=2),
                             ], spacing=12),
                             ft.Text(
-                                f"{'+ ' if is_income else '− '}{t['amount']:,.0f} ₽",
+                                f"{'+ ' if is_income else '− '}{t['amount']:,.0f} {get_currency_symbol(self.page_ref)}",
                                 color="#253A82" if is_income else ft.Colors.with_opacity(0.6, "#FF7E1C"),
                                 size=15, font_family="Montserrat SemiBold",
                                 weight=ft.FontWeight.W_600,

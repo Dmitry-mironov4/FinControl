@@ -1,5 +1,6 @@
 import flet as ft
 from components.base_page import BasePage
+from utils import get_currency_symbol
 
 
 # ── shared style constants ────────────────────────────────────────────────────
@@ -115,8 +116,10 @@ class SimulatorPage(BasePage):
 
     # ── field factory ─────────────────────────────────────────────────────────
 
-    def _field(self, label: str, suffix: str = "₽", hint: str = None,
+    def _field(self, label: str, suffix: str = None, hint: str = None,
                on_change=None) -> ft.TextField:
+        if suffix is None:
+            suffix = get_currency_symbol(self.page_ref)
         return ft.TextField(
             label=label,
             hint_text=hint,
@@ -224,6 +227,7 @@ class SimulatorPage(BasePage):
 
     def _goal_progress_bars(self, before: float, after: float,
                             goal: float) -> ft.Container:
+        sym = get_currency_symbol(self.page_ref)
         """
         Shows two labelled ProgressBar rows side-by-side (before vs after).
         Values are fractions 0..1.
@@ -277,13 +281,13 @@ class SimulatorPage(BasePage):
                         alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                         controls=[
                             ft.Text(
-                                f"Накоплено: {before:,.0f} ₽",
+                                f"Накоплено: {before:,.0f} {sym}",
                                 size=11,
                                 color="rgba(37,58,130,0.6)",
                                 font_family="Montserrat Medium",
                             ),
                             ft.Text(
-                                f"Цель: {goal:,.0f} ₽",
+                                f"Цель: {goal:,.0f} {sym}",
                                 size=11,
                                 color="rgba(37,58,130,0.6)",
                                 font_family="Montserrat Medium",
@@ -295,14 +299,88 @@ class SimulatorPage(BasePage):
             ),
         )
 
+    # ── on_change validators (live feedback while typing) ────────────────────
+
+    def _make_amount_validator(self, field: ft.TextField):
+        """Возвращает on_change-обработчик: число > 0, иначе ошибка под полем."""
+        def _validate(e):
+            v = (field.value or "").replace(" ", "").replace("\u202f", "").replace(",", ".").strip()
+            if not v:
+                # пустое поле во время ввода — не считаем ошибкой; required-логика
+                # отрабатывает в _parse_amount при нажатии «Рассчитать»
+                field.error_text = None
+            else:
+                try:
+                    field.error_text = None if float(v) > 0 else "Сумма должна быть больше нуля"
+                except ValueError:
+                    field.error_text = "Введите число, например: 5000"
+            try:
+                field.update()
+            except Exception:
+                pass
+        return _validate
+
+    def _make_months_validator(self, field: ft.TextField):
+        """Возвращает on_change-обработчик: целое число от 1 до 360."""
+        def _validate(e):
+            v = (field.value or "").strip()
+            if not v:
+                field.error_text = None
+            else:
+                try:
+                    val = int(v)
+                    if val < 1:
+                        field.error_text = "Период должен быть больше нуля"
+                    elif val > 360:
+                        field.error_text = "Максимум 360 месяцев"
+                    else:
+                        field.error_text = None
+                except ValueError:
+                    field.error_text = "Введите целое число, например: 12"
+            try:
+                field.update()
+            except Exception:
+                pass
+        return _validate
+
+    def _make_percent_validator(self, field: ft.TextField):
+        """Возвращает on_change-обработчик: число от 1 до 99."""
+        def _validate(e):
+            v = (field.value or "").replace(",", ".").strip()
+            if not v:
+                field.error_text = None
+            else:
+                try:
+                    val = float(v)
+                    if val <= 0 or val >= 100:
+                        field.error_text = "Введите значение от 1 до 99"
+                    else:
+                        field.error_text = None
+                except ValueError:
+                    field.error_text = "Введите число, например: 10"
+            try:
+                field.update()
+            except Exception:
+                pass
+        return _validate
+
     # ── panels ────────────────────────────────────────────────────────────────
 
     def _build_purchase_panel(self) -> ft.Control:
-        self._purchase_cost     = self._field("Стоимость покупки",
-                                              on_change=self._on_purchase_cost_change)
+        self._purchase_cost     = self._field("Стоимость покупки")
         self._purchase_income   = self._field("Ежемесячный доход")
         self._purchase_expenses = self._field("Ежемесячные расходы")
         self._purchase_savings  = self._field("Уже накоплено", hint="0")
+
+        # validation + instant hint для поля стоимости
+        _validate_cost = self._make_amount_validator(self._purchase_cost)
+        def _cost_change(e):
+            _validate_cost(e)
+            self._on_purchase_cost_change(e)
+        self._purchase_cost.on_change   = _cost_change
+        self._purchase_income.on_change   = self._make_amount_validator(self._purchase_income)
+        self._purchase_expenses.on_change = self._make_amount_validator(self._purchase_expenses)
+        self._purchase_savings.on_change  = self._make_amount_validator(self._purchase_savings)
 
         # SIM-UI-1 — instant hint container
         self._purchase_hint = ft.Container(visible=False)
@@ -323,7 +401,8 @@ class SimulatorPage(BasePage):
             val = float(raw)
             if val > 0:
                 # Simple rough estimate: assume 20% saving rate as a teaser
-                hint_text = f"≈ {val * 0.2:,.0f} ₽ в месяц — 20% от суммы"
+                sym = get_currency_symbol(self.page_ref)
+                hint_text = f"≈ {val * 0.2:,.0f} {sym} в месяц — 20% от суммы"
                 self._purchase_hint.content = self._instant_hint(
                     hint_text, ft.Icons.LIGHTBULB_OUTLINE, "#253A82")
                 self._purchase_hint.visible = True
@@ -341,6 +420,10 @@ class SimulatorPage(BasePage):
         self._sub_income   = self._field("Ежемесячный доход")
         self._sub_expenses = self._field("Прочие расходы")
         self._sub_months   = self._field("Период анализа", suffix="мес.", hint="12")
+        self._sub_cost.on_change     = self._make_amount_validator(self._sub_cost)
+        self._sub_income.on_change   = self._make_amount_validator(self._sub_income)
+        self._sub_expenses.on_change = self._make_amount_validator(self._sub_expenses)
+        self._sub_months.on_change   = self._make_months_validator(self._sub_months)
         return self._panel_card(
             hint="Посмотрите, как подписка скажется на ваших накоплениях за период",
             title="Параметры подписки",
@@ -354,6 +437,10 @@ class SimulatorPage(BasePage):
         self._goal_income   = self._field("Ежемесячный доход")
         self._goal_expenses = self._field("Ежемесячные расходы")
         self._goal_savings  = self._field("Уже накоплено", hint="0")
+        self._goal_amount.on_change   = self._make_amount_validator(self._goal_amount)
+        self._goal_income.on_change   = self._make_amount_validator(self._goal_income)
+        self._goal_expenses.on_change = self._make_amount_validator(self._goal_expenses)
+        self._goal_savings.on_change  = self._make_amount_validator(self._goal_savings)
         return self._panel_card(
             hint="Рассчитайте, когда вы достигнете своей финансовой цели",
             title="Параметры цели",
@@ -368,6 +455,10 @@ class SimulatorPage(BasePage):
         self._cut_percent  = self._field("На сколько урезать расходы",
                                          suffix="%", hint="10")
         self._cut_months   = self._field("Период анализа", suffix="мес.", hint="12")
+        self._cut_income.on_change   = self._make_amount_validator(self._cut_income)
+        self._cut_expenses.on_change = self._make_amount_validator(self._cut_expenses)
+        self._cut_percent.on_change  = self._make_percent_validator(self._cut_percent)
+        self._cut_months.on_change   = self._make_months_validator(self._cut_months)
         return self._panel_card(
             hint="Увидьте, сколько дополнительно можно накопить, сократив расходы",
             title="Параметры экономии",
@@ -499,19 +590,20 @@ class SimulatorPage(BasePage):
             return
 
         # SIM-UI-2 — scenario cards for purchase
+        sym = get_currency_symbol(self.page_ref)
         monthly_free = income - expenses
         if monthly_free > 0:
             months_needed = max(0, (cost - savings) / monthly_free)
             scenarios = [
                 {
-                    "label": f"Если куплю за {cost:,.0f} ₽",
+                    "label": f"Если куплю за {cost:,.0f} {sym}",
                     "value": f"{months_needed:.1f} мес.",
                     "tone":  "good" if months_needed <= 6 else ("warn" if months_needed <= 18 else "bad"),
                     "sub":   "при текущем темпе накоплений",
                 },
                 {
                     "label": "Свободных в месяц",
-                    "value": f"{monthly_free:,.0f} ₽",
+                    "value": f"{monthly_free:,.0f} {sym}",
                     "tone":  "good" if monthly_free > 0 else "bad",
                     "sub":   "доход минус расходы",
                 },
@@ -519,7 +611,7 @@ class SimulatorPage(BasePage):
                     "label": "Уже накоплено",
                     "value": f"{savings / cost * 100:.0f}%" if cost > 0 else "—",
                     "tone":  "good" if savings / cost >= 0.5 else "neutral",
-                    "sub":   f"{savings:,.0f} ₽ из {cost:,.0f} ₽",
+                    "sub":   f"{savings:,.0f} {sym} из {cost:,.0f} {sym}",
                 },
             ]
             result["_scenarios"] = scenarios
@@ -542,25 +634,26 @@ class SimulatorPage(BasePage):
             return
 
         # SIM-UI-2 — subscription scenarios
+        sym = get_currency_symbol(self.page_ref)
         total_cost = sub_cost * months
         free_without = (income - expenses) * months
         free_with    = (income - expenses - sub_cost) * months
         scenarios = [
             {
-                "label": f"Если добавлю подписку {sub_cost:,.0f} ₽/мес.",
-                "value": f"−{total_cost:,.0f} ₽",
+                "label": f"Если добавлю подписку {sub_cost:,.0f} {sym}/мес.",
+                "value": f"−{total_cost:,.0f} {sym}",
                 "tone":  "warn",
                 "sub":   f"за {months} мес.",
             },
             {
                 "label": "Накоплю без подписки",
-                "value": f"{free_without:,.0f} ₽",
+                "value": f"{free_without:,.0f} {sym}",
                 "tone":  "good",
                 "sub":   f"за {months} мес.",
             },
             {
                 "label": "Накоплю с подпиской",
-                "value": f"{free_with:,.0f} ₽",
+                "value": f"{free_with:,.0f} {sym}",
                 "tone":  "good" if free_with > 0 else "bad",
                 "sub":   f"за {months} мес.",
             },
@@ -612,6 +705,7 @@ class SimulatorPage(BasePage):
             return
 
         # SIM-UI-2 — cut scenarios
+        sym = get_currency_symbol(self.page_ref)
         saved_monthly = expenses * (percent / 100)
         new_expenses  = expenses - saved_monthly
         free_before   = (income - expenses) * months
@@ -619,21 +713,21 @@ class SimulatorPage(BasePage):
         scenarios = [
             {
                 "label": f"Если урежу на {percent:.0f}%",
-                "value": f"−{saved_monthly:,.0f} ₽/мес.",
+                "value": f"−{saved_monthly:,.0f} {sym}/мес.",
                 "tone":  "good",
                 "sub":   "экономия в месяц",
             },
             {
                 "label": "Накоплю без изменений",
-                "value": f"{free_before:,.0f} ₽",
+                "value": f"{free_before:,.0f} {sym}",
                 "tone":  "neutral",
                 "sub":   f"за {months} мес.",
             },
             {
                 "label": "Накоплю после сокращения",
-                "value": f"{free_after:,.0f} ₽",
+                "value": f"{free_after:,.0f} {sym}",
                 "tone":  "good",
-                "sub":   f"+{free_after - free_before:,.0f} ₽ дополнительно",
+                "sub":   f"+{free_after - free_before:,.0f} {sym} дополнительно",
             },
         ]
         result["_scenarios"] = scenarios
@@ -719,7 +813,8 @@ class SimulatorPage(BasePage):
         value_color = _TONE_COLOR.get(tone, "#253A82")
 
         value_str = m.get("value", "—")
-        if value_str.endswith("₽") or value_str.endswith(" ₽"):
+        sym = get_currency_symbol(self.page_ref)
+        if value_str.endswith(sym) or value_str.endswith(f" {sym}") or value_str.endswith("₽") or value_str.endswith(" ₽"):
           icon = ft.Icons.CURRENCY_RUBLE
         elif value_str.endswith("мес."):
           icon = ft.Icons.CALENDAR_MONTH_OUTLINED

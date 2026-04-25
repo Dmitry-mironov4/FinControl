@@ -3,6 +3,7 @@ import datetime
 from datetime import date
 from components.base_page import BasePage
 from components.dialogs import close_dialog as _close_dialog
+from utils import get_currency_symbol
 
 MONTH_SHORT = ["янв", "фев", "мар", "апр", "май", "июн",
                "июл", "авг", "сен", "окт", "ноя", "дек"]
@@ -72,7 +73,7 @@ class SubscriptionsPage(BasePage):
                 ),
                 content=ft.Column([
                     ft.Text("Сумма подписок в месяц", size=14,font_family="Montserrat SemiBold", color=ft.Colors.with_opacity(0.8, "#000000")),
-                    ft.Text(f"{monthly_total:,.0f} ₽", size=28,font_family="Montserrat SemiBold",
+                    ft.Text(f"{monthly_total:,.0f} {get_currency_symbol(self.page_ref)}", size=28,font_family="Montserrat SemiBold",
                             weight=ft.FontWeight.BOLD, color="#000000"),
                 ], spacing=4),
             ),
@@ -144,7 +145,7 @@ class SubscriptionsPage(BasePage):
             next_color = ft.Colors.with_opacity(0.8, "#FF7E1C") if urgent else ft.Colors.with_opacity(0.7, "#000000")
             next_text = f"⚠ через {days_left} дн." if urgent else f"Следующее: {next_label}"
             # Годовая стоимость для месячных подписок
-            yearly_text = f"{s['amount'] * 12:,.0f} ₽/год" if s["period"] == "monthly" else None
+            yearly_text = f"{s['amount'] * 12:,.0f} {get_currency_symbol(self.page_ref)}/год" if s["period"] == "monthly" else None
 
             row_content = ft.Container(
                 padding=ft.Padding.only(left=16, right=8, top=10, bottom=10),
@@ -182,7 +183,7 @@ class SubscriptionsPage(BasePage):
                         ft.Row([
                             ft.Column([
                                 ft.Text(
-                                    f"{s['amount']:,.0f} ₽",
+                                    f"{s['amount']:,.0f} {get_currency_symbol(self.page_ref)}",
                                     color="#483EB7", size=14,
                                     font_family="Montserrat SemiBold",
                                     weight=ft.FontWeight.W_600,

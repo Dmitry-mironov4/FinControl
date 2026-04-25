@@ -60,6 +60,7 @@ def main(page: ft.Page):
     page.bgcolor = AppTheme.BG_PAGE
     page.padding = 0
     page.data = {}
+    page.data.setdefault("_s_currency", "RUB")
 
     page.theme = ft.Theme(
         color_scheme=ft.ColorScheme(
@@ -340,6 +341,7 @@ def main(page: ft.Page):
         def logout():
             _clear_session()
             page.data = {}
+            page.data.setdefault("_s_currency", "RUB")
             show_auth()
 
         page.data["navigate"] = navigate

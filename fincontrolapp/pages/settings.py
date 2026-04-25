@@ -1,12 +1,23 @@
 import flet as ft
 from components.base_page import BasePage
 from components.dialogs import show_dialog as _show_dialog, close_dialog as _close_dialog
+from utils import CURRENCY_LABELS
 
 
 class SettingsPage(BasePage):
     def __init__(self, page: ft.Page, ctrl):
         self._ctrl = ctrl
+        self._username_text: ft.Text | None = None
+        self._initials_text: ft.Text | None = None
+        self._currency_subtitle: ft.Text | None = None
         super().__init__(page, "Настройки")
+
+    @staticmethod
+    def _calc_initials(username: str) -> str:
+        parts = (username or "User").strip().split()
+        if not parts:
+            return "U"
+        return (parts[0][0] + (parts[1][0] if len(parts) > 1 else "")).upper()
 
     def build_header(self):
         return ft.AppBar(
@@ -22,57 +33,17 @@ class SettingsPage(BasePage):
         )
 
     def build_body(self):
-        user = self._ctrl.get_user()
-        username = (user["username"] or "User") if user else "User"
-        contact = (user["email"] or user["phone"] or "") if user else ""
-    
-        # Инициалы из имени
-        parts = username.strip().split()
-        initials = (parts[0][0] + (parts[1][0] if len(parts) > 1 else "")).upper()
-
-        avatar_block = ft.Container(
-    padding=ft.padding.symmetric(horizontal=16, vertical=12),
-    border_radius=18,
-    border=ft.border.all(1.5, ft.Colors.with_opacity(0.06, "#483EB7")),
-    bgcolor=ft.Colors.with_opacity(0.04, "#483EB7"),
-    content=ft.Row([
-        ft.Container(
-            width=64, height=64,
-            border_radius=32,
-            gradient=ft.LinearGradient(
-                colors=["#ffffff", "#88A2FF"],
-                begin=ft.Alignment(-1, -1),
-                end=ft.Alignment(1, 1),
-            ),
-            alignment=ft.Alignment(0, 0),
-            content=ft.Text(
-                initials,
-                size=24,
-                font_family="Montserrat SemiBold",
-                color="#483EB7",
-                weight=ft.FontWeight.BOLD,
-            ),
-        ),
-        ft.Column([
-            ft.Text(
-                username,
-                size=18,
-                font_family="Montserrat SemiBold",
-                color="#000000",
-                weight=ft.FontWeight.W_600,
-            ),
-            ft.Text(
-                contact,
-                size=13,
-                font_family="Montserrat SemiBold",
-                color=ft.Colors.with_opacity(0.5, "#000000"),
-            ) if contact else ft.Container(),
-        ], spacing=2),
-    ], spacing=16, vertical_alignment=ft.CrossAxisAlignment.CENTER),
-)
+        currency_code = (self.page_ref.data or {}).get("_s_currency", "RUB")
+        currency_label = CURRENCY_LABELS.get(currency_code, CURRENCY_LABELS["RUB"])
+        self._currency_subtitle = ft.Text(
+            currency_label,
+            size=12,
+            color=ft.Colors.with_opacity(0.6, "#000000"),
+            font_family="Montserrat SemiBold",
+        )
 
         return ft.Column([
-            avatar_block,
+            self._build_avatar_block(),
             # ── Группа: Аккаунт ──────────────────────────────────────────
             self._section_header("Аккаунт"),
             self._group([
@@ -80,7 +51,7 @@ class SettingsPage(BasePage):
                     on_click=self._open_profile_dialog),
                 self._setting_item(ft.Icons.NOTIFICATIONS_OUTLINED, "Уведомления", "Напоминания о расходах",
                     on_click=self._open_notifications_dialog, divider=True),
-                self._setting_item(ft.Icons.CURRENCY_RUBLE, "Валюта", "Рубль (₽)",
+                self._setting_item(ft.Icons.CURRENCY_RUBLE, "Валюта", self._currency_subtitle,
                     on_click=self._open_currency_dialog, divider=True),
                 self._setting_item(ft.Icons.TELEGRAM, "Telegram-бот", "Подключить бота",
                     on_click=self._open_telegram_dialog, divider=True),
@@ -121,6 +92,56 @@ class SettingsPage(BasePage):
 
     # ── Вспомогательные методы ───────────────────────────────────────────
 
+    def _build_avatar_block(self) -> ft.Container:
+        user = self._ctrl.get_user()
+        username = (user["username"] or "User") if user else "User"
+        contact = (user["email"] or user["phone"] or "") if user else ""
+        initials = self._calc_initials(username)
+
+        self._username_text = ft.Text(
+            username,
+            size=18,
+            font_family="Montserrat SemiBold",
+            color="#000000",
+            weight=ft.FontWeight.W_600,
+        )
+        self._initials_text = ft.Text(
+            initials,
+            size=24,
+            font_family="Montserrat SemiBold",
+            color="#483EB7",
+            weight=ft.FontWeight.BOLD,
+        )
+
+        return ft.Container(
+            padding=ft.padding.symmetric(horizontal=16, vertical=12),
+            border_radius=18,
+            border=ft.border.all(1.5, ft.Colors.with_opacity(0.06, "#483EB7")),
+            bgcolor=ft.Colors.with_opacity(0.04, "#483EB7"),
+            content=ft.Row([
+                ft.Container(
+                    width=64, height=64,
+                    border_radius=32,
+                    gradient=ft.LinearGradient(
+                        colors=["#ffffff", "#88A2FF"],
+                        begin=ft.Alignment(-1, -1),
+                        end=ft.Alignment(1, 1),
+                    ),
+                    alignment=ft.Alignment(0, 0),
+                    content=self._initials_text,
+                ),
+                ft.Column([
+                    self._username_text,
+                    ft.Text(
+                        contact,
+                        size=13,
+                        font_family="Montserrat SemiBold",
+                        color=ft.Colors.with_opacity(0.5, "#000000"),
+                    ) if contact else ft.Container(),
+                ], spacing=2),
+            ], spacing=16, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+        )
+
     def _section_header(self, label: str) -> ft.Container:
         """Заголовок группы (серый текст, как 'Account' / 'Preferences' на картинке)."""
         return ft.Container(
@@ -153,7 +174,15 @@ class SettingsPage(BasePage):
         """
         Один пункт настроек внутри группы.
         divider=True добавляет тонкую разделительную линию сверху.
+        subtitle может быть строкой или готовым ft.Text — это позволяет
+        обновлять подзаголовок без перестроения всей страницы.
         """
+        subtitle_widget = subtitle if isinstance(subtitle, ft.Text) else ft.Text(
+            subtitle,
+            size=12,
+            color=ft.Colors.with_opacity(0.6, "#000000"),
+            font_family="Montserrat SemiBold",
+        )
         row = ft.Container(
             padding=ft.padding.symmetric(horizontal=16, vertical=14),
             ink=True,
@@ -168,12 +197,7 @@ class SettingsPage(BasePage):
                         font_family="Montserrat SemiBold",
                         weight=ft.FontWeight.W_600,
                     ),
-                    ft.Text(
-                        subtitle,
-                        size=12,
-                        color=ft.Colors.with_opacity(0.6, "#000000"),
-                        font_family="Montserrat SemiBold",
-                    ),
+                    subtitle_widget,
                 ], spacing=2, expand=True),
                 ft.Icon(ft.Icons.CHEVRON_RIGHT,
                         color=ft.Colors.with_opacity(0.45, "#000000"), size=20),
@@ -212,6 +236,19 @@ class SettingsPage(BasePage):
             except Exception:
                 self._show_error("Не удалось сохранить имя")
                 return
+            new_name = (username_field.value or "").strip() or "User"
+            if self._username_text is not None:
+                self._username_text.value = new_name
+                try:
+                    self._username_text.update()
+                except Exception:
+                    pass
+            if self._initials_text is not None:
+                self._initials_text.value = self._calc_initials(new_name)
+                try:
+                    self._initials_text.update()
+                except Exception:
+                    pass
             _close_dialog(self.page_ref, dlg)
             self.page_ref.snack_bar = ft.SnackBar(ft.Text("Имя сохранено ✓", font_family="Montserrat SemiBold"), open=True)
             self.page_ref.update()
@@ -276,6 +313,14 @@ class SettingsPage(BasePage):
  
         def on_submit(e):
             self.page_ref.data["_s_currency"] = dd.value
+            if self._currency_subtitle is not None:
+                self._currency_subtitle.value = CURRENCY_LABELS.get(
+                    dd.value, CURRENCY_LABELS["RUB"]
+                )
+                try:
+                    self._currency_subtitle.update()
+                except Exception:
+                    pass
             _close_dialog(self.page_ref, dlg)
             self.page_ref.snack_bar = ft.SnackBar(ft.Text("Валюта сохранена ✓", font_family="Montserrat SemiBold"), open=True)
             self.page_ref.update()
