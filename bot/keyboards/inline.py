@@ -1,26 +1,9 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-PAGE_SIZE = 10
+PAGE_SIZE = 15
 
-# кнопка назад
-def back_keyboard(action: str):
-    buttons = [
-        [InlineKeyboardButton(text='Назад', callback_data=f'back_to_{action}')]
-    ]
-    return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-# главное меню
-def main_menu_keyboard():
-    buttons = [
-        [InlineKeyboardButton(text='Баланс', callback_data='menu_balance')],
-        [InlineKeyboardButton(text='Операции', callback_data='menu_operations')],
-        [InlineKeyboardButton(text='Подписки', callback_data='menu_subscriptions')],
-        [InlineKeyboardButton(text='Профиль', callback_data='menu_profile')]
-    ]
-    return InlineKeyboardMarkup(inline_keyboard=buttons)
-
-# операции
 def operations_keyboard():
     buttons = [
         [
@@ -32,7 +15,7 @@ def operations_keyboard():
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-# выбор типа транзакции (доход/расход)
+
 def type_keyboard():
     buttons = [
         [
@@ -42,7 +25,7 @@ def type_keyboard():
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-# список категорий
+
 def categories_keyboard(categories: list):
     builder = InlineKeyboardBuilder()
     for cat in categories:
@@ -50,14 +33,14 @@ def categories_keyboard(categories: list):
     builder.adjust(2)
     return builder.as_markup()
 
-# кнопка "пропустить"
+
 def skip_keyboard():
     buttons = [
         [InlineKeyboardButton(text='Пропустить', callback_data='add_skip_desc')]
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-# подписки
+
 def subscriptions_keyboard(action: str):
     buttons = [
         [InlineKeyboardButton(text='Активные', callback_data='sub_active')],
@@ -65,7 +48,7 @@ def subscriptions_keyboard(action: str):
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-# профиль
+
 def profile_keyboard(action: str):
     buttons = [
         [InlineKeyboardButton(text='Мои данные', callback_data='profile_data')],
@@ -74,25 +57,7 @@ def profile_keyboard(action: str):
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-# цели
-def goals_keyboard(action: str):
-    buttons = [
-        [InlineKeyboardButton(text='Новая цель', callback_data='goal_add')],
-        [InlineKeyboardButton(text='Мои цели', callback_data='goal_list')],
-        [InlineKeyboardButton(text='Назад', callback_data=f'back_to_{action}')]
-    ]
-    return InlineKeyboardMarkup(inline_keyboard=buttons)
 
-# настройки
-def settings_keyboard(action: str):
-    buttons = [
-        [InlineKeyboardButton(text='Валюта', callback_data='set_currency')],
-        [InlineKeyboardButton(text='Уведомления', callback_data='set_notifications')],
-        [InlineKeyboardButton(text='Назад', callback_data=f'back_to_{action}')]
-    ]
-    return InlineKeyboardMarkup(inline_keyboard=buttons)
-
-# отмена быстро добавленной транзакции
 def cancel_transaction_keyboard(tx_id: int):
     buttons = [
         [InlineKeyboardButton(text='Отменить', callback_data=f'cancel_tx_{tx_id}')]
@@ -100,7 +65,6 @@ def cancel_transaction_keyboard(tx_id: int):
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
-# история транзакций с пагинацией
 def history_keyboard(transactions: list, offset: int, has_more: bool) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     for i, t in enumerate(transactions, start=1):
@@ -122,7 +86,42 @@ def history_keyboard(transactions: list, offset: int, has_more: bool) -> InlineK
     return builder.as_markup()
 
 
-# подтверждение удаления транзакции
+def hist_keyboard(tx_filter: str, offset: int, has_more: bool) -> InlineKeyboardMarkup:
+    """Клавиатура для просмотра истории с фильтром по типу и пагинацией."""
+    builder = InlineKeyboardBuilder()
+
+    # фильтры
+    builder.button(
+        text="📈 Доходы" if tx_filter != "income" else "✅ Доходы",
+        callback_data="hist:income:0",
+    )
+    builder.button(
+        text="📉 Расходы" if tx_filter != "expense" else "✅ Расходы",
+        callback_data="hist:expense:0",
+    )
+    builder.adjust(2)
+
+    # кнопка назад к полной истории (только когда активен фильтр)
+    if tx_filter != "all":
+        builder.button(text="← Вся история", callback_data="hist:all:0")
+        builder.adjust(2, 1)
+
+    # пагинация
+    if offset > 0 or has_more:
+        nav = InlineKeyboardBuilder()
+        if offset > 0:
+            nav.button(text="◀️", callback_data=f"hist:{tx_filter}:{offset - PAGE_SIZE}")
+        if has_more:
+            nav.button(text="▶️", callback_data=f"hist:{tx_filter}:{offset + PAGE_SIZE}")
+        nav.adjust(2)
+        builder.attach(nav)
+
+    # закрыть
+    builder.row(InlineKeyboardButton(text="✖️ Закрыть", callback_data="hist:close"))
+
+    return builder.as_markup()
+
+
 def confirm_delete_tx_keyboard(tx_id: int, offset: int) -> InlineKeyboardMarkup:
     buttons = [
         [
@@ -133,11 +132,3 @@ def confirm_delete_tx_keyboard(tx_id: int, offset: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
-# подтверждение (да/нет)
-def confirm_keyboard(action: str):
-    buttons = [
-        [InlineKeyboardButton(text='Да', callback_data=f'confirm_{action}')],
-        [InlineKeyboardButton(text='Нет', callback_data=f'cancel{action}')],
-        [InlineKeyboardButton(text='Назад', callback_data=f'back_to_{action}')]
-    ]
-    return InlineKeyboardMarkup(inline_keyboard=buttons)

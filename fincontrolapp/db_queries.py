@@ -217,7 +217,7 @@ def add_transaction(user_id, type_, amount, category_id, description, date, is_r
         return cursor.lastrowid
 
 
-def get_transactions(user_id, type_=None, category_id=None, limit=None):
+def get_transactions(user_id, type_=None, category_id=None, limit=None, offset=0):
     query = '''
         SELECT t.id, t.type, t.amount, t.description, t.date, t.is_recurring,
                c.name as category_name
@@ -234,8 +234,8 @@ def get_transactions(user_id, type_=None, category_id=None, limit=None):
         params.append(category_id)
     query += ' ORDER BY t.date DESC'
     if limit:
-        query += ' LIMIT ?'
-        params.append(limit)
+        query += ' LIMIT ? OFFSET ?'
+        params.extend([limit, offset])
 
     with get_connection() as conn:
         return conn.execute(query, params).fetchall()
@@ -258,15 +258,19 @@ def get_last_transactions(user_id: int, limit: int = 10, offset: int = 0):
     return rows
 
 
-def delete_transaction(transaction_id, user_id=None):
+def delete_transaction(transaction_id: int, user_id: int | None = None) -> bool:
     with get_connection() as conn:
         if user_id is not None:
-            conn.execute(
+            cursor = conn.execute(
                 'DELETE FROM transactions WHERE id = ? AND user_id = ?',
                 (transaction_id, user_id)
             )
         else:
-            conn.execute('DELETE FROM transactions WHERE id = ?', (transaction_id,))
+            cursor = conn.execute(
+                'DELETE FROM transactions WHERE id = ?',
+                (transaction_id,)
+            )
+        return cursor.rowcount > 0
 
 
 def update_transaction(transaction_id, amount, date):
@@ -395,8 +399,8 @@ def deposit_to_goal(user_id, goal_id, amount):
     """Пополняет цель и создаёт расход с категорией Накопления."""
     with get_connection() as conn:
         conn.execute(
-            'UPDATE goals SET current_amount = current_amount + ? WHERE id = ?',
-            (amount, goal_id)
+            'UPDATE goals SET current_amount = current_amount + ? WHERE id = ? AND user_id = ?',
+            (amount, goal_id, user_id)
         )
         savings_cat = conn.execute(
             "SELECT id FROM categories WHERE name='Накопления' AND type='expense'"
@@ -480,6 +484,152 @@ def get_next_charge_date(charge_day: int, period: str, start_date_str: str | Non
             pass
 
     return candidate
+
+
+# ─── Настройки уведомлений ────────────────────────────────────────────────────
+
+def get_notification_hour(user_id: int) -> int:
+    """Возвращает час уведомлений пользователя (0–23, default 9)."""
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT notification_hour FROM users WHERE id = ?", (user_id,)
+        ).fetchone()
+    return int(row["notification_hour"]) if row and row["notification_hour"] is not None else 9
+
+
+def set_notification_hour(user_id: int, hour: int) -> None:
+    """Установить час ежедневных уведомлений (0–23)."""
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE users SET notification_hour = ? WHERE id = ?", (hour, user_id)
+        )
+        conn.commit()
+
+
+def get_users_to_notify(hour: int) -> list:
+    """Все привязанные пользователи, у которых notification_hour == hour."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT * FROM users WHERE telegram_id IS NOT NULL AND notification_hour = ?",
+            (hour,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+# ─── Таймеры покупок ──────────────────────────────────────────────────────────
+
+def get_active_timers(user_id: int) -> list:
+    """Активные таймеры: решение ещё не принято."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            """SELECT id, item_name, amount, remind_at, notified
+               FROM purchase_timers
+               WHERE user_id = ? AND decision IS NULL
+               ORDER BY remind_at ASC""",
+            (user_id,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def create_purchase_timer(user_id: int, item_name: str, amount: float, remind_at: str) -> int:
+    """
+    Создать таймер покупки.
+    remind_at — строка ISO 8601: 'YYYY-MM-DD HH:MM:SS'
+    Возвращает id новой записи.
+    """
+    with get_connection() as conn:
+        cursor = conn.execute(
+            """INSERT INTO purchase_timers (user_id, item_name, amount, remind_at)
+               VALUES (?, ?, ?, ?)""",
+            (user_id, item_name, amount, remind_at),
+        )
+        conn.commit()
+        return cursor.lastrowid
+
+
+def get_due_purchase_timers() -> list:
+    """Таймеры, по которым пора отправить уведомление: remind_at <= now, notified=0."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            """SELECT pt.id, pt.user_id, pt.item_name, pt.amount, u.telegram_id
+               FROM purchase_timers pt
+               JOIN users u ON u.id = pt.user_id
+               WHERE pt.notified = 0
+                 AND pt.decision IS NULL
+                 AND pt.remind_at <= datetime('now', 'localtime')
+                 AND u.telegram_id IS NOT NULL""",
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def mark_purchase_timer_notified(timer_id: int) -> None:
+    """Пометить таймер как отправленный (notified=1)."""
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE purchase_timers SET notified = 1 WHERE id = ?",
+            (timer_id,),
+        )
+        conn.commit()
+
+
+def set_purchase_timer_decision(timer_id: int, decision: str) -> None:
+    """
+    Записать решение пользователя.
+    decision: 'bought' | 'cancelled'
+    """
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE purchase_timers SET decision = ? WHERE id = ?",
+            (decision, timer_id),
+        )
+        conn.commit()
+
+
+# ─── Проверка превышения бюджета ──────────────────────────────────────────────
+
+def get_budget_exceeded_info(user_id: int, category_id: int) -> dict | None:
+    """
+    Проверяет, превышен ли лимит бюджета по категории за текущий месяц.
+    Возвращает None если лимита нет или расход < 90% лимита.
+    Возвращает dict {'category_name', 'limit', 'spent', 'pct'} если >= 90%.
+    """
+    from datetime import date
+    today = date.today()
+    start = today.replace(day=1).isoformat()
+    end = today.isoformat()
+
+    with get_connection() as conn:
+        budget = conn.execute(
+            "SELECT limit_amount FROM budgets WHERE user_id = ? AND category_id = ? AND period = 'monthly'",
+            (user_id, category_id),
+        ).fetchone()
+        if not budget:
+            return None
+
+        limit = float(budget["limit_amount"])
+        row = conn.execute(
+            """SELECT COALESCE(SUM(amount), 0) AS spent
+               FROM transactions
+               WHERE user_id = ? AND category_id = ? AND type = 'expense'
+                 AND date BETWEEN ? AND ?""",
+            (user_id, category_id, start, end),
+        ).fetchone()
+        spent = float(row["spent"])
+        pct = spent / limit * 100 if limit > 0 else 0
+
+        if pct < 90:
+            return None
+
+        cat = conn.execute(
+            "SELECT name FROM categories WHERE id = ?", (category_id,)
+        ).fetchone()
+
+    return {
+        "category_name": cat["name"] if cat else "Категория",
+        "limit": limit,
+        "spent": spent,
+        "pct": pct,
+    }
 
 
 if __name__ == "__main__":

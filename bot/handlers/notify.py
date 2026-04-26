@@ -1,3 +1,4 @@
+import asyncio
 import calendar
 import datetime
 import logging
@@ -5,23 +6,28 @@ import logging
 from aiogram import Bot
 from aiogram.exceptions import TelegramForbiddenError
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.triggers.cron import CronTrigger
 
 from bot.utils.formatters import fmt_amount
-from fincontrolapp.db_queries import get_all_linked_users, get_subscriptions, get_goals, get_monthly_stats
+from fincontrolapp.db_queries import (
+    get_all_linked_users,
+    get_subscriptions,
+    get_goals,
+    get_monthly_stats,
+    get_due_purchase_timers,
+    mark_purchase_timer_notified,
+    get_users_to_notify,
+)
+from bot.handlers.purchase_timer import make_decision_keyboard
 
 logger = logging.getLogger(__name__)
 
 
 def _next_charge_date(charge_day: int) -> datetime.date:
-    """Вычислить ближайшую дату списания для дня месяца charge_day."""
     today = datetime.date.today()
-    import calendar
     last_day = calendar.monthrange(today.year, today.month)[1]
     day = min(charge_day, last_day)
     candidate = today.replace(day=day)
     if candidate <= today:
-        # переходим на следующий месяц
         if today.month == 12:
             next_month = today.replace(year=today.year + 1, month=1, day=1)
         else:
@@ -31,122 +37,105 @@ def _next_charge_date(charge_day: int) -> datetime.date:
     return candidate
 
 
-async def _send_subscription_reminders(bot: Bot) -> None:
-    """Ежедневно в 09:00 — уведомления о подписках, которые спишутся завтра."""
-    tomorrow = datetime.date.today() + datetime.timedelta(days=1)
+async def _notify_user(bot: Bot, user: dict) -> None:
+    """
+    Отправляет все актуальные уведомления одному пользователю.
+    Вызывается каждый час для пользователей, у которых notification_hour совпадает.
+    """
+    tg_id = user["telegram_id"]
+    user_id = user["id"]
+    today = datetime.date.today()
+    tomorrow = today + datetime.timedelta(days=1)
+    messages = []
 
-    users = get_all_linked_users()
-    for user in users:
-        tg_id = user["telegram_id"]
-        subs = get_subscriptions(user["id"])
-
-        due = [s for s in subs if _next_charge_date(s["charge_day"]) == tomorrow]
-        if not due:
-            continue
-
+    # 1. Подписки, которые спишутся завтра
+    subs = get_subscriptions(user_id)
+    due_subs = [s for s in subs if _next_charge_date(s["charge_day"]) == tomorrow]
+    if due_subs:
         lines = ["💳 Завтра спишется:"]
         total = 0.0
-        for s in due:
+        for s in due_subs:
             amount = float(s["amount"])
             total += amount
             lines.append(f"  • {s['name']} — {fmt_amount(amount)} ₽")
         lines.append(f"Итого: {fmt_amount(total)} ₽")
+        messages.append("\n".join(lines))
 
-        text = "\n".join(lines)
-        try:
-            await bot.send_message(tg_id, text)
-        except TelegramForbiddenError:
-            logger.warning("Пользователь %s заблокировал бота — пропускаем", tg_id)
-        except Exception as e:
-            logger.warning("Не удалось отправить напоминание о подписках %s: %s", tg_id, e)
+    # 2. Цели (только по понедельникам)
+    if today.weekday() == 0:
+        goals = get_goals(user_id)
+        active = [g for g in goals if float(g["current_amount"]) < float(g["target_amount"])]
+        if active:
+            lines = ["🎯 Прогресс по целям:"]
+            for g in active:
+                target = float(g["target_amount"])
+                current = float(g["current_amount"])
+                pct = int(current / target * 100) if target > 0 else 0
+                lines.append(f"  • {g['name']}: {pct}% ({fmt_amount(current)} / {fmt_amount(target)} ₽)")
+            messages.append("\n".join(lines))
 
-
-async def _send_goals_reminders(bot: Bot) -> None:
-    """Еженедельно в понедельник 09:00 — напоминания о незавершённых целях."""
-    users = get_all_linked_users()
-    for user in users:
-        tg_id = user["telegram_id"]
-        goals = get_goals(user["id"])
-
-        active = [
-            g for g in goals
-            if float(g["current_amount"]) < float(g["target_amount"])
-        ]
-        if not active:
-            continue
-
-        lines = ["🎯 Напоминание о целях:"]
-        for g in active:
-            target = float(g["target_amount"])
-            current = float(g["current_amount"])
-            pct = int(current / target * 100) if target > 0 else 0
-            lines.append(
-                f"  • {g['name']}: {pct}% ({fmt_amount(current)} / {fmt_amount(target)} ₽)"
-            )
-
-        text = "\n".join(lines)
-        try:
-            await bot.send_message(tg_id, text)
-        except TelegramForbiddenError:
-            logger.warning("Пользователь %s заблокировал бота — пропускаем", tg_id)
-        except Exception as e:
-            logger.warning("Не удалось отправить напоминание о целях %s: %s", tg_id, e)
-
-
-async def _send_budget_warning(bot: Bot) -> None:
-    """Еженедельно — предупреждение, если расходы превысили 80% доходов."""
-    today = datetime.date.today()
-
-    users = get_all_linked_users()
-    for user in users:
-        tg_id = user["telegram_id"]
-        stats = get_monthly_stats(user["id"], today.year, today.month)
+    # 3. Перерасход бюджета (только по понедельникам)
+    if today.weekday() == 0:
+        stats = get_monthly_stats(user_id, today.year, today.month)
         income = stats["income"]
         expenses = stats["expenses"]
+        if income > 0 and expenses / income >= 0.8:
+            pct = expenses / income * 100
+            days_left = calendar.monthrange(today.year, today.month)[1] - today.day
+            remaining = max(income - expenses, 0)
+            messages.append(
+                f"📊 Внимание! Потрачено {pct:.0f}% доходов за месяц.\n"
+                f"Осталось: {fmt_amount(remaining)} ₽ и {days_left} дней."
+            )
 
-        if income <= 0 or expenses / income < 0.8:
-            continue
-
-        pct = expenses / income * 100
-        days_in_month = calendar.monthrange(today.year, today.month)[1]
-        days_left = days_in_month - today.day
-        remaining = max(income - expenses, 0)
-
-        text = (
-            f"📊 Внимание!\n"
-            f"В этом месяце ты уже потратил {pct:.0f}% доходов.\n"
-            f"Осталось: {fmt_amount(remaining)}₽ и {days_left} дней до конца месяца."
-        )
+    for text in messages:
         try:
             await bot.send_message(tg_id, text)
         except TelegramForbiddenError:
-            logger.warning("Пользователь %s заблокировал бота — пропускаем", tg_id)
+            logger.warning("Пользователь %s заблокировал бота", tg_id)
         except Exception as e:
-            logger.warning("Не удалось отправить предупреждение о бюджете %s: %s", tg_id, e)
+            logger.warning("Ошибка при отправке уведомления %s: %s", tg_id, e)
+
+
+async def _hourly_job(bot: Bot) -> None:
+    """
+    Запускается каждый час.
+    Отправляет уведомления пользователям, у которых notification_hour == текущий час.
+    Также проверяет созревшие таймеры покупок.
+    """
+    current_hour = datetime.datetime.now().hour
+
+    # уведомления пользователям по их времени
+    users = await asyncio.to_thread(get_users_to_notify, current_hour)
+    for user in users:
+        await _notify_user(bot, user)
+
+    # таймеры покупок
+    timers = await asyncio.to_thread(get_due_purchase_timers)
+    for t in timers:
+        try:
+            await bot.send_message(
+                t["telegram_id"],
+                f"🛍 Ты всё ещё хочешь *{t['item_name']}* за *{t['amount']:,.0f} ₽*?",
+                parse_mode="Markdown",
+                reply_markup=make_decision_keyboard(t["id"]),
+            )
+            await asyncio.to_thread(mark_purchase_timer_notified, t["id"])
+        except TelegramForbiddenError:
+            logger.warning("Пользователь %s заблокировал бота", t["telegram_id"])
+        except Exception as e:
+            logger.warning("Ошибка при отправке таймера %s: %s", t["id"], e)
 
 
 def setup_notify_scheduler(bot: Bot) -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler()
 
     scheduler.add_job(
-        _send_subscription_reminders,
-        CronTrigger(hour=9, minute=0),
+        _hourly_job,
+        "interval",
+        hours=1,
         args=[bot],
-        id="notify_subscriptions",
-    )
-
-    scheduler.add_job(
-        _send_goals_reminders,
-        CronTrigger(day_of_week="mon", hour=9, minute=0),
-        args=[bot],
-        id="notify_goals",
-    )
-
-    scheduler.add_job(
-        _send_budget_warning,
-        CronTrigger(day_of_week="mon", hour=9, minute=0),
-        args=[bot],
-        id="notify_budget",
+        id="hourly_notifications",
     )
 
     return scheduler

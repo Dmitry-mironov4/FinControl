@@ -83,6 +83,42 @@ def create_tables():
         )
     ''')
 
+    # бюджеты по категориям
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS budgets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            category_id INTEGER NOT NULL,
+            limit_amount DECIMAL(10,2) NOT NULL,
+            period TEXT DEFAULT 'monthly' CHECK(period IN ('monthly', 'yearly')),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id),
+            FOREIGN KEY (category_id) REFERENCES categories(id),
+            UNIQUE(user_id, category_id, period)
+        )
+    ''')
+
+    # таймеры антиимпульсных покупок
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS purchase_timers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            item_name TEXT NOT NULL,
+            amount DECIMAL(10,2) NOT NULL,
+            remind_at TIMESTAMP NOT NULL,
+            notified INTEGER DEFAULT 0,
+            decision TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    ''')
+
+    # миграция: notification_hour для пользователей (default 9 = 09:00)
+    try:
+        cursor.execute('ALTER TABLE users ADD COLUMN notification_hour INTEGER DEFAULT 9')
+    except Exception:
+        pass
+
     # миграция: добавляем start_date в subscriptions для существующих БД
     try:
         cursor.execute('ALTER TABLE subscriptions ADD COLUMN start_date DATE')

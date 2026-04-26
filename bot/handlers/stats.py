@@ -1,10 +1,6 @@
-import datetime
 from aiogram import Router
 from aiogram.filters import Command
-from aiogram.types import Message, ReplyKeyboardRemove
-
-from fincontrolapp.db_queries import get_user_by_telegram_id, get_balance, get_monthly_summary
-from bot.utils.formatters import fmt_amount, MONTH_NAMES
+from aiogram.types import Message
 
 router = Router()
 
@@ -14,39 +10,29 @@ async def cmd_help(message: Message):
     text = (
         "📖 Справка FinControl\n"
         "─────────────────────\n"
-        "/start        — привязать аккаунт\n"
-        "/stats        — баланс и статистика\n"
-        "/add          — добавить транзакцию\n"
-        "/history      — история операций\n"
-        "/goals        — мои цели\n"
+        "Кнопки внизу:\n"
+        "  ➕ Доход / ➖ Расход — добавить транзакцию\n"
+        "  💰 Баланс — баланс и статистика за месяц\n"
+        "  📋 История — все операции с фильтром\n"
+        "  🎯 Цели / 📑 Подписки — цели и подписки\n"
+        "  ⏰ Таймер — антиимпульсный таймер покупки\n"
+        "  ⚙️ Настройки — время уведомлений\n\n"
+        "Быстрое добавление:\n"
+        "<code>+5000 Зарплата</code>          — доход\n"
+        "<code>-300 Еда кофе в маке</code>    — расход с описанием\n"
+        "<code>-1200 Транспорт, метро</code>  — запятая как разделитель\n\n"
+        "Команды:\n"
+        "/goals         — цели\n"
         "/subscriptions — подписки\n"
-        "/help         — эта справка\n\n"
-        "💡 Быстрое добавление — просто напиши:\n"
-        "<code>+5000 зарплата</code>  (доход)\n"
-        "<code>-300 кофе</code>       (расход)"
+        "/timer         — таймер покупки\n"
+        "/cancel        — отменить диалог\n"
+        "/help          — эта справка"
     )
     await message.answer(text, parse_mode="HTML")
 
 
 @router.message(Command("stats"))
 async def cmd_stats(message: Message):
-    user = get_user_by_telegram_id(message.from_user.id)
-    if not user:
-        await message.answer("Сначала запустите /start")
-        return
-
-    month_name = MONTH_NAMES[datetime.date.today().month].capitalize()
-    balance = get_balance(user["id"])
-    summary = get_monthly_summary(user["id"])
-    income = summary["income"]
-    expenses = summary["expenses"]
-    savings_rate = round((income - expenses) / income * 100) if income > 0 else 0
-
-    text = (
-        f"💰 Баланс: {fmt_amount(balance)} ₽\n"
-        f"─────────────────\n"
-        f"📈 Доходы ({month_name}):   {fmt_amount(income)} ₽\n"
-        f"📉 Расходы ({month_name}):  {fmt_amount(expenses)} ₽\n"
-        f"💼 Норма сбережений:  {savings_rate}%"
-    )
-    await message.answer(text)
+    """Алиас: /stats → тот же UI, что и кнопка 💰 Баланс."""
+    from bot.handlers.kb_buttons import kb_balance
+    await kb_balance(message)

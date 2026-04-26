@@ -14,14 +14,18 @@ def fmt_amount(n: float) -> str:
     return f"{n:,.0f}".replace(",", " ")
 
 
-def format_balance(balance: float) -> str:
-    formatted = f"{abs(balance):,.0f}".replace(",", " ")
-    if balance < 0:
+def format_balance(balance) -> str:
+    if isinstance(balance, dict):
+        val = balance.get("balance", 0)
+    else:
+        val = float(balance)
+    formatted = f"{abs(val):,.0f}".replace(",", " ")
+    if val < 0:
         return f"💰 Баланс: -{formatted}₽"
     return f"💰 Баланс: {formatted}₽"
 
 
-def format_transaction(t: dict) -> str:
+def format_transaction(t) -> str:
     today = datetime.date.today()
     yesterday = today - datetime.timedelta(days=1)
 

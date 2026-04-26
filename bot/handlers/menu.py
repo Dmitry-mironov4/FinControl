@@ -3,7 +3,7 @@ from aiogram import Router, F
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 
-from bot.keyboards.inline import main_menu_keyboard, operations_keyboard, subscriptions_keyboard, profile_keyboard
+from bot.keyboards.inline import operations_keyboard, subscriptions_keyboard, profile_keyboard, hist_keyboard
 from bot.utils.formatters import format_balance, fmt_amount, format_transaction, MONTH_NAMES, MONTH_SHORT
 from bot.handlers.add_dialog import AddTransaction
 from bot.handlers.subscriptions import _next_charge_date
@@ -20,7 +20,6 @@ router = Router()
 
 
 def _fmt_tx_line(t) -> str:
-    """📈 22 апр  +5 000 ₽  Зарплата"""
     try:
         tx_date = datetime.date.fromisoformat(t["date"])
         date_str = f"{tx_date.day} {MONTH_SHORT[tx_date.month]}"
@@ -54,7 +53,7 @@ async def menu_balance(callback: CallbackQuery):
         f"📉 Расходы ({month_name}):  {fmt_amount(expenses)} ₽\n"
         f"💼 Норма сбережений:  {savings_rate}%"
     )
-    await callback.message.edit_text(text, reply_markup=main_menu_keyboard())
+    await callback.message.edit_text(text)
     await callback.answer()
 
 
@@ -78,12 +77,7 @@ async def menu_operations(callback: CallbackQuery):
 
 @router.callback_query(F.data == "back_to_main")
 async def back_to_main(callback: CallbackQuery):
-    user = get_user_by_telegram_id(callback.from_user.id)
-    name = user["username"] if user else callback.from_user.first_name
-    await callback.message.edit_text(
-        f"👋 Привет, {name}! Выберите раздел:",
-        reply_markup=main_menu_keyboard(),
-    )
+    await callback.message.delete()
     await callback.answer()
 
 
@@ -124,8 +118,6 @@ async def menu_profile(callback: CallbackQuery):
     await callback.answer()
 
 
-# --- Операции ---
-
 @router.callback_query(F.data == "op_add_income")
 async def op_add_income(callback: CallbackQuery, state: FSMContext):
     user = get_user_by_telegram_id(callback.from_user.id)
@@ -156,18 +148,17 @@ async def op_history(callback: CallbackQuery):
     if not user:
         await callback.answer("Сначала запустите /start", show_alert=True)
         return
-    transactions = get_last_transactions(user["id"], limit=10)
-    if not transactions:
+    txs = get_last_transactions(user["id"], limit=15, offset=0)
+    has_more = len(txs) == 15
+    if not txs:
         await callback.answer("Операций пока нет", show_alert=True)
         return
-    lines = ["Последние 10 операций:"]
-    for t in transactions:
+    lines = ["🗂 Все операции (1–{end}):".replace("{end}", str(len(txs)))]
+    for t in txs:
         lines.append(format_transaction(t))
-    await callback.message.edit_text("\n".join(lines), reply_markup=operations_keyboard())
+    await callback.message.edit_text("\n".join(lines), reply_markup=hist_keyboard("all", 0, has_more))
     await callback.answer()
 
-
-# --- Подписки ---
 
 @router.callback_query(F.data == "sub_active")
 async def sub_active(callback: CallbackQuery):
@@ -197,20 +188,18 @@ async def sub_active(callback: CallbackQuery):
     await callback.answer()
 
 
-# --- Профиль ---
-
 @router.callback_query(F.data == "profile_data")
 async def profile_data(callback: CallbackQuery):
     user = get_user_by_telegram_id(callback.from_user.id)
     if not user:
         await callback.answer("Сначала запустите /start", show_alert=True)
         return
-    name = user["username"] or user["first_name"] or "не указано"
+    name = user["username"] or callback.from_user.first_name or "не указано"
     phone = user["phone"] or "не указан"
     created = user["created_at"] or ""
     if created:
         try:
-            d = datetime.date.fromisoformat(created[:10])
+            d = datetime.date.fromisoformat(str(created)[:10])
             created = d.strftime("%d.%m.%Y")
         except ValueError:
             pass
@@ -246,5 +235,3 @@ async def profile_goals(callback: CallbackQuery):
         lines.append("")
     await callback.message.edit_text("\n".join(lines).rstrip(), reply_markup=profile_keyboard("menu"))
     await callback.answer()
-
-
