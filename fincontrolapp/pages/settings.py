@@ -266,11 +266,10 @@ class SettingsPage(BasePage):
         _show_dialog(self.page_ref, dlg)
  
     def _open_notifications_dialog(self, e):
-        from fincontrolapp.db_queries import get_notify_prefs, set_notify_prefs
-        user = self._ctrl.get_user()
-        if not user:
+        from db_queries import get_notify_prefs, set_notify_prefs
+        user_id = self._ctrl._user_id
+        if not user_id:
             return
-        user_id = user["id"]
         prefs = get_notify_prefs(user_id)
 
         sw_subs = ft.Switch(value=bool(prefs["notify_subscriptions"]), active_color="#6976EB")
