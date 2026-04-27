@@ -11,6 +11,7 @@ from bot.handlers.purchase_timer import router as timer_router
 from bot.handlers.kb_buttons import router as kb_router
 from bot.handlers.settings import router as settings_router
 from bot.handlers.notify import setup_notify_scheduler
+from fincontrolapp.database import create_tables
 
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -34,6 +35,7 @@ dp.include_router(subscriptions.router)
 
 
 async def main():
+    create_tables()  # гарантируем наличие всех таблиц
     scheduler = setup_notify_scheduler(bot)
     scheduler.start()
     try:

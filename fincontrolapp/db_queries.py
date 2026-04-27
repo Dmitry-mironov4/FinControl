@@ -85,6 +85,21 @@ def create_tables():
         )
     ''')
 
+    # таймеры антиимпульсных покупок
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS purchase_timers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            item_name TEXT NOT NULL,
+            amount DECIMAL(10,2) NOT NULL,
+            remind_at TIMESTAMP NOT NULL,
+            notified INTEGER DEFAULT 0,
+            decision TEXT CHECK(decision IN ('bought', 'cancelled')),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    ''')
+
     # миграция: добавляем start_date в subscriptions для существующих БД
     try:
         cursor.execute('ALTER TABLE subscriptions ADD COLUMN start_date DATE')
@@ -423,7 +438,7 @@ def delete_goal(goal_id):
 def get_subscriptions(user_id):
     with get_connection() as conn:
         return conn.execute(
-            'SELECT * FROM subscriptions WHERE user_id = ? ORDER BY charge_day',
+            'SELECT * FROM subscriptions WHERE user_id = ? AND (is_paused IS NULL OR is_paused = 0) ORDER BY charge_day',
             (user_id,)
         ).fetchall()
 

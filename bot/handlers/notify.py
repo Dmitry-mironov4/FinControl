@@ -97,39 +97,50 @@ async def _notify_user(bot: Bot, user: dict) -> None:
             logger.warning("Ошибка при отправке уведомления %s: %s", tg_id, e)
 
 
-async def _hourly_job(bot: Bot) -> None:
-    """
-    Запускается каждый час.
-    Отправляет уведомления пользователям, у которых notification_hour == текущий час.
-    Также проверяет созревшие таймеры покупок.
-    """
-    current_hour = datetime.datetime.now().hour
-
-    # уведомления пользователям по их времени
-    users = await asyncio.to_thread(get_users_to_notify, current_hour)
-    for user in users:
-        await _notify_user(bot, user)
-
-    # таймеры покупок
+async def _timer_job(bot: Bot) -> None:
+    """Проверяет таймеры покупок. Запускается каждые 5 минут."""
     timers = await asyncio.to_thread(get_due_purchase_timers)
     for t in timers:
         try:
             await bot.send_message(
                 t["telegram_id"],
-                f"🛍 Ты всё ещё хочешь *{t['item_name']}* за *{t['amount']:,.0f} ₽*?",
+                f"🛍 Ты всё ещё хочешь *{t['item_name']}* за *{t['amount']:,.0f} ₽*?\n"
+                f"Время вышло — принимай решение:",
                 parse_mode="Markdown",
                 reply_markup=make_decision_keyboard(t["id"]),
             )
             await asyncio.to_thread(mark_purchase_timer_notified, t["id"])
+            logger.info("Таймер #%s отправлен пользователю %s", t["id"], t["telegram_id"])
         except TelegramForbiddenError:
-            logger.warning("Пользователь %s заблокировал бота", t["telegram_id"])
+            await asyncio.to_thread(mark_purchase_timer_notified, t["id"])
         except Exception as e:
-            logger.warning("Ошибка при отправке таймера %s: %s", t["id"], e)
+            logger.warning("Ошибка при отправке таймера #%s: %s", t["id"], e)
+
+
+async def _hourly_job(bot: Bot) -> None:
+    """
+    Запускается каждый час.
+    Отправляет уведомления пользователям, у которых notification_hour == текущий час.
+    """
+    current_hour = datetime.datetime.now().hour
+    users = await asyncio.to_thread(get_users_to_notify, current_hour)
+    for user in users:
+        await _notify_user(bot, user)
 
 
 def setup_notify_scheduler(bot: Bot) -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler()
 
+    # Таймеры покупок — каждые 5 минут (точность ±5 мин)
+    scheduler.add_job(
+        _timer_job,
+        "interval",
+        minutes=5,
+        args=[bot],
+        id="purchase_timers",
+    )
+
+    # Уведомления пользователей по их расписанию — каждый час
     scheduler.add_job(
         _hourly_job,
         "interval",
