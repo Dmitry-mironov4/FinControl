@@ -178,6 +178,10 @@ async def _finish_goal(message: Message, state: FSMContext, deadline: str | None
     await state.clear()
 
     user = get_user_by_telegram_id(message.chat.id)
+    if not user:
+        await message.answer("Аккаунт не найден. Запустите /start заново.")
+        return
+
     add_goal(
         user_id=user["id"],
         name=data["name"],

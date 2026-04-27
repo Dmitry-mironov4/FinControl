@@ -26,6 +26,7 @@ def create_tables():
             phone TEXT UNIQUE,
             username TEXT,
             password_hash TEXT,
+            notification_hour INTEGER DEFAULT 9,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
@@ -100,6 +101,21 @@ def create_tables():
         )
     ''')
 
+    # бюджетные лимиты по категориям
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS budgets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            category_id INTEGER NOT NULL,
+            limit_amount DECIMAL(10,2) NOT NULL,
+            period TEXT DEFAULT 'monthly' CHECK(period IN ('monthly', 'yearly')),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id),
+            FOREIGN KEY (category_id) REFERENCES categories(id),
+            UNIQUE(user_id, category_id, period)
+        )
+    ''')
+
     # миграция: добавляем start_date в subscriptions для существующих БД
     try:
         cursor.execute('ALTER TABLE subscriptions ADD COLUMN start_date DATE')
@@ -113,6 +129,12 @@ def create_tables():
         pass
     try:
         cursor.execute('ALTER TABLE subscriptions ADD COLUMN last_charged_at DATE')
+    except Exception:
+        pass
+
+    # миграция: notification_hour для существующих пользователей
+    try:
+        cursor.execute('ALTER TABLE users ADD COLUMN notification_hour INTEGER DEFAULT 9')
     except Exception:
         pass
 
@@ -288,12 +310,13 @@ def delete_transaction(transaction_id: int, user_id: int | None = None) -> bool:
         return cursor.rowcount > 0
 
 
-def update_transaction(transaction_id, amount, date):
+def update_transaction(transaction_id: int, amount: float, date, user_id: int) -> bool:
     with get_connection() as conn:
-        conn.execute(
-            'UPDATE transactions SET amount=?, date=? WHERE id=?',
-            (amount, date, transaction_id)
+        cursor = conn.execute(
+            'UPDATE transactions SET amount=?, date=? WHERE id=? AND user_id=?',
+            (amount, date, transaction_id, user_id)
         )
+        return cursor.rowcount > 0
 
 
 # ─── БАЛАНС (для Home) ────────────────────────────────────────────────────────
@@ -428,9 +451,13 @@ def deposit_to_goal(user_id, goal_id, amount):
             )
 
 
-def delete_goal(goal_id):
+def delete_goal(goal_id: int, user_id: int) -> bool:
     with get_connection() as conn:
-        conn.execute('DELETE FROM goals WHERE id = ?', (goal_id,))
+        cursor = conn.execute(
+            'DELETE FROM goals WHERE id = ? AND user_id = ?',
+            (goal_id, user_id)
+        )
+        return cursor.rowcount > 0
 
 
 # ─── ПОДПИСКИ ─────────────────────────────────────────────────────────────────
@@ -463,9 +490,13 @@ def add_subscription(user_id, name, amount, charge_day, period='monthly', start_
         )
 
 
-def delete_subscription(subscription_id):
+def delete_subscription(subscription_id: int, user_id: int) -> bool:
     with get_connection() as conn:
-        conn.execute('DELETE FROM subscriptions WHERE id = ?', (subscription_id,))
+        cursor = conn.execute(
+            'DELETE FROM subscriptions WHERE id = ? AND user_id = ?',
+            (subscription_id, user_id)
+        )
+        return cursor.rowcount > 0
 
 
 def get_next_charge_date(charge_day: int, period: str, start_date_str: str | None = None) -> date:
