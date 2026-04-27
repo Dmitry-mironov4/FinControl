@@ -552,6 +552,32 @@ def set_notification_hour(user_id: int, hour: int) -> None:
         conn.commit()
 
 
+def get_notify_prefs(user_id: int) -> dict:
+    """Возвращает настройки типов уведомлений (1=вкл, 0=выкл)."""
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT notify_subscriptions, notify_goals, notify_budget FROM users WHERE id = ?",
+            (user_id,)
+        ).fetchone()
+    if not row:
+        return {"notify_subscriptions": 1, "notify_goals": 1, "notify_budget": 1}
+    return {
+        "notify_subscriptions": int(row["notify_subscriptions"] if row["notify_subscriptions"] is not None else 1),
+        "notify_goals": int(row["notify_goals"] if row["notify_goals"] is not None else 1),
+        "notify_budget": int(row["notify_budget"] if row["notify_budget"] is not None else 1),
+    }
+
+
+def set_notify_prefs(user_id: int, notify_subscriptions: int, notify_goals: int, notify_budget: int) -> None:
+    """Сохранить настройки типов уведомлений."""
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE users SET notify_subscriptions=?, notify_goals=?, notify_budget=? WHERE id=?",
+            (notify_subscriptions, notify_goals, notify_budget, user_id)
+        )
+        conn.commit()
+
+
 def get_users_to_notify(hour: int) -> list:
     """Все привязанные пользователи, у которых notification_hour == hour."""
     with get_connection() as conn:
@@ -591,6 +617,15 @@ def create_purchase_timer(user_id: int, item_name: str, amount: float, remind_at
         )
         conn.commit()
         return cursor.lastrowid
+
+
+def get_purchase_timer(timer_id: int) -> dict | None:
+    """Вернуть один таймер по id."""
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT * FROM purchase_timers WHERE id = ?", (timer_id,)
+        ).fetchone()
+    return dict(row) if row else None
 
 
 def get_due_purchase_timers() -> list:

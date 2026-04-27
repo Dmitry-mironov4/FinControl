@@ -16,6 +16,7 @@ from fincontrolapp.db_queries import (
     get_due_purchase_timers,
     mark_purchase_timer_notified,
     get_users_to_notify,
+    get_notify_prefs,
 )
 from bot.handlers.purchase_timer import make_decision_keyboard
 
@@ -46,23 +47,25 @@ async def _notify_user(bot: Bot, user: dict) -> None:
     user_id = user["id"]
     today = datetime.date.today()
     tomorrow = today + datetime.timedelta(days=1)
+    prefs = get_notify_prefs(user_id)
     messages = []
 
     # 1. Подписки, которые спишутся завтра
-    subs = get_subscriptions(user_id)
-    due_subs = [s for s in subs if _next_charge_date(s["charge_day"]) == tomorrow]
-    if due_subs:
-        lines = ["💳 Завтра спишется:"]
-        total = 0.0
-        for s in due_subs:
-            amount = float(s["amount"])
-            total += amount
-            lines.append(f"  • {s['name']} — {fmt_amount(amount)} ₽")
-        lines.append(f"Итого: {fmt_amount(total)} ₽")
-        messages.append("\n".join(lines))
+    if prefs["notify_subscriptions"]:
+        subs = get_subscriptions(user_id)
+        due_subs = [s for s in subs if _next_charge_date(s["charge_day"]) == tomorrow]
+        if due_subs:
+            lines = ["💳 Завтра спишется:"]
+            total = 0.0
+            for s in due_subs:
+                amount = float(s["amount"])
+                total += amount
+                lines.append(f"  • {s['name']} — {fmt_amount(amount)} ₽")
+            lines.append(f"Итого: {fmt_amount(total)} ₽")
+            messages.append("\n".join(lines))
 
     # 2. Цели (только по понедельникам)
-    if today.weekday() == 0:
+    if prefs["notify_goals"] and today.weekday() == 0:
         goals = get_goals(user_id)
         active = [g for g in goals if float(g["current_amount"]) < float(g["target_amount"])]
         if active:
@@ -75,7 +78,7 @@ async def _notify_user(bot: Bot, user: dict) -> None:
             messages.append("\n".join(lines))
 
     # 3. Перерасход бюджета (только по понедельникам)
-    if today.weekday() == 0:
+    if prefs["notify_budget"] and today.weekday() == 0:
         stats = get_monthly_stats(user_id, today.year, today.month)
         income = stats["income"]
         expenses = stats["expenses"]

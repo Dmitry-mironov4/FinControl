@@ -7,6 +7,7 @@ from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKe
 
 from fincontrolapp.db_queries import get_user_by_telegram_id, get_goals, deposit_to_goal, add_goal
 from bot.utils.formatters import fmt_amount
+import asyncio
 
 router = Router()
 
@@ -92,6 +93,33 @@ async def cmd_goals(message: Message):
     await message.answer("\n".join(lines).rstrip(), reply_markup=keyboard)
 
 
+async def _send_goals_summary(message: Message, user_id: int) -> None:
+    """Отправить итоговое сообщение со всеми целями и прогрессом."""
+    goals = await asyncio.to_thread(get_goals, user_id)
+    if not goals:
+        await message.answer("✅ Пополнено! Активных целей больше нет.")
+        return
+
+    lines = ["🎯 Твои цели:", ""]
+    for g in goals:
+        target = float(g["target_amount"])
+        current = float(g["current_amount"])
+        pct = min(current / target * 100, 100) if target > 0 else 0
+        bar = _progress_bar(pct)
+        remaining = max(target - current, 0)
+        lines.append(f"🎯 {g['name']}")
+        lines.append(f"   {bar} {pct:.0f}% · {fmt_amount(current)} / {fmt_amount(target)}₽")
+        if remaining > 0:
+            deadline = _format_deadline(g["deadline"])
+            lines.append(f"   Осталось: {fmt_amount(remaining)}₽{deadline}")
+        else:
+            lines.append("   ✅ Цель достигнута!")
+        lines.append("")
+
+    keyboard = _goals_keyboard(goals)
+    await message.answer("\n".join(lines).rstrip(), reply_markup=keyboard)
+
+
 # ─── Пополнение цели ──────────────────────────────────────────────────────────
 
 @router.callback_query(F.data.startswith("goal_deposit_"))
@@ -120,7 +148,7 @@ async def process_deposit(message: Message, state: FSMContext):
     await state.clear()
 
     deposit_to_goal(user["id"], goal_id, amount)
-    await message.answer(f"✅ Пополнено на {fmt_amount(amount)}₽")
+    await _send_goals_summary(message, user["id"])
 
 
 # ─── Добавление цели ──────────────────────────────────────────────────────────

@@ -266,32 +266,62 @@ class SettingsPage(BasePage):
         _show_dialog(self.page_ref, dlg)
  
     def _open_notifications_dialog(self, e):
-        enabled = self.page_ref.data.get("_s_notifications", False)
-        switch = ft.Switch(value=enabled, active_color="#6976EB")
-        switch_row = ft.Row([switch, ft.Text("Напоминания о расходах",
-            font_family="Montserrat SemiBold", size=13,
-            color=ft.Colors.with_opacity(0.6, "#000000"))], spacing=8)
-        dlg = ft.AlertDialog(modal=True, title=ft.Text("Уведомления", font_family="Montserrat SemiBold"))
+        from fincontrolapp.db_queries import get_notify_prefs, set_notify_prefs
+        user = self._ctrl.get_user()
+        if not user:
+            return
+        user_id = user["id"]
+        prefs = get_notify_prefs(user_id)
+
+        sw_subs = ft.Switch(value=bool(prefs["notify_subscriptions"]), active_color="#6976EB")
+        sw_goals = ft.Switch(value=bool(prefs["notify_goals"]), active_color="#6976EB")
+        sw_budget = ft.Switch(value=bool(prefs["notify_budget"]), active_color="#6976EB")
+
+        def _row(sw, label, hint):
+            return ft.Column([
+                ft.Row([
+                    sw,
+                    ft.Column([
+                        ft.Text(label, font_family="Montserrat SemiBold", size=13),
+                        ft.Text(hint, font_family="Montserrat SemiBold", size=11,
+                                color=ft.Colors.with_opacity(0.5, "#000000")),
+                    ], spacing=0, expand=True),
+                ], spacing=8),
+            ], spacing=0)
+
+        dlg = ft.AlertDialog(modal=True, title=ft.Text("Уведомления в боте", font_family="Montserrat SemiBold"))
 
         def on_cancel(e):
             _close_dialog(self.page_ref, dlg)
- 
+
         def on_submit(e):
-            self.page_ref.data["_s_notifications"] = switch.value
-            msg = "Уведомления включены" if switch.value else "Уведомления выключены"
+            set_notify_prefs(
+                user_id,
+                int(sw_subs.value),
+                int(sw_goals.value),
+                int(sw_budget.value),
+            )
             _close_dialog(self.page_ref, dlg)
-            self.page_ref.snack_bar = ft.SnackBar(ft.Text(msg, font_family="Montserrat SemiBold"), open=True)
+            self.page_ref.snack_bar = ft.SnackBar(
+                ft.Text("Настройки уведомлений сохранены ✓", font_family="Montserrat SemiBold"), open=True)
             self.page_ref.update()
 
-
         dlg.content = ft.Column([
-            ft.Text("Push-уведомления работают после сборки на устройстве.",
-                    size=12, color=ft.Colors.with_opacity(0.6, "#000000"), font_family="Montserrat SemiBold"),
-            switch_row,
-        ], tight=True, spacing=12)
+            ft.Text(
+                "Управляй тем, что Telegram-бот присылает тебе каждый день.",
+                size=12, color=ft.Colors.with_opacity(0.6, "#000000"),
+                font_family="Montserrat SemiBold",
+            ),
+            ft.Divider(height=1, thickness=0.5, color=ft.Colors.with_opacity(0.1, "#000000")),
+            _row(sw_subs, "Подписки", "За день до списания"),
+            _row(sw_goals, "Цели", "Прогресс — по понедельникам"),
+            _row(sw_budget, "Бюджет", "Если потрачено ≥80% — по понедельникам"),
+        ], tight=True, spacing=10, width=300)
         dlg.actions = [
-            ft.TextButton("Отмена", style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_cancel),
-            ft.TextButton("Сохранить", style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_submit),
+            ft.TextButton("Отмена", style=ft.ButtonStyle(color="#483EB7",
+                text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_cancel),
+            ft.TextButton("Сохранить", style=ft.ButtonStyle(color="#483EB7",
+                text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_submit),
         ]
         _show_dialog(self.page_ref, dlg)
  
