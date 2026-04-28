@@ -1,6 +1,6 @@
-import json
 import os
 import flet as ft
+
 from pages import HomePage, TransactionsPage, GoalsPage, SettingsPage, SubscriptionsPage, IncomePage, ExpensesPage, AnalyticsPage, SimulatorPage
 from pages.auth import AuthPage
 from components import AppTheme
@@ -10,34 +10,6 @@ from controllers import (HomeController, GoalsController, SubscriptionsControlle
 from components import show_dialog, close_dialog
 from database import create_tables, get_connection
 
-
-
-
-_SESSION_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "session.json")
-
-
-def _save_session(user_id: int):
-    try:
-        with open(_SESSION_FILE, "w") as f:
-            json.dump({"user_id": user_id}, f)
-    except Exception:
-        pass
-
-
-def _load_session() -> int | None:
-    try:
-        with open(_SESSION_FILE) as f:
-            val = json.load(f).get("user_id")
-            return int(val) if val else None
-    except Exception:
-        return None
-
-
-def _clear_session():
-    try:
-        os.remove(_SESSION_FILE)
-    except Exception:
-        pass
 
 
 
@@ -86,7 +58,7 @@ def main(page: ft.Page):
 
     def on_auth_success(user_id: int, is_new: bool = False):
         page.data["user_id"] = user_id
-        _save_session(user_id)
+        page.session.store.set("user_id", user_id)
         show_main_app()
         _check_and_add_recurring_income(user_id)  # AUTO-1: автодобавить зарплату, если наступил новый месяц
         _check_and_charge_subscriptions(user_id)  # AUTO-2: списать подписки с charge_day ≤ сегодня
@@ -339,7 +311,7 @@ def main(page: ft.Page):
         }
 
         def logout():
-            _clear_session()
+            page.session.store.remove("user_id")
             page.data = {}
             page.data.setdefault("_s_currency", "RUB")
             show_auth()
@@ -363,7 +335,7 @@ def main(page: ft.Page):
 
     # ─── СТАРТ ────────────────────────────────────────────────────────────────
 
-    stored_id = _load_session()
+    stored_id = page.session.store.get("user_id") if page.session.store.contains_key("user_id") else None
     if stored_id:
         with get_connection() as conn:
             user = conn.execute("SELECT id FROM users WHERE id=?", (stored_id,)).fetchone()
@@ -378,4 +350,5 @@ def main(page: ft.Page):
     show_auth()
 
 
-ft.run(main, assets_dir="assets")
+ft.run(main, assets_dir="assets", view=ft.AppView.WEB_BROWSER,
+       port=int(os.environ.get("PORT", 8550)), host="0.0.0.0")

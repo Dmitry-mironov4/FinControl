@@ -114,9 +114,9 @@ class SettingsPage(BasePage):
         )
 
         return ft.Container(
-            padding=ft.padding.symmetric(horizontal=16, vertical=12),
+            padding=ft.Padding.symmetric(horizontal=16, vertical=12),
             border_radius=18,
-            border=ft.border.all(1.5, ft.Colors.with_opacity(0.06, "#483EB7")),
+            border=ft.Border.all(1.5, ft.Colors.with_opacity(0.06, "#483EB7")),
             bgcolor=ft.Colors.with_opacity(0.04, "#483EB7"),
             content=ft.Row([
                 ft.Container(
@@ -145,7 +145,7 @@ class SettingsPage(BasePage):
     def _section_header(self, label: str) -> ft.Container:
         """Заголовок группы (серый текст, как 'Account' / 'Preferences' на картинке)."""
         return ft.Container(
-            padding=ft.padding.only(left=4, top=12, bottom=4),
+            padding=ft.Padding.only(left=4, top=12, bottom=4),
             content=ft.Text(
                 label,
                 size=12,
@@ -184,7 +184,7 @@ class SettingsPage(BasePage):
             font_family="Montserrat SemiBold",
         )
         row = ft.Container(
-            padding=ft.padding.symmetric(horizontal=16, vertical=14),
+            padding=ft.Padding.symmetric(horizontal=16, vertical=14),
             ink=True,
             on_click=on_click,
             content=ft.Row([
@@ -363,7 +363,6 @@ class SettingsPage(BasePage):
         _show_dialog(self.page_ref, dlg)
  
     def _open_telegram_dialog(self, e):
-        import webbrowser
         user_id = self._ctrl._user_id
         if user_id is None:
             self._show_error("Не удалось получить данные пользователя")
@@ -374,19 +373,13 @@ class SettingsPage(BasePage):
         def on_cancel(e):
             _close_dialog(self.page_ref, dlg)
 
-        def on_open(e):
-            try:
-                webbrowser.open(deep_link)
-            finally:
-                _close_dialog(self.page_ref, dlg)
-
         dlg.content = ft.Column([
             ft.Text("Нажми «Открыть Telegram» — бот автоматически привяжет твой аккаунт.",
                     size=13, color=ft.Colors.with_opacity(0.6, "#000000"), font_family="Montserrat SemiBold"),
         ], tight=True, spacing=12)
         dlg.actions = [
-            ft.TextButton("Отмена",style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_cancel),
-            ft.TextButton("Открыть Telegram",style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_open),
+            ft.TextButton("Отмена", style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_cancel),
+            ft.TextButton("Открыть Telegram", url=deep_link, style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold"))),
         ]
         _show_dialog(self.page_ref, dlg)
  
