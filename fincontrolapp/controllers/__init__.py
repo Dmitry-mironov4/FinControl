@@ -6,6 +6,7 @@ from .expenses_ctrl import ExpensesController
 from .income_ctrl import IncomeController
 from .settings_ctrl import SettingsController
 from .simulator_ctrl import SimulatorController
+from .budget_ctrl import BudgetController
 
 __all__ = [
     "HomeController",
@@ -16,4 +17,5 @@ __all__ = [
     "IncomeController",
     "SettingsController",
     "SimulatorController",
+    "BudgetController"
 ]
