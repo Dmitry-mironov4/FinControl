@@ -3,6 +3,7 @@ import datetime
 from datetime import date
 from components.base_page import BasePage
 from components.dialogs import close_dialog as _close_dialog
+from components.empty_state import empty_state
 
 MONTH_SHORT = ["янв", "фев", "мар", "апр", "май", "июн",
                "июл", "авг", "сен", "окт", "ноя", "дек"]
@@ -67,8 +68,8 @@ class SubscriptionsPage(BasePage):
                 border_radius=16,
                 gradient=ft.LinearGradient(
                     colors=["#ffffff", "#88A2FF"],
-                    begin=ft.Alignment(-1, -1),
-                    end=ft.Alignment(1, 1),
+                    begin=ft.Alignment(-2, -1),
+                    end=ft.Alignment(1, 8),
                 ),
                 content=ft.Column([
                     ft.Text("Сумма подписок в месяц", size=14,font_family="Montserrat SemiBold", color=ft.Colors.with_opacity(0.8, "#000000")),
@@ -86,7 +87,7 @@ class SubscriptionsPage(BasePage):
                     gradient=ft.RadialGradient(
                         colors=["#ffffff", "#88A2FF"],
                         center=ft.Alignment(0, -0.2),
-                        radius=4.0,
+                        radius=8.0,
                         stops=[0.0, 0.8],
                     ),
                     alignment=ft.Alignment(0, 0),
@@ -102,15 +103,11 @@ class SubscriptionsPage(BasePage):
 
     def _subscriptions_list(self, subscriptions):
         if not subscriptions:
-            return ft.Container(
-                padding=16,
-                border_radius=16,
-                gradient=ft.LinearGradient(
-                    colors=["#ffffff", "#88A2FF"],
-                    begin=ft.Alignment(-1, -1),
-                    end=ft.Alignment(1, 1),
-                ),
-                content=ft.Text("Подписок нет",font_family="Montserrat SemiBold", color=ft.Colors.with_opacity(0.8, "#000000"), size=14),
+            return empty_state(
+                icon=ft.Icons.SUBSCRIPTIONS_OUTLINED,
+                title="Подписок нет",
+                subtitle="Добавьте подписки чтобы отслеживать регулярные списания",
+                icon_color="#DB5C0D",
             )
 
         rows = []
@@ -158,8 +155,8 @@ class SubscriptionsPage(BasePage):
                 ) if urgent else ft.Border(),
                 gradient=ft.LinearGradient(
                     colors=["#ffffff", "#88A2FF"],
-                    begin=ft.Alignment(-1, -1),
-                    end=ft.Alignment(1, 1),
+                    begin=ft.Alignment(-2, -1),
+                    end=ft.Alignment(1, 8),
                 ),
                 content=ft.Row(
                     alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
