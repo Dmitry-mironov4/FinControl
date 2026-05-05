@@ -6,13 +6,13 @@ from components.base_page import BasePage
 
 _CARD_GRADIENT = ft.LinearGradient(
     colors=["#ffffff", "#88A2FF"],
-    begin=ft.Alignment(-1, -1),
-    end=ft.Alignment(1, 1),
+    begin=ft.Alignment(-2, -1),
+    end=ft.Alignment(1, 8),
 )
 _BTN_GRADIENT = ft.RadialGradient(
     colors=["#ffffff", "#88A2FF"],
     center=ft.Alignment(0, -0.2),
-    radius=4.0,
+    radius=8.0,
     stops=[0.0, 0.8],
 )
 
@@ -79,7 +79,7 @@ class SimulatorPage(BasePage):
                     gradient=ft.RadialGradient(
                         colors=["#ffffff", "#88A2FF"],
                         center=ft.Alignment(0, -0.2),
-                        radius=4.0,
+                        radius=8.0,
                         stops=[0.0, 0.8],
                     ) if active else None,
                     bgcolor=ft.Colors.with_opacity(0.07, "#483EB7") if not active else None,
@@ -96,8 +96,8 @@ class SimulatorPage(BasePage):
         border_radius=24,
         gradient=ft.LinearGradient(
             colors=["#ffffff", "#88A2FF"],
-            begin=ft.Alignment(-1, -1),
-            end=ft.Alignment(5, 5),
+            begin=ft.Alignment(-2, -1),
+            end=ft.Alignment(5, 8),
         ),
         padding=ft.Padding.only(left=4, right=4, top=4, bottom=4),
         clip_behavior=ft.ClipBehavior.HARD_EDGE,
