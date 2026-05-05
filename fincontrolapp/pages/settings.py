@@ -139,9 +139,9 @@ class SettingsPage(BasePage):
         return ft.Container(
             gradient=ft.RadialGradient(
                 colors=["#ffffff", "#88A2FF"],
-                center=ft.Alignment(0.3, 0.9),
-                radius=7.0,
-                stops=[0.0, 0.8],
+                center=ft.Alignment(0.6, -0.2),
+                radius=10.0,
+                stops=[0.0, 0.75],
             ),
             border_radius=12,
             clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
