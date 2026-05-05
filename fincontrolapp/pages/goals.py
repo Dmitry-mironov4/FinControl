@@ -1,8 +1,10 @@
 import flet as ft
 import datetime
+import threading
+import time
 from components.base_page import BasePage
 from components.dialogs import show_dialog as _show_dialog, close_dialog as _close_dialog
-
+from components.empty_state import empty_state
 
 class GoalsPage(BasePage):
     def __init__(self, page, ctrl):
@@ -36,7 +38,7 @@ class GoalsPage(BasePage):
                         gradient=ft.RadialGradient(
                             colors=["#ffffff", "#88A2FF"],
                             center=ft.Alignment(0, -0.2),
-                            radius=4.0,
+                            radius=8.0,
                             stops=[0.0, 0.8],
                         ),
                         alignment=ft.Alignment(0, 0),
@@ -53,22 +55,85 @@ class GoalsPage(BasePage):
             expand=True,
         )
 
+    # ── Анимация прогресс-бара ────────────────────────────────────────────────
+
+    def _animate_progress(self, bar: ft.ProgressBar, from_val: float, to_val: float,
+                          on_done=None):
+        """Плавно анимирует ProgressBar от from_val до to_val за ~500мс."""
+        steps = 25
+        delta = (to_val - from_val) / steps
+
+        def run():
+            for i in range(steps + 1):
+                bar.value = min(1.0, from_val + delta * i)
+                try:
+                    bar.update()
+                except Exception:
+                    break
+                time.sleep(0.02)
+            if on_done:
+                on_done()
+
+        threading.Thread(target=run, daemon=True).start()
+
+    # ── Конфетти-диалог при 100% ─────────────────────────────────────────────
+
+    def _show_confetti(self, goal_name: str):
+        """Показывает поздравительный диалог при достижении цели."""
+        dlg = ft.AlertDialog(
+            modal=True,
+            content=ft.Column(
+                [
+                    
+                    ft.Text(
+                        "Цель достигнута!",
+                        size=20,
+                        font_family="Montserrat SemiBold",
+                        color="#253A82",
+                        text_align=ft.TextAlign.CENTER,
+                        weight=ft.FontWeight.W_700,
+                    ),
+                    ft.Text(
+                        f"«{goal_name}»",
+                        size=15,
+                        font_family="Montserrat SemiBold",
+                        color=ft.Colors.with_opacity(0.7, "#253A82"),
+                        text_align=ft.TextAlign.CENTER,
+                    ),
+                    ft.Text(
+                        "Поздравляем! Вы справились!",
+                        size=13,
+                        font_family="Montserrat SemiBold",
+                        color=ft.Colors.with_opacity(0.5, "#000000"),
+                        text_align=ft.TextAlign.CENTER,
+                    ),
+                ],
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                spacing=10,
+                tight=True,
+            ),
+            actions=[
+                ft.TextButton(
+                    "К новой цели ➔",
+                    on_click=lambda e: _close_dialog(self.page_ref, dlg),
+                    style=ft.ButtonStyle(
+                        color="#253A82",
+                        text_style=ft.TextStyle(
+                            font_family="Montserrat SemiBold", size=15
+                        ),
+                    ),
+                ),
+            ],
+            actions_alignment=ft.MainAxisAlignment.CENTER,
+        )
+        _show_dialog(self.page_ref, dlg)
+
     def _goals_list(self, goals):
         if not goals:
-            return ft.Container(
-                padding=16,
-                border_radius=16,
-                gradient=ft.LinearGradient(
-                    colors=["#ffffff", "#88A2FF"],
-                    begin=ft.Alignment(-1, -1),
-                    end=ft.Alignment(1, 1),
-                ),
-                content=ft.Text(
-                    "Целей пока нет",
-                    color="rgba(0,0,0,0.65)",
-                    size=14,
-                    font_family="Montserrat SemiBold",
-                ),
+            return empty_state(
+                icon=ft.Icons.FLAG_OUTLINED,
+                title="Целей пока нет",
+                subtitle="Поставьте финансовую цель и откладывайте к ней",
             )
 
         cards = []
@@ -80,8 +145,8 @@ class GoalsPage(BasePage):
             done = progress >= 1.0
             pace = self._ctrl.calc_pace(target, current, g["deadline"])
 
-            bar_color = "#E3FC87" if done else "#253A82"
-            percent_color = "#E3FC87" if done else "#253A82"
+            bar_color = "#CAF03F" if done else "#253A82"
+            percent_color = "#CAF03F" if done else "#253A82"
 
             status_row = []
             if done:
@@ -104,7 +169,6 @@ class GoalsPage(BasePage):
                     )
                 )
 
-            # Фон-подсказка, который показывается при свайпе влево
             delete_bg = ft.Container(
                 border_radius=16,
                 padding=ft.Padding.only(right=20),
@@ -134,15 +198,23 @@ class GoalsPage(BasePage):
                 visible=False,
             )
 
-            # Сама карточка цели
+            # ProgressBar как отдельная переменная — нужна для анимации
+            progress_bar = ft.ProgressBar(
+                value=progress,
+                color=bar_color,
+                bgcolor="rgba(37, 58, 130, 0.7)",
+                height=6,
+                border_radius=3,
+            )
+
             card_content = ft.Container(
                 gradient=ft.RadialGradient(
                     colors=["#ffffff", "#88A2FF"],
                     center=ft.Alignment(0, -0.2),
-                    radius=2.0,
+                    radius=8.0,
                     stops=[0.0, 0.5],
                 ),
-                border_radius=16,
+                border_radius=24,
                 padding=16,
                 content=ft.Column(
                     [
@@ -151,7 +223,7 @@ class GoalsPage(BasePage):
                             controls=[
                                 ft.Row(
                                     [
-                                        ft.Icon(ft.Icons.EMOJI_EVENTS, color="#E3FC87", size=18)
+                                        ft.Icon(ft.Icons.EMOJI_EVENTS, color="#CAF03F", size=18)
                                         if done
                                         else ft.Icon(ft.Icons.FLAG_OUTLINED, color="#253A82", size=18),
                                         ft.Text(
@@ -173,13 +245,7 @@ class GoalsPage(BasePage):
                                 ),
                             ],
                         ),
-                        ft.ProgressBar(
-                            value=progress,
-                            color=bar_color,
-                            bgcolor="rgba(37, 58, 130, 0.7)",
-                            height=6,
-                            border_radius=3,
-                        ),
+                        progress_bar,
                         ft.Row(
                             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                             controls=[
@@ -203,8 +269,8 @@ class GoalsPage(BasePage):
                                 ft.TextButton(
                                     "Пополнить",
                                     icon=ft.Icons.ADD,
-                                    on_click=lambda e, gid=g["id"], gname=g["name"]: self._open_deposit_dialog(
-                                        gid, gname
+                                    on_click=lambda e, gid=g["id"], gname=g["name"], pb=progress_bar, prog=progress: (
+                                        self._open_deposit_dialog(gid, gname, pb, prog)
                                     ),
                                     style=ft.ButtonStyle(
                                         color="#253A82",
@@ -216,7 +282,7 @@ class GoalsPage(BasePage):
                                 ),
                                 ft.Row(
                                     [
-                                        ft.IconButton( #Изменить
+                                        ft.IconButton(
                                             icon=ft.Icons.EDIT_OUTLINED,
                                             style=ft.ButtonStyle(
                                                 color="#253A82",
@@ -227,7 +293,7 @@ class GoalsPage(BasePage):
                                             ),
                                             on_click=lambda e, goal=g: self._open_edit_dialog(goal),
                                         ),
-                                        ft.IconButton( #Удалить
+                                        ft.IconButton(
                                             icon=ft.Icons.DELETE_OUTLINE,
                                             style=ft.ButtonStyle(
                                                 color=ft.Colors.with_opacity(0.6, "#FF7E1C"),
@@ -251,13 +317,8 @@ class GoalsPage(BasePage):
                 ),
             )
 
-            # Стек: фон корзины снизу, карточка сверху
-            stack = ft.Stack(
-                controls=[delete_bg, card_content],
-            )
+            stack = ft.Stack(controls=[delete_bg, card_content])
 
-            # Свайп влево через GestureDetector (замена Dismissible для Flet 0.82)
-            # last_x запоминается в on_pan_update, т.к. DragEndEvent не имеет local_x
             swipe = {"start_x": 0.0, "last_x": 0.0}
 
             def on_pan_start(e, sw=swipe):
@@ -275,14 +336,14 @@ class GoalsPage(BasePage):
                         db.visible = True
                         db.update()
                 else:
-                    # свайп вправо — возвращаем на место
                     cc.offset = ft.Offset(0, 0)
                     cc.update()
                     if db.visible:
                         db.visible = False
                         db.update()
 
-            def on_pan_end(e, cc=card_content, db=delete_bg, sw=swipe, gid=g["id"], gname=g["name"]):
+            def on_pan_end(e, cc=card_content, db=delete_bg, sw=swipe,
+                           gid=g["id"], gname=g["name"]):
                 delta = sw["last_x"] - sw["start_x"]
                 if delta < -80:
                     self._confirm_delete(gid, gname)
@@ -381,7 +442,6 @@ class GoalsPage(BasePage):
             error_style=error_style,
         )
 
-        # Валидация при вводе
         def validate_name(e):
             name_field.error = (
                 None if (name_field.value or "").strip() else "Введите название цели"
@@ -404,7 +464,6 @@ class GoalsPage(BasePage):
         name_field.on_change = validate_name
         amount_field.on_change = validate_amount
 
-        # DatePicker
         def on_date_selected(e):
             deadline_display.value = (
                 e.control.value.strftime("%Y-%m-%d") if e.control.value else ""
@@ -425,7 +484,6 @@ class GoalsPage(BasePage):
 
         deadline_display.on_click = open_date_picker
 
-        # BottomSheet для Flet 0.82: открываем через bs.open = True
         bs = ft.BottomSheet(open=False, content=ft.Container())
 
         def on_cancel(e):
@@ -469,7 +527,7 @@ class GoalsPage(BasePage):
             try:
                 self._ctrl.add_goal(name=name, target_amount=amount, deadline=deadline)
             except Exception:
-                self._show_error("Не удалось создать цель", close_bs=bs)
+                self._show_error("Не удалось создать цель")
                 return
             bs.open = False
             self.page.update()
@@ -529,7 +587,9 @@ class GoalsPage(BasePage):
         bs.open = True
         self.page.update()
 
-    def _open_deposit_dialog(self, goal_id, goal_name):
+    def _open_deposit_dialog(self, goal_id, goal_name,
+                              progress_bar: ft.ProgressBar = None,
+                              current_progress: float = 0.0):
         error_style = ft.TextStyle(
             font_family="Montserrat Medium",
             size=10,
@@ -546,7 +606,6 @@ class GoalsPage(BasePage):
             error_style=error_style,
         )
 
-        # Валидация при вводе
         def validate(e):
             v = (amount_field.value or "").replace(",", ".")
             if not v:
@@ -588,14 +647,49 @@ class GoalsPage(BasePage):
             try:
                 self._ctrl.deposit(goal_id, amount)
             except Exception:
-                self._show_error("Не удалось пополнить цель", close_bs=bs)
+                self._show_error("Не удалось пополнить цель")
                 return
+
             bs.open = False
             self.page.update()
-            self.rebuild()
-            pages = self.page_ref.data.get("pages", {})
-            if 0 in pages:
-                pages[0].rebuild()
+
+            # Получаем обновлённую цель для вычисления нового прогресса
+            updated_goal = next(
+                (g for g in self._ctrl.get_goals() if g["id"] == goal_id), None
+            )
+            new_progress = 0.0
+            is_done = False
+            if updated_goal:
+                target = updated_goal["target_amount"] or 1
+                new_current = updated_goal["current_amount"] or 0
+                new_progress = min(new_current / target, 1.0)
+                is_done = new_progress >= 1.0
+
+            # ── Анимация прогресс-бара ──
+            if progress_bar is not None:
+                def after_animation():
+                    # Перестраиваем страницу после анимации
+                    time.sleep(0.1)
+                    self.rebuild()
+                    pages = self.page_ref.data.get("pages", {})
+                    if 0 in pages:
+                        pages[0].rebuild()
+                    # ── Конфетти при 100% ──
+                    if is_done:
+                        self._show_confetti(goal_name)
+
+                self._animate_progress(
+                    progress_bar, current_progress, new_progress,
+                    on_done=after_animation,
+                )
+            else:
+                self.rebuild()
+                pages = self.page_ref.data.get("pages", {})
+                if 0 in pages:
+                    pages[0].rebuild()
+                if is_done:
+                    self._show_confetti(goal_name)
+
             self._show_success(f"Пополнено на {amount:,.0f} ₽")
 
         bs.content = ft.Container(
@@ -770,9 +864,12 @@ class GoalsPage(BasePage):
                 return
 
             try:
-                self._ctrl.update_goal(goal_id=goal["id"], name=name, target_amount=amount, deadline=deadline)
+                self._ctrl.update_goal(
+                    goal_id=goal["id"], name=name,
+                    target_amount=amount, deadline=deadline
+                )
             except Exception:
-                self._show_error("Не удалось сохранить цель", close_bs=bs)
+                self._show_error("Не удалось сохранить цель")
                 return
             bs.open = False
             self.page.update()
