@@ -62,7 +62,7 @@ def main(page: ft.Page):
     page.theme_mode = ft.ThemeMode.LIGHT
     page.window.width = 390
     page.window.height = 844
-    page.bgcolor = AppTheme.BG_PAGE
+    page.bgcolor = AppTheme.BACKGROUND
     page.padding = 0
     page.data = {}
 
@@ -324,11 +324,17 @@ def main(page: ft.Page):
             )
 
         def navigate(index: int):
-            pages[index].refresh()
+            # Сначала показываем страницу
             content.content = pages[index]
-            content.update()
             nav_container.content = build_nav(index)
-            nav_container.update()
+            # Обновляем всё сразу
+            page.update()
+            # Только потом перестраиваем данные
+            try:
+                pages[index].rebuild()
+                page.update()
+            except Exception as e:
+                print(f"navigate rebuild error: {e}")
 
         uid = page.data["user_id"]
         pages = {
