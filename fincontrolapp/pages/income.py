@@ -4,7 +4,7 @@ from datetime import date
 from components.base_page import BasePage
 from components.dialogs import close_dialog as _close_dialog
 from components.form_utils import parse_amount, parse_date
-
+from components.empty_state import empty_state
 
 class IncomePage(BasePage):
     def __init__(self, page: ft.Page, ctrl):
@@ -73,7 +73,7 @@ class IncomePage(BasePage):
                     gradient=ft.RadialGradient(
                         colors=["#ffffff", "#88A2FF"],
                         center=ft.Alignment(0, -0.2),
-                        radius=4.0,
+                        radius=8.0,
                         stops=[0.0, 0.8],
                     ),
                     alignment=ft.Alignment(0, 0),
@@ -91,11 +91,11 @@ class IncomePage(BasePage):
         amount_text = f"{salary['amount']:,.0f} ₽" if salary else "Не указана"
         return ft.Container(
             padding=16,
-            border_radius=16,
+            border_radius=24,
             gradient=ft.LinearGradient(
                 colors=["#ffffff", "#88A2FF"],
-                begin=ft.Alignment(-1, -1),
-                end=ft.Alignment(1, 1),
+                begin=ft.Alignment(-2, -1),
+                end=ft.Alignment(1, 8),
             ),
             content=ft.Column([
                 ft.Row([
@@ -131,20 +131,10 @@ class IncomePage(BasePage):
 
     def _income_list(self, incomes):
      if not incomes:
-        return ft.Container(
-            padding=16,
-            border_radius=16,
-            gradient=ft.LinearGradient(
-                colors=["#ffffff", "#88A2FF"],
-                begin=ft.Alignment(-1, -1),
-                end=ft.Alignment(1, 1),
-            ),
-            content=ft.Text(
-                "Нет записей",
-                font_family="Montserrat SemiBold",
-                color=ft.Colors.with_opacity(0.8, "#000000"),
-                size=14,
-            ),
+        return empty_state(
+            icon=ft.Icons.SAVINGS_OUTLINED,
+            title="Нет дополнительных доходов",
+            subtitle="Нажмите «Добавить доход» чтобы записать поступление",
         )
 
      rows = []
@@ -269,11 +259,11 @@ class IncomePage(BasePage):
 
     # Все строки внутри одного градиентного контейнера — как в HomePage
      return ft.Container(
-        border_radius=16,
+        border_radius=24,
         gradient=ft.LinearGradient(
             colors=["#ffffff", "#88A2FF"],
-            begin=ft.Alignment(-1, -1),
-            end=ft.Alignment(1, 1),
+            begin=ft.Alignment(-2, -1),
+            end=ft.Alignment(1, 8),
         ),
         padding=ft.Padding(left=0, right=0, top=4, bottom=4),
         content=ft.Column(rows, spacing=0),
