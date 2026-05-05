@@ -20,17 +20,17 @@ analytics.py — Экран аналитики финансов.
 """
 
 import flet as ft
+from flet_charts.line_chart_data_point import LineChartDataPointTooltip
 from flet_charts import (
-    BarChart, BarChartGroup, BarChartRod,
+    BarChart, BarChartGroup, BarChartRod, BarChartRodTooltip,
     LineChart, LineChartData, LineChartDataPoint,
     ChartGridLines, ChartAxis, ChartAxisLabel,
 )
+from flet_charts.bar_chart import BarChartTooltip
 from datetime import datetime
 from database import get_connection
 from components.base_page import BasePage
 
-
-# ─── Константы ───────────────────────────────────────────────────────────────
 
 MONTH_NAMES = ["Янв", "Фев", "Мар", "Апр", "Май", "Июн",
                "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек"]
@@ -40,14 +40,10 @@ CATEGORY_COLORS = [
     "#C80D00", "#6DD0F0", "#775Aff", "#9C27B0",
 ]
 
-# Минимум месяцев с данными для отображения графиков
 MIN_MONTHS = 2
 
 
-# ─── DB-функции ──────────────────────────────────────────────────────────────
-
 def get_available_years(user_id: int) -> list[int]:
-    """Возвращает отсортированный список лет, за которые есть транзакции."""
     with get_connection() as conn:
         rows = conn.execute(
             """SELECT DISTINCT strftime('%Y', date) AS y
@@ -64,14 +60,6 @@ def get_available_years(user_id: int) -> list[int]:
 
 
 def get_monthly_summary(user_id: int, year: int) -> list[dict]:
-    """
-    Суммы доходов и расходов по каждому месяцу выбранного года.
-
-    Возвращает список словарей:
-        month   — короткое название месяца ("Янв", "Фев", …)
-        income  — сумма доходов за месяц
-        expense — сумма расходов за месяц
-    """
     with get_connection() as conn:
         rows = conn.execute(
             """SELECT
@@ -81,30 +69,29 @@ def get_monthly_summary(user_id: int, year: int) -> list[dict]:
                FROM transactions
                WHERE user_id = ? AND strftime('%Y', date) = ?
                GROUP BY m
-               ORDER BY m""",
+               ORDER BY m ASC""",
             (user_id, str(year)),
         ).fetchall()
 
-    result = []
+    db_data = {}
     for r in rows:
-        idx = int(r["m"]) - 1
-        result.append({
-            "month":   MONTH_NAMES[idx],
+        db_data[int(r["m"])] = {
             "income":  r["income"]  or 0.0,
             "expense": r["expense"] or 0.0,
+        }
+
+    result = []
+    for month_num in range(1, 13):
+        d = db_data.get(month_num, {"income": 0.0, "expense": 0.0})
+        result.append({
+            "month":   MONTH_NAMES[month_num - 1],
+            "income":  d["income"],
+            "expense": d["expense"],
         })
     return result
 
 
 def get_expense_breakdown_by_year(user_id: int, year: int) -> list[dict]:
-    """
-    Разбивка расходов по категориям за выбранный год.
-
-    Возвращает список словарей:
-        label — название категории
-        value — доля в % от суммарных расходов
-        color — цвет для отображения
-    """
     with get_connection() as conn:
         rows = conn.execute(
             """SELECT c.name AS category, SUM(t.amount) AS total
@@ -132,21 +119,22 @@ def get_expense_breakdown_by_year(user_id: int, year: int) -> list[dict]:
     ]
 
 
-# ─── UI-helpers ──────────────────────────────────────────────────────────────
-
 def _title(text: str) -> ft.Text:
-    return ft.Text(text, size=16, font_family="Montserrat SemiBold", weight=ft.FontWeight.W_600, color="#000000")
+    return ft.Text(text, size=16, font_family="Montserrat SemiBold",
+                   weight=ft.FontWeight.W_600, color="#000000")
 
 
 def _card(content: ft.Control) -> ft.Container:
     return ft.Container(
-                border=ft.border.all(1.5, ft.Colors.with_opacity(0.06, "#483EB7")),
-                bgcolor=ft.Colors.with_opacity(0.2, "#483EB7"), border_radius=16, padding=20, content=content,
+        border=ft.border.all(1.5, ft.Colors.with_opacity(0.06, "#483EB7")),
+        bgcolor=ft.Colors.with_opacity(0.2, "#483EB7"),
+        border_radius=16,
+        padding=20,
+        content=content,
     )
 
 
 def _stub(message: str) -> ft.Container:
-    """Заглушка при недостатке данных."""
     return ft.Container(
         height=130,
         alignment=ft.Alignment(0, 0),
@@ -155,7 +143,9 @@ def _stub(message: str) -> ft.Container:
                 ft.Icon(ft.Icons.BAR_CHART_OUTLINED, color="#3A3A50", size=44),
                 ft.Text(
                     message,
-                    size=13, font_family="Montserrat SemiBold", color="#666677",
+                    size=13,
+                    font_family="Montserrat SemiBold",
+                    color="#666677",
                     text_align=ft.TextAlign.CENTER,
                 ),
             ],
@@ -166,10 +156,9 @@ def _stub(message: str) -> ft.Container:
 
 
 def _has_enough_data(monthly: list[dict]) -> bool:
-    return len(monthly) >= MIN_MONTHS
+    non_zero = sum(1 for d in monthly if d["income"] > 0 or d["expense"] > 0)
+    return non_zero >= MIN_MONTHS
 
-
-# ─── AnalyticsPage ───────────────────────────────────────────────────────────
 
 class AnalyticsPage(BasePage):
 
@@ -191,31 +180,25 @@ class AnalyticsPage(BasePage):
             toolbar_height=50,
         )
 
-    # ── Построение тела ──────────────────────────────────────────────────────
-
     def _build_chart_controls(self) -> list[ft.Control]:
-        """Собирает все блоки с данными для текущего self.selected_year."""
         monthly    = get_monthly_summary(self.user_id, self.selected_year)
         categories = get_expense_breakdown_by_year(self.user_id, self.selected_year)
         enough     = _has_enough_data(monthly)
 
         controls = [self._summary(monthly)]
 
-        # Доходы / расходы по месяцам
         controls.append(_title("Доходы и расходы по месяцам"))
         controls.append(
             _card(self._bar_chart(monthly)) if enough
             else _card(_stub("Добавьте хотя бы 2 месяца данных,\nчтобы увидеть диаграмму"))
         )
 
-        # Динамика баланса
         controls.append(_title("Динамика баланса"))
         controls.append(
             _card(self._balance_chart(monthly)) if enough
             else _card(_stub("Добавьте хотя бы 2 месяца данных,\nчтобы увидеть график баланса"))
         )
 
-        # Структура расходов
         controls.append(_title("Структура расходов"))
         controls.append(
             _card(self._category_bars(categories)) if categories
@@ -240,7 +223,8 @@ class AnalyticsPage(BasePage):
             spacing=10,
             controls=[
                 ft.Row(
-                    [ft.Text("Год:",font_family="Montserrat SemiBold",size=20, color="#000000"), self._year_row],
+                    [ft.Text("Год:", font_family="Montserrat SemiBold",
+                             size=20, color="#000000"), self._year_row],
                     spacing=10,
                 ),
                 self._charts_col,
@@ -249,27 +233,27 @@ class AnalyticsPage(BasePage):
 
     def _render_year_buttons(self, years: list[int]) -> None:
         def _btn(y: int) -> ft.Container:
-          active = (y == self.selected_year)
-          return ft.Container(
-            content=ft.Text(
-                str(y),
-                font_family="Montserrat SemiBold",
-                size=13,
-                color="#483EB7" if active else "#A8A8A8",
-                text_align=ft.TextAlign.CENTER,
-            ),
-            padding=ft.padding.symmetric(horizontal=16, vertical=8),
-            border_radius=20,
-            gradient=ft.RadialGradient(
-                colors=["#ffffff", "#88A2FF"],
-                center=ft.Alignment(0, -0.2),
-                radius=2.5,
-                stops=[0.0, 0.8],
-            ) if active else None,
-            bgcolor=None if active else "rgba(108,99,255,0.1)",
-            on_click=self._make_year_handler(y),
-            ink=True,
-        )
+            active = (y == self.selected_year)
+            return ft.Container(
+                content=ft.Text(
+                    str(y),
+                    font_family="Montserrat SemiBold",
+                    size=13,
+                    color="#483EB7" if active else "#A8A8A8",
+                    text_align=ft.TextAlign.CENTER,
+                ),
+                padding=ft.Padding.symmetric(horizontal=16, vertical=8),
+                border_radius=20,
+                gradient=ft.RadialGradient(
+                    colors=["#ffffff", "#88A2FF"],
+                    center=ft.Alignment(0.2, -0.2),
+                    radius=5.0,
+                    stops=[0.0, 0.8],
+                ) if active else None,
+                bgcolor=None if active else "rgba(108,99,255,0.1)",
+                on_click=self._make_year_handler(y),
+                ink=True,
+            )
 
         self._year_row.controls = [_btn(y) for y in years]
 
@@ -282,148 +266,177 @@ class AnalyticsPage(BasePage):
             self.page_ref.update()
         return handler
 
-    def _on_year_change(self, e: ft.ControlEvent) -> None:
-        pass
-
-    # ── Сводные плашки ───────────────────────────────────────────────────────
-
     def _summary(self, monthly: list[dict]) -> ft.Column:
         total_income  = sum(d["income"]  for d in monthly)
         total_expense = sum(d["expense"] for d in monthly)
         savings       = total_income - total_expense
         savings_pct   = round(savings / total_income * 100) if total_income else 0
 
+       
+
         def fmt(v: float) -> str:
             return f"{int(v):,}".replace(",", " ") + " ₽"
 
         def tile(label, value, color, icon):
             return ft.Container(
-                expand=True, border=ft.border.all(1.5, ft.Colors.with_opacity(0.06, "#483EB7")),
-                bgcolor=ft.Colors.with_opacity(0.1, "#483EB7"), border_radius=14, padding=16,
+                expand=True,
+                border=ft.border.all(1.5, ft.Colors.with_opacity(0.06, "#483EB7")),
+                bgcolor=ft.Colors.with_opacity(0.1, "#483EB7"),
+                border_radius=14,
+                padding=16,
                 content=ft.Column([
                     ft.Row([
                         ft.Icon(icon, color=color, size=18),
-                        ft.Text(label, font_family="Montserrat SemiBold",size=14, color="#888888"),
+                        ft.Text(label, font_family="Montserrat SemiBold",
+                                size=14, color="#888888"),
                     ], spacing=6),
-                    ft.Text(fmt(value), size=16, font_family="Montserrat SemiBold", weight=ft.FontWeight.BOLD, color=color),
+                    ft.Text(fmt(value), size=16, font_family="Montserrat SemiBold",
+                            weight=ft.FontWeight.BOLD, color=color),
                 ], spacing=6),
             )
 
         return ft.Column([
             ft.Row([
-                tile("Доходы",  total_income, ft.Colors.with_opacity(0.6, "#23CF01"), ft.Icons.TRENDING_UP),
-                tile("Расходы", total_expense, ft.Colors.with_opacity(0.6, "#FF7E1C"), ft.Icons.TRENDING_DOWN),
+                tile("Доходы",  total_income,
+                     ft.Colors.with_opacity(0.6, "#23CF01"), ft.Icons.TRENDING_UP),
+                tile("Расходы", total_expense,
+                     ft.Colors.with_opacity(0.6, "#FF7E1C"), ft.Icons.TRENDING_DOWN),
             ], spacing=10),
             ft.Row([
                 tile("Экономия", savings, "#6C63FF", ft.Icons.SAVINGS_OUTLINED),
                 ft.Container(
-                    expand=True, border=ft.border.all(1.5, ft.Colors.with_opacity(0.06, "#483EB7")),
-                    bgcolor=ft.Colors.with_opacity(0.1, "#483EB7"), border_radius=14, padding=16,
+                    expand=True,
+                    border=ft.border.all(1.5, ft.Colors.with_opacity(0.06, "#483EB7")),
+                    bgcolor=ft.Colors.with_opacity(0.1, "#483EB7"),
+                    border_radius=14,
+                    padding=16,
                     content=ft.Column([
                         ft.Row([
                             ft.Icon(ft.Icons.PERCENT, color="#483EB7", size=18),
-                            ft.Text("Норма сбережений",font_family="Montserrat SemiBold", size=12, color="#888888",expand=True),
+                            ft.Text("Норма сбережений", font_family="Montserrat SemiBold",
+                                    size=12, color="#888888", expand=True),
                         ], spacing=6),
                         ft.ProgressBar(
                             value=max(0, savings_pct) / 100,
-                            bgcolor=ft.Colors.with_opacity(0.6, "#483EB7"), color="#483EB7",
-                            height=8, border_radius=4,
+                            bgcolor=ft.Colors.with_opacity(0.6, "#483EB7"),
+                            color="#483EB7",
+                            height=8,
+                            border_radius=4,
                         ),
-                        ft.Text(f"{savings_pct}% от доходов",font_family="Montserrat SemiBold", size=13, color=ft.Colors.with_opacity(0.6, "#483EB7")),
+                        ft.Text(f"{savings_pct}% от доходов",
+                                font_family="Montserrat SemiBold",
+                                size=13,
+                                color=ft.Colors.with_opacity(0.6, "#483EB7")),
                     ], spacing=6),
                 ),
             ], spacing=10),
         ], spacing=10)
 
-    # ── Столбчатая диаграмма (flet_charts BarChart) ──────────────────────────
-
     def _bar_chart(self, monthly: list[dict]) -> ft.Column:
-     months   = [d["month"]  for d in monthly]
-     incomes  = [d["income"] for d in monthly]
-     expenses = [d["expense"] for d in monthly]
-     n        = len(months)
+        months   = [d["month"]  for d in monthly]
+        incomes  = [d["income"] for d in monthly]
+        expenses = [d["expense"] for d in monthly]
+        n        = len(months)
+       
 
-     bar_w   = 20
-     max_val = max(max(incomes), max(expenses), 1)
-     max_y   = max_val * 1.25
+        bar_w   = 20
+        max_val = max(max(incomes), max(expenses), 1)
+        max_y   = max_val * 1.25
 
-     groups = [
-        BarChartGroup(
-            x=i,
-            rods=[
-                BarChartRod(
-                    from_y=0, to_y=incomes[i],
-                    width=bar_w,
-                    color=ft.Colors.with_opacity(0.6, "#23CF01"),
-                    border_radius=3,
-                    tooltip=f"↑ {incomes[i]:,.0f} ₽",
-                ),
-                BarChartRod(
-                    from_y=0, to_y=expenses[i],
-                    width=bar_w,
-                    color=ft.Colors.with_opacity(0.6, "#FF7E1C"),
-                    border_radius=3,
-                    tooltip=f"↓ {expenses[i]:,.0f} ₽",
-                ),
-            ],
-        )
-        for i in range(n)
-    ]
-
-     bottom_axis = ChartAxis(
-        labels=[
-            ChartAxisLabel(
-                value=i,
-                label=ft.Text(
-                    months[i],
-                    font_family="Montserrat SemiBold",
-                    size=11,
-                    color=ft.Colors.with_opacity(0.9, "#483EB7"),
-                ),
-            )
-            for i in range(n)
-        ],
-    )
-
-     chart_width = max(360, n * (bar_w * 2 + 28))
-
-     return ft.Column([
-        ft.Row(
-            scroll="always",
-            controls=[
-                ft.Container(
-                    width=chart_width,
-                    height=300,
-                    content=BarChart(
-                        groups=groups,
-                        bottom_axis=bottom_axis,
-                        max_y=max_y,
-                        horizontal_grid_lines=ChartGridLines(
-                            color=ft.Colors.with_opacity(0.1, "#483EB7"),
+        groups = [
+            BarChartGroup(
+                x=i,
+                rods=[
+                    BarChartRod(
+                        from_y=0, to_y=incomes[i],
+                        width=bar_w,
+                        color=ft.Colors.with_opacity(0.6, "#23CF01"),
+                        border_radius=3,
+                        tooltip=BarChartRodTooltip(
+                            text=f"↑ {incomes[i]:,.0f} ₽",
+                            text_style=ft.TextStyle(
+                                color="#FFFFFF", size=12,
+                                font_family="Montserrat SemiBold",
+                                
+                            ),
                         ),
                     ),
-                ),
-            ],
-        ),
-        ft.Row([
-            ft.Row([
-                ft.Container(width=12, height=12,
-                             bgcolor=ft.Colors.with_opacity(0.6, "#23CF01"),
-                             border_radius=3),
-                ft.Text("Доходы", font_family="Montserrat SemiBold",
-                        size=12, color=ft.Colors.with_opacity(0.9, "#483EB7")),
-            ], spacing=6),
-            ft.Row([
-                ft.Container(width=12, height=12,
-                             bgcolor=ft.Colors.with_opacity(0.6, "#FF7E1C"),
-                             border_radius=3),
-                ft.Text("Расходы", font_family="Montserrat SemiBold",
-                        size=12, color=ft.Colors.with_opacity(0.9, "#483EB7")),
-            ], spacing=6),
-        ], spacing=20),
-    ], spacing=10)
+                    BarChartRod(
+                        from_y=0, to_y=expenses[i],
+                        width=bar_w,
+                        color=ft.Colors.with_opacity(0.6, "#FF7E1C"),
+                        border_radius=3,
+                        tooltip=BarChartRodTooltip(
+                            text=f"↓ {expenses[i]:,.0f} ₽",
+                            text_style=ft.TextStyle(
+                                color="#FFFFFF", size=12,
+                                font_family="Montserrat SemiBold",
+                                
+                            ),
+                        ),
+                    ),
+                ],
+            )
+            for i in range(n)
+        ]
 
-    # ── Линейный график баланса (flet_charts LineChart) ───────────────────────
+        bottom_axis = ChartAxis(
+            labels=[
+                ChartAxisLabel(
+                    value=i,
+                    label=ft.Text(
+                        months[i],
+                        font_family="Montserrat SemiBold",
+                        size=11,
+                        color=ft.Colors.with_opacity(0.9, "#483EB7"),
+                    ),
+                )
+                for i in range(n)
+            ],
+            label_size=32,
+        )
+
+        chart_width = max(360, n * (bar_w * 2 + 28))
+
+        return ft.Column([
+            ft.Row(
+                scroll="always",
+                controls=[
+                    ft.Container(
+                        width=chart_width,
+                        height=300,
+                        content=BarChart(
+                            groups=groups,
+                            bottom_axis=bottom_axis,
+                            max_y=max_y,
+                            tooltip=BarChartTooltip(
+                                bgcolor=ft.Colors.with_opacity(0.4, "#483EB7"),
+                                border_radius=5,
+                            ),
+                            horizontal_grid_lines=ChartGridLines(
+                                color=ft.Colors.with_opacity(0.1, "#483EB7"),
+                            ),
+                        ),
+                    ),
+                ],
+            ),
+            ft.Row([
+                ft.Row([
+                    ft.Container(width=12, height=12,
+                                 bgcolor=ft.Colors.with_opacity(0.6, "#23CF01"),
+                                 border_radius=3),
+                    ft.Text("Доходы", font_family="Montserrat SemiBold",
+                            size=12, color=ft.Colors.with_opacity(0.9, "#483EB7")),
+                ], spacing=6),
+                ft.Row([
+                    ft.Container(width=12, height=12,
+                                 bgcolor=ft.Colors.with_opacity(0.6, "#FF7E1C"),
+                                 border_radius=3),
+                    ft.Text("Расходы", font_family="Montserrat SemiBold",
+                            size=12, color=ft.Colors.with_opacity(0.9, "#483EB7")),
+                ], spacing=6),
+            ], spacing=20),
+        ], spacing=10)
 
     def _balance_chart(self, monthly: list[dict]) -> ft.Row:
         balance  = 0
@@ -441,6 +454,22 @@ class AnalyticsPage(BasePage):
         min_y   = min_val * 1.1  if min_val < 0 else 0
 
         points = [LineChartDataPoint(x=i, y=balances[i]) for i in range(n)]
+        
+        points = [
+            LineChartDataPoint(
+                 x=i,
+                 y=balances[i],
+                 tooltip=LineChartDataPointTooltip(
+                     text=f"{balances[i]:,.0f} ₽",
+                     text_style=ft.TextStyle(
+                color="#FFFFFF",
+                size=12,
+                font_family="Montserrat SemiBold",
+                    ),
+                ),
+            )
+            for i in range(n)
+        ]
 
         series = LineChartData(
             points=points,
@@ -453,10 +482,16 @@ class AnalyticsPage(BasePage):
             labels=[
                 ChartAxisLabel(
                     value=i,
-                    label=ft.Text(months[i],font_family="Montserrat SemiBold", size=11, color=ft.Colors.with_opacity(0.9, "#483EB7")),
+                    label=ft.Text(
+                        months[i],
+                        font_family="Montserrat SemiBold",
+                        size=11,
+                        color=ft.Colors.with_opacity(0.9, "#483EB7"),
+                    ),
                 )
                 for i in range(n)
             ],
+            label_size=32,
         )
 
         chart_width = max(360, n * 70)
@@ -472,28 +507,36 @@ class AnalyticsPage(BasePage):
                         bottom_axis=bottom_axis,
                         min_x=-0.5,  max_x=n - 0.5,
                         min_y=min_y, max_y=max_y,
-                        horizontal_grid_lines=ChartGridLines(color=ft.Colors.with_opacity(0.09, "#483EB7")),
+                        tooltip=BarChartTooltip(
+                                bgcolor=ft.Colors.with_opacity(0.4, "#483EB7"),
+                                border_radius=5,
+                            ),
+                        horizontal_grid_lines=ChartGridLines(
+                            color=ft.Colors.with_opacity(0.09, "#483EB7"),
+                        ),
                         expand=True,
                     ),
                 ),
             ],
         )
 
-    # ── Горизонтальные бары категорий ────────────────────────────────────────
-
     def _category_bars(self, categories: list[dict]) -> ft.Column:
         rows = []
         for cat in categories:
             rows.append(ft.Column([
                 ft.Row([
-                    ft.Text(cat["label"], font_family="Montserrat SemiBold",size=13, color=ft.Colors.with_opacity(0.9, "#483EB7"), expand=True),
-                    ft.Text(f"{cat['value']}%",font_family="Montserrat SemiBold", size=13, color=cat["color"],
-                            weight=ft.FontWeight.W_600),
+                    ft.Text(cat["label"], font_family="Montserrat SemiBold",
+                            size=13, color=ft.Colors.with_opacity(0.9, "#483EB7"),
+                            expand=True),
+                    ft.Text(f"{cat['value']}%", font_family="Montserrat SemiBold",
+                            size=13, color=cat["color"], weight=ft.FontWeight.W_600),
                 ]),
                 ft.ProgressBar(
                     value=cat["value"] / 100,
-                    bgcolor=ft.Colors.with_opacity(0.09, "#483EB7"), color=cat["color"],
-                    height=8, border_radius=4,
+                    bgcolor=ft.Colors.with_opacity(0.09, "#483EB7"),
+                    color=cat["color"],
+                    height=8,
+                    border_radius=4,
                 ),
             ], spacing=6))
         return ft.Column(rows, spacing=14)
