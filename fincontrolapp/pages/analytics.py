@@ -141,7 +141,38 @@ def get_expense_breakdown_by_year(user_id: int, year: int) -> list[dict]:
         for i, r in enumerate(rows)
     ]
 
+def get_expense_breakdown_by_period(user_id: int, start_date: str, end_date: str) -> list[dict]:
+    """
+    Разбивка расходов по категориям за произвольный период.
+    Возвращает список: [{"label": str, "value": int (%), "amount": float, "color": str}, ...]
+    """
+    with get_connection() as conn:
+        rows = conn.execute(
+            """SELECT c.name AS category, SUM(t.amount) AS total
+               FROM transactions t
+               JOIN categories c ON t.category_id = c.id
+               WHERE t.user_id = ?
+                 AND t.type = 'expense'
+                 AND t.date BETWEEN ? AND ?
+               GROUP BY c.id, c.name
+               ORDER BY total DESC""",
+            (user_id, start_date, end_date),
+        ).fetchall()
 
+    total = sum(r["total"] for r in rows) or 0
+    if total == 0:
+        return []
+
+    CATEGORY_COLORS = ["#6976EB", "#FF7684", "#00B487", "#FFB347", "#9B59B6", "#5DADE2"]  # расширь при необходимости
+    return [
+        {
+            "label": r["category"],
+            "value": round(r["total"] / total * 100),
+            "amount": r["total"],
+            "color": CATEGORY_COLORS[i % len(CATEGORY_COLORS)],
+        }
+        for i, r in enumerate(rows)
+    ]
 # ─── UI-helpers ──────────────────────────────────────────────────────────────
 
 def _title(text: str) -> ft.Text:
@@ -175,40 +206,50 @@ def _stub(message: str) -> ft.Container:
     )
 
 
-def _stub(message: str) -> ft.Container:
-    """Заглушка при недостатке данных."""
-    return ft.Container(
-        height=130,
-        alignment=ft.Alignment(0, 0),
-        content=ft.Column(
-            [
-                ft.Icon(ft.Icons.BAR_CHART_OUTLINED, color="#3A3A50", size=44),
-                ft.Text(
-                    message,
-                    size=13, color="#666677",
-                    text_align=ft.TextAlign.CENTER,
-                ),
-            ],
-            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-            spacing=10,
-        ),
-    )
-
-
 def _has_enough_data(monthly: list[dict]) -> bool:
     non_zero = sum(1 for d in monthly if d["income"] > 0 or d["expense"] > 0)
     return non_zero >= MIN_MONTHS
 
 
 # ─── AnalyticsPage ───────────────────────────────────────────────────────────
+from datetime import date
 
+def period_dates(period: str) -> tuple[str, str]:
+    """Возвращает (start_date, end_date) для period: 'month' | 'quarter' | 'half' | 'year'."""
+    today = date.today()
+    end = today.isoformat()
+    if period == 'month':
+        start = today.replace(day=1).isoformat()
+    elif period == 'quarter':
+        # 3 месяца назад
+        month = today.month - 3
+        year = today.year
+        if month <= 0:
+            month += 12
+            year -= 1
+        start = date(year, month, 1).isoformat()
+    elif period == 'half':
+        # 6 месяцев назад
+        month = today.month - 6
+        year = today.year
+        if month <= 0:
+            month += 12
+            year -= 1
+        start = date(year, month, 1).isoformat()
+    else:  # 'year'
+        start = today.replace(month=1, day=1).isoformat()
+    return start, end
+    
 class AnalyticsPage(BasePage):
 
     def __init__(self, page: ft.Page, user_id: int | None = None):
         self.user_id = user_id
+        self.current_period = "month"
+        self.pie_container = ft.Container()  # будет заполнен позже
         self.selected_year = datetime.now().year
         super().__init__(page, "Аналитика")
-
+        self._reload_pie(self.current_period)
+        
     def build_header(self):
         return ft.AppBar(
             title=ft.Text(
@@ -254,6 +295,38 @@ class AnalyticsPage(BasePage):
         )
 
         return controls
+                # ─── Pie chart с фильтром периода (структура расходов за последние N месяцев)
+        controls.append(_title("Структура расходов за период"))
+        # Создаём выпадающий список периода
+        period_dropdown = ft.Dropdown(
+            value=self.current_period,
+            width=160,
+            text_style=ft.TextStyle(font_family="Montserrat Medium", size=13, color="#000000"),
+            options=[
+                ft.dropdown.Option(key="month", text="Месяц"),
+                ft.dropdown.Option(key="quarter", text="Квартал"),
+                ft.dropdown.Option(key="half", text="Полгода"),
+                ft.dropdown.Option(key="year", text="Год"),
+            ],
+            on_change=lambda e: self._reload_pie(e.control.value),
+            bgcolor="#F0F0F0",
+            border_color="#483EB7",
+        )
+        # Блок с заголовком, дропдауном и pie контейнером
+        pie_block = ft.Container(
+            content=ft.Column(
+                controls=[
+                    ft.Row([period_dropdown], alignment=ft.MainAxisAlignment.END),
+                    self.pie_container,
+                ],
+                spacing=10,
+            ),
+            padding=ft.padding.all(16),
+            margin=ft.margin.only(top=12),
+            border_radius=16,
+            bgcolor=ft.Colors.with_opacity(0.2, "#483EB7"),
+        )
+        controls.append(pie_block)
 
     def build_body(self) -> ft.Column:
         years = get_available_years(self.user_id)
@@ -528,3 +601,70 @@ class AnalyticsPage(BasePage):
                 ),
             ], spacing=6))
         return ft.Column(rows, spacing=14)
+
+   
+    
+       # ── Pie chart (структура расходов за период) ─────────────────────────────
+    def _build_pie_chart(self, breakdown: list[dict]) -> ft.Control:
+        """Строит PieChart расходов по категориям."""
+        if not breakdown:
+            return ft.Container(
+                content=ft.Text("Нет данных за период", color="#666677",
+                                font_family="Montserrat Medium", size=13),
+                alignment=ft.alignment.center,
+                height=220,
+            )
+
+        from flet_charts import PieChart, PieChartSection
+
+        sections = [
+            PieChartSection(
+                value=item["value"],
+                color=item["color"],
+                title=f"{item['value']}%",
+                title_style=ft.TextStyle(
+                    color="#FFFFFF",
+                    font_family="Montserrat Bold",
+                    size=11,
+                ),
+                radius=80,
+            )
+            for item in breakdown
+        ]
+
+        legend_rows = [
+            ft.Row(
+                controls=[
+                    ft.Container(width=12, height=12, border_radius=3, bgcolor=item["color"]),
+                    ft.Text(item["label"], font_family="Montserrat Medium", size=12,
+                            color="#AAAAAA", expand=True),
+                    ft.Text(f"{item['value']}%", font_family="Montserrat Medium",
+                            size=12, color="#FFFFFF"),
+                ],
+                spacing=8,
+            )
+            for item in breakdown[:6]
+        ]
+
+        return ft.Column(
+            controls=[
+                ft.Container(
+                    content=PieChart(
+                        sections=sections,
+                        sections_space=2,
+                        center_space_radius=40,
+                    ),
+                    height=220,
+                    alignment=ft.alignment.center,
+                ),
+                ft.Column(controls=legend_rows, spacing=6),
+            ],
+            spacing=12,
+        )
+
+
+    def _reload_pie(self, period: str):
+        start, end = period_dates(period)
+        breakdown = get_expense_breakdown_by_period(self.user_id, start, end)
+        self.pie_container.content = self._build_pie_chart(breakdown)
+        self.pie_container.update()
