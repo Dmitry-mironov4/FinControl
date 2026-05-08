@@ -173,11 +173,7 @@ class GoalsPage(BasePage):
                 border_radius=16,
                 padding=ft.Padding.only(right=20),
                 alignment=ft.Alignment(1, 0),
-                gradient=ft.RadialGradient(
-                    colors=["#ffffff", "#FF7E1C"],
-                    center=ft.Alignment(0.8, 0),
-                    radius=2.0,
-                ),
+                bgcolor=ft.Colors.TRANSPARENT,
                 content=ft.Row(
                     alignment=ft.MainAxisAlignment.END,
                     controls=[

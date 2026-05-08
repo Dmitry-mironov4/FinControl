@@ -164,7 +164,7 @@ class ExpensesPage(BasePage):
                     alignment=ft.MainAxisAlignment.END,
                     controls=[
                         ft.Icon(ft.Icons.DELETE_OUTLINE, color=ft.Colors.with_opacity(0.8, "#FF7E1C"), size=22),
-                        ft.Text("Удалить", color=ft.Colors.with_opacity(0.8, "#FF7E1C"), size=13),
+                        ft.Text("Удалить", color=ft.Colors.with_opacity(0.8, "#FF7E1C"), font_family="Montserrat SemiBold", size=13),
                     ],
                     spacing=4,
                 ),
