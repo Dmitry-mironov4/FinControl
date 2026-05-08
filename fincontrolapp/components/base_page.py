@@ -16,7 +16,7 @@ BasePage определяет скелет экрана (заголовок + т
         def build_body(self):
             return ft.Text("Привет!")
 """
-
+import uuid
 import flet as ft
 from datetime import date
 from components.theme import AppTheme
@@ -63,8 +63,10 @@ class BasePage(ft.Container):
         self.page_title = title
         self.expand     = True                    # занимает всё доступное пространство
         self.bgcolor    = AppTheme.BACKGROUND               # фоновый цвет экрана
-        self.padding    = ft.Padding(left=16, right=16, top=48, bottom=8)
-        # top=48 — отступ сверху, чтобы контент не уходил под системную строку статуса
+        self.padding    = ft.Padding(left=16, right=16, top=20, bottom=8)
+        self.alignment  = ft.Alignment(-1, -1)
+        self.key = str(uuid.uuid4())  # новый key при каждом rebuild
+        # top=20 — отступ сверху, чтобы контент не уходил под системную строку статуса
         # scroll=AUTO на внешней колонке — скроллится весь экран целиком,
         # включая заголовок. Дочерние build_body() НЕ должны задавать
         # собственный scroll, иначе получится скролл внутри скролла.

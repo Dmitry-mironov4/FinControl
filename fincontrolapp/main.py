@@ -274,15 +274,38 @@ def main(page: ft.Page):
 
         return
 
-    # ─── ОСНОВНОЕ ПРИЛОЖЕНИЕ ──────────────────────────────────────────────────
+# ─── ОСНОВНОЕ ПРИЛОЖЕНИЕ ──────────────────────────────────────────────────
 
     def show_main_app():
-        content = ft.Container(expand=True)
+        # 1. Сначала определяем uid и словарь pages
+        uid = page.data["user_id"]
+        pages = {
+            0: HomePage(page, HomeController(uid)),
+            1: AnalyticsPage(page, uid),
+            2: GoalsPage(page, GoalsController(uid)),
+            3: SettingsPage(page, SettingsController(uid)),
+            4: SubscriptionsPage(page, SubscriptionsController(uid)),
+            5: IncomePage(page, IncomeController(uid)),
+            6: ExpensesPage(page, ExpensesController(uid)),
+            7: TransactionsPage(page, TransactionsController(uid)),
+            8: SimulatorPage(page, SimulatorController()),
+        }
+
+        # 2. Теперь можем безопасно использовать pages[0]
+        content = ft.AnimatedSwitcher(
+            content=pages[0],
+            expand=True,
+            transition=ft.AnimatedSwitcherTransition.FADE,
+            duration=200,
+            reverse_duration=200,
+            switch_in_curve=ft.AnimationCurve.EASE_IN,
+            switch_out_curve=ft.AnimationCurve.EASE_OUT,
+        )
         nav_container = ft.Container(expand=False)
 
         def build_nav(selected_index: int) -> ft.Container:
             items = [
-                ("navigation/home.svg",         0),
+                ("navigation/home.svg",        0),
                 ("navigation/analytics.svg",    1),
                 ("navigation/goals.svg",        2),
                 ("navigation/test.svg",         8),
@@ -324,7 +347,7 @@ def main(page: ft.Page):
             )
 
         def navigate(index: int):
-            # Сначала показываем страницу
+            pages[index].key = str(index) + "_" + str(id(pages[index]))
             content.content = pages[index]
             nav_container.content = build_nav(index)
             # Обновляем всё сразу
@@ -335,19 +358,6 @@ def main(page: ft.Page):
                 page.update()
             except Exception as e:
                 print(f"navigate rebuild error: {e}")
-
-        uid = page.data["user_id"]
-        pages = {
-            0: HomePage(page, HomeController(uid)),
-            1: AnalyticsPage(page, uid),
-            2: GoalsPage(page, GoalsController(uid)),
-            3: SettingsPage(page, SettingsController(uid)),
-            4: SubscriptionsPage(page, SubscriptionsController(uid)),
-            5: IncomePage(page, IncomeController(uid)),
-            6: ExpensesPage(page, ExpensesController(uid)),
-            7: TransactionsPage(page, TransactionsController(uid)),
-            8: SimulatorPage(page, SimulatorController()),
-        }
 
         def logout():
             _clear_session()
@@ -361,7 +371,10 @@ def main(page: ft.Page):
             page.data.get("user_id")
         )
 
-        content.content = pages[0]
+        content.content = ft.Container(
+            content=pages[0],
+            key="0",
+        )
         nav_container.content = build_nav(0)
 
         inner.content = ft.Column(
