@@ -83,6 +83,21 @@ def create_tables():
         )
     ''')
 
+   # бюджеты по категориям
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS budgets (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            category_id INTEGER NOT NULL,
+            limit_amount DECIMAL(10,2) NOT NULL,
+            period TEXT DEFAULT 'monthly' CHECK(period IN ('monthly', 'yearly')),
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id),
+            FOREIGN KEY (category_id) REFERENCES categories(id),
+            UNIQUE(user_id, category_id, period)
+        )
+    ''') 
+
     # миграция: добавляем start_date в subscriptions для существующих БД
     try:
         cursor.execute('ALTER TABLE subscriptions ADD COLUMN start_date DATE')

@@ -8,6 +8,7 @@ from .analytics import AnalyticsPage
 from .settings import SettingsPage
 from .auth import AuthPage
 from .simulator import SimulatorPage
+from .budget import BudgetPage
 
 __all__ = [
     "HomePage",
@@ -20,4 +21,5 @@ __all__ = [
     "SettingsPage",
     "AuthPage",
     "SimulatorPage",
+    "BudgetPage"
 ]
