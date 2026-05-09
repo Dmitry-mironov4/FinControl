@@ -619,6 +619,30 @@ def create_purchase_timer(user_id: int, item_name: str, amount: float, remind_at
         return cursor.lastrowid
 
 
+def delete_purchase_timer(timer_id: int, user_id: int) -> None:
+    """Удалить таймер покупки (только свой)."""
+    with get_connection() as conn:
+        conn.execute(
+            "DELETE FROM purchase_timers WHERE id = ? AND user_id = ?",
+            (timer_id, user_id),
+        )
+        conn.commit()
+
+
+def get_active_purchase_timers(user_id: int) -> list:
+    """Активные таймеры пользователя: без решения и без уведомления (ещё ждут)."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            """SELECT id, item_name, amount, remind_at
+               FROM purchase_timers
+               WHERE user_id = ?
+                 AND decision IS NULL
+               ORDER BY remind_at ASC""",
+            (user_id,),
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
 def get_purchase_timer(timer_id: int) -> dict | None:
     """Вернуть один таймер по id."""
     with get_connection() as conn:

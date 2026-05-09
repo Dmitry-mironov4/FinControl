@@ -350,5 +350,4 @@ def main(page: ft.Page):
     show_auth()
 
 
-ft.run(main, assets_dir="assets", view=ft.AppView.WEB_BROWSER,
-       port=int(os.environ.get("PORT", 8550)), host="0.0.0.0")
+ft.run(main, assets_dir="assets")

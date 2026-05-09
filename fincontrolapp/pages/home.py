@@ -1,7 +1,25 @@
 import flet as ft
 import os
+from datetime import datetime
 from components.base_page import BasePage
 from utils import get_currency_symbol
+
+
+def _format_time_left(remind_at: str) -> str:
+    """Вернуть строку вида '2 ч 15 мин', '45 мин' или 'Пора!'."""
+    try:
+        target = datetime.strptime(remind_at, "%Y-%m-%d %H:%M:%S")
+    except ValueError:
+        return ""
+    delta = target - datetime.now()
+    total_seconds = int(delta.total_seconds())
+    if total_seconds <= 0:
+        return "Пора!"
+    hours, rem = divmod(total_seconds, 3600)
+    minutes = rem // 60
+    if hours > 0:
+        return f"{hours} ч {minutes} мин" if minutes else f"{hours} ч"
+    return f"{minutes} мин"
 
 
 
@@ -65,6 +83,27 @@ class HomePage(BasePage):
                 ],
                 spacing=12,
             ),
+            ft.Container(
+                border_radius=12,
+                padding=ft.Padding(left=16, right=16, top=14, bottom=14),
+                bgcolor="#483EB7",
+                on_click=lambda e: self._show_purchase_timer_dialog(),
+                ink=True,
+                content=ft.Row(
+                    alignment=ft.MainAxisAlignment.CENTER,
+                    spacing=8,
+                    controls=[
+                        ft.Icon(ft.Icons.TIMER_OUTLINED, color="#FFFFFF", size=18),
+                        ft.Text(
+                            "Таймер покупки",
+                            color="#FFFFFF",
+                            font_family="Montserrat SemiBold",
+                            size=13,
+                        ),
+                    ],
+                ),
+            ),
+            *self._timer_list(),
         ]
 
         if GRAPH_ASSET_SRC:
@@ -281,6 +320,179 @@ class HomePage(BasePage):
             padding=ft.Padding(left=16, right=16, top=4, bottom=4),
             content=ft.Column(rows, spacing=0),
         )
+
+    def _timer_list(self) -> list:
+        """Список активных таймеров с остатком времени справа. Пусто — пустой список."""
+        from db_queries import get_active_purchase_timers, delete_purchase_timer
+        uid = self._ctrl._user_id
+        if not uid:
+            return []
+        timers = get_active_purchase_timers(uid)
+        if not timers:
+            return []
+
+        def make_dismiss_handler(timer_id):
+            def on_dismiss(e):
+                delete_purchase_timer(timer_id, uid)
+                self.refresh()
+            return on_dismiss
+
+        rows = []
+        for t in timers:
+            time_left = _format_time_left(t["remind_at"])
+            is_due = time_left == "Пора!"
+
+            row_content = ft.Container(
+                bgcolor="#FFFFFF",
+                padding=ft.Padding(left=14, right=14, top=10, bottom=10),
+                border=ft.Border(bottom=ft.BorderSide(1, "#E8E8F0")),
+                content=ft.Row(
+                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                    controls=[
+                        ft.Row(
+                            spacing=10,
+                            tight=True,
+                            controls=[
+                                ft.Icon(ft.Icons.TIMER_OUTLINED, size=18, color="#483EB7"),
+                                ft.Text(
+                                    t["item_name"],
+                                    font_family="Montserrat SemiBold",
+                                    size=14,
+                                    color="#1a1a1a",
+                                    max_lines=1,
+                                    overflow=ft.TextOverflow.ELLIPSIS,
+                                ),
+                            ],
+                        ),
+                        ft.Text(
+                            time_left,
+                            font_family="Montserrat SemiBold",
+                            size=13,
+                            color="#E53935" if is_due else "#483EB7",
+                        ),
+                    ],
+                ),
+            )
+
+            rows.append(
+                ft.Dismissible(
+                    content=row_content,
+                    background=ft.Container(
+                        bgcolor="#FFEBEE",
+                        padding=ft.Padding(left=20, right=20, top=0, bottom=0),
+                        content=ft.Row(
+                            alignment=ft.MainAxisAlignment.END,
+                            controls=[
+                                ft.Icon(ft.Icons.DELETE_OUTLINE, color="#E53935", size=22),
+                            ],
+                        ),
+                    ),
+                    on_dismiss=make_dismiss_handler(t["id"]),
+                )
+            )
+
+        return [
+            ft.Container(
+                border_radius=16,
+                clip_behavior=ft.ClipBehavior.HARD_EDGE,
+                gradient=ft.LinearGradient(
+                    colors=["#ffffff", "#88A2FF"],
+                    begin=ft.Alignment(-1, -1),
+                    end=ft.Alignment(1, 1),
+                ),
+                padding=ft.Padding(left=0, right=0, top=4, bottom=4),
+                content=ft.Column(rows, spacing=0),
+            )
+        ]
+
+    def _show_purchase_timer_dialog(self):
+        from datetime import datetime, timedelta
+        from db_queries import create_purchase_timer
+        from components import show_dialog, close_dialog
+
+        item_field = ft.TextField(
+            label="Название товара",
+            text_style=ft.TextStyle(font_family="Montserrat Medium"),
+            label_style=ft.TextStyle(font_family="Montserrat Medium"),
+            border_color="#6976EB",
+        )
+        amount_field = ft.TextField(
+            label="Цена (₽)",
+            keyboard_type=ft.KeyboardType.NUMBER,
+            text_style=ft.TextStyle(font_family="Montserrat Medium"),
+            label_style=ft.TextStyle(font_family="Montserrat Medium"),
+            border_color="#6976EB",
+        )
+        hours_field = ft.TextField(
+            label="Напомнить через (часов)",
+            value="24",
+            keyboard_type=ft.KeyboardType.NUMBER,
+            text_style=ft.TextStyle(font_family="Montserrat Medium"),
+            label_style=ft.TextStyle(font_family="Montserrat Medium"),
+            border_color="#6976EB",
+        )
+
+        dlg = ft.AlertDialog(
+            modal=True,
+            title=ft.Text("Таймер покупки", font_family="Montserrat SemiBold"),
+        )
+
+        def on_save(e):
+            item = (item_field.value or "").strip()
+            if not item:
+                return
+            try:
+                amount = float((amount_field.value or "0").replace(",", "."))
+                hours = int(hours_field.value or "24")
+            except ValueError:
+                return
+            if amount <= 0 or hours <= 0:
+                return
+
+            remind_at = (datetime.now() + timedelta(hours=hours)).strftime("%Y-%m-%d %H:%M:%S")
+            uid = self._ctrl._user_id
+            if uid:
+                create_purchase_timer(uid, item, amount, remind_at)
+
+            close_dialog(self.page_ref, dlg)
+            self.page_ref.snack_bar = ft.SnackBar(
+                ft.Text(
+                    f"Напомню про «{item}» через {hours} ч.",
+                    font_family="Montserrat Medium",
+                ),
+                open=True,
+            )
+            self.refresh()
+
+        def on_cancel(e):
+            close_dialog(self.page_ref, dlg)
+
+        dlg.content = ft.Column(
+            controls=[item_field, amount_field, hours_field],
+            tight=True,
+            spacing=12,
+        )
+        dlg.actions = [
+            ft.TextButton(
+                "Отмена",
+                on_click=on_cancel,
+                style=ft.ButtonStyle(
+                    color="#483EB7",
+                    text_style=ft.TextStyle(font_family="Montserrat SemiBold"),
+                ),
+            ),
+            ft.TextButton(
+                "Создать",
+                on_click=on_save,
+                style=ft.ButtonStyle(
+                    color="#483EB7",
+                    text_style=ft.TextStyle(font_family="Montserrat SemiBold"),
+                ),
+            ),
+        ]
+
+        show_dialog(self.page_ref, dlg)
 
     def _quick_action_icon(self, icon, label, color, on_click=None):
         return ft.Container(
