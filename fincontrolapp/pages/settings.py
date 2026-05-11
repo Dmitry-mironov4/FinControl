@@ -9,6 +9,7 @@ class SettingsPage(BasePage):
         self._ctrl = ctrl
         self._username_text: ft.Text | None = None
         self._initials_text: ft.Text | None = None
+        self._contact_text: ft.Text | None = None
         self._currency_subtitle: ft.Text | None = None
         super().__init__(page, "Настройки")
 
@@ -47,10 +48,8 @@ class SettingsPage(BasePage):
             # ── Группа: Аккаунт ──────────────────────────────────────────
             self._section_header("Аккаунт"),
             self._group([
-                self._setting_item(ft.Icons.PERSON_OUTLINE, "Профиль", "Настройте своё имя",
-                    on_click=self._open_profile_dialog),
                 self._setting_item(ft.Icons.LOCK_OUTLINE, "Сменить пароль", "Изменить пароль аккаунта",
-                    on_click=self._open_change_password_dialog, divider=True),
+                    on_click=self._open_change_password_dialog),
                 self._setting_item(ft.Icons.NOTIFICATIONS_OUTLINED, "Уведомления", "Напоминания о расходах",
                     on_click=self._open_notifications_dialog, divider=True),
                 self._setting_item(ft.Icons.CURRENCY_RUBLE, "Валюта", self._currency_subtitle,
@@ -120,6 +119,8 @@ class SettingsPage(BasePage):
             border_radius=18,
             border=ft.Border.all(1.5, ft.Colors.with_opacity(0.06, "#483EB7")),
             bgcolor=ft.Colors.with_opacity(0.04, "#483EB7"),
+            ink=True,
+            on_click=self._open_profile_dialog,
             content=ft.Row([
                 ft.Container(
                     width=64, height=64,
@@ -134,15 +135,22 @@ class SettingsPage(BasePage):
                 ),
                 ft.Column([
                     self._username_text,
-                    ft.Text(
-                        contact,
-                        size=13,
-                        font_family="Montserrat SemiBold",
-                        color=ft.Colors.with_opacity(0.5, "#000000"),
-                    ) if contact else ft.Container(),
-                ], spacing=2),
+                    self._build_contact_text(contact),
+                ], spacing=2, expand=True),
+                ft.Icon(ft.Icons.CHEVRON_RIGHT,
+                        color=ft.Colors.with_opacity(0.35, "#483EB7"), size=20),
             ], spacing=16, vertical_alignment=ft.CrossAxisAlignment.CENTER),
         )
+
+    def _build_contact_text(self, contact: str) -> ft.Control:
+        self._contact_text = ft.Text(
+            contact,
+            size=13,
+            font_family="Montserrat SemiBold",
+            color=ft.Colors.with_opacity(0.5, "#000000"),
+            visible=bool(contact),
+        )
+        return self._contact_text
 
     def _section_header(self, label: str) -> ft.Container:
         """Заголовок группы (серый текст, как 'Account' / 'Preferences' на картинке)."""
@@ -219,51 +227,104 @@ class SettingsPage(BasePage):
 
     def _open_profile_dialog(self, e):
         user = self._ctrl.get_user()
-        username_field = ft.TextField(
-            label="Имя пользователя",
-            text_style=ft.TextStyle(font_family="Montserrat Medium"),
-            label_style=ft.TextStyle(font_family="Montserrat Medium"),
-            value=user["username"] or "" if user else "",
-            border_color="#6976EB",
-        )
-        contact_hint = (user["email"] or user["phone"] or "") if user else ""
+
+        def _field(label, value, keyboard_type=ft.KeyboardType.TEXT):
+            return ft.TextField(
+                label=label,
+                value=value or "",
+                border_color="#6976EB",
+                border_radius=12,
+                keyboard_type=keyboard_type,
+                text_style=ft.TextStyle(font_family="Montserrat Medium"),
+                label_style=ft.TextStyle(font_family="Montserrat Medium"),
+            )
+
+        username_field = _field("Имя пользователя", user["username"] if user else "")
+        email_field = _field("E-mail", user["email"] if user else "", ft.KeyboardType.EMAIL)
+        phone_field = _field("Телефон", user["phone"] if user else "", ft.KeyboardType.PHONE)
+
+        tg_connected = bool(user["telegram_id"]) if user else False
+        tg_status_color = "#483EB7" if tg_connected else ft.Colors.with_opacity(0.45, "#000000")
+        tg_status_text = "Подключён" if tg_connected else "Не подключён"
+        tg_row = ft.Row([
+            ft.Icon(ft.Icons.TELEGRAM, color=tg_status_color, size=20),
+            ft.Text("Telegram-бот", font_family="Montserrat SemiBold", size=13, expand=True),
+            ft.Container(
+                padding=ft.Padding.symmetric(horizontal=10, vertical=4),
+                border_radius=20,
+                bgcolor=ft.Colors.with_opacity(0.12, "#483EB7") if tg_connected
+                        else ft.Colors.with_opacity(0.06, "#000000"),
+                content=ft.Text(
+                    tg_status_text,
+                    size=11,
+                    font_family="Montserrat SemiBold",
+                    color=tg_status_color,
+                ),
+            ),
+        ], spacing=10, vertical_alignment=ft.CrossAxisAlignment.CENTER)
+
+        err = ft.Text("", color=ft.Colors.with_opacity(0.8, "#FF7E1C"),
+                      size=12, font_family="Montserrat SemiBold")
+
         dlg = ft.AlertDialog(modal=True, title=ft.Text("Профиль", font_family="Montserrat SemiBold"))
 
-        def on_cancel(e):
+        def on_cancel(ev):
             _close_dialog(self.page_ref, dlg)
- 
-        def on_submit(e):
+
+        def on_submit(ev):
+            new_name = (username_field.value or "").strip()
+            new_email = (email_field.value or "").strip() or None
+            new_phone = (phone_field.value or "").strip() or None
             try:
-                self._ctrl.update_username(username_field.value.strip() or None)
+                self._ctrl.update_username(new_name or None)
+                self._ctrl.update_email(new_email)
+                self._ctrl.update_phone(new_phone)
             except Exception:
-                self._show_error("Не удалось сохранить имя")
+                err.value = "Не удалось сохранить — возможно, email или телефон уже используются"
+                try:
+                    self.page_ref.update()
+                except Exception:
+                    pass
                 return
-            new_name = (username_field.value or "").strip() or "User"
+            display_name = new_name or "User"
             if self._username_text is not None:
-                self._username_text.value = new_name
+                self._username_text.value = display_name
                 try:
                     self._username_text.update()
                 except Exception:
                     pass
             if self._initials_text is not None:
-                self._initials_text.value = self._calc_initials(new_name)
+                self._initials_text.value = self._calc_initials(display_name)
                 try:
                     self._initials_text.update()
                 except Exception:
                     pass
+            if self._contact_text is not None:
+                new_contact = new_email or new_phone or ""
+                self._contact_text.value = new_contact
+                self._contact_text.visible = bool(new_contact)
+                try:
+                    self._contact_text.update()
+                except Exception:
+                    pass
             _close_dialog(self.page_ref, dlg)
-            self.page_ref.snack_bar = ft.SnackBar(ft.Text("Имя сохранено ✓", font_family="Montserrat SemiBold"), open=True)
+            self.page_ref.snack_bar = ft.SnackBar(
+                ft.Text("Профиль сохранён ✓", font_family="Montserrat SemiBold"), open=True)
             self.page_ref.update()
 
-
         dlg.content = ft.Column([
-            ft.Text(contact_hint, size=12, color=ft.Colors.with_opacity(0.6, "#000000"),
-                    font_family="Montserrat SemiBold") if contact_hint else ft.Container(),
             username_field,
-        ], tight=True, spacing=12)
+            email_field,
+            phone_field,
+            ft.Divider(height=1, thickness=0.5, color=ft.Colors.with_opacity(0.1, "#000000")),
+            tg_row,
+            err,
+        ], tight=True, spacing=12, width=300)
         dlg.actions = [
-            ft.TextButton("Отмена", style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_cancel),
-            ft.TextButton("Сохранить", style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_submit),
+            ft.TextButton("Отмена", style=ft.ButtonStyle(color="#483EB7",
+                text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_cancel),
+            ft.TextButton("Сохранить", style=ft.ButtonStyle(color="#483EB7",
+                text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_submit),
         ]
         _show_dialog(self.page_ref, dlg)
  
