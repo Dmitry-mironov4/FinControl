@@ -3,7 +3,7 @@ import os
 import threading
 from datetime import datetime
 from components.base_page import BasePage
-from utils import get_currency_symbol
+from utils import get_currency_symbol, format_amount
 
 
 def _format_time_left(remind_at: str) -> str:
@@ -73,15 +73,22 @@ class HomePage(BasePage):
         if user_id:
             try:
                 from db_queries import get_user_currency
-                db_currency, db_conv = get_user_currency(user_id)
+                db_currency, db_conv, db_secondary = get_user_currency(user_id)
                 self.page_ref.data["_s_currency"] = db_currency
                 self.page_ref.data["_s_currency_conv"] = db_conv
+                self.page_ref.data["_s_secondary_currency"] = db_secondary
             except Exception:
                 pass
 
+        rub_balance = balance['balance']
+        rate_widget = self._build_rate_widget(rub_balance)
+        top_block_controls = [self._balance_card(balance, monthly)]
+        if rate_widget is not None:
+            top_block_controls.append(rate_widget)
+        top_block = ft.Column(controls=top_block_controls, spacing=8)
+
         controls = [
-            self._balance_card(balance, monthly),
-            self._build_rate_widget(),
+            top_block,
             ft.Text(
                 "Быстрые действия",
                 size=20,
@@ -177,13 +184,19 @@ class HomePage(BasePage):
 
         return ft.Column(controls=controls, spacing=20)
 
-    def _build_rate_widget(self) -> ft.Control:
-        """Плашка с курсом выбранной валюты к рублю. Скрыта для RUB."""
-        currency = self.page_ref.data.get("_s_currency", "RUB")
-        if currency == "RUB":
-            return ft.Container()
+    def _build_rate_widget(self, balance_rub: float) -> ft.Control:
+        """Плашка: курс первой валюты ко второй + баланс во второй валюте.
 
-        # Начальное состояние — индикатор загрузки
+        Показывается только если выбрана вторая валюта.
+        """
+        from utils import CURRENCY_SYMBOLS
+        currency = self.page_ref.data.get("_s_currency", "RUB")
+        secondary = self.page_ref.data.get("_s_secondary_currency")
+
+        # Плашка нужна только когда есть вторая валюта
+        if not secondary:
+            return None
+
         spinner = ft.ProgressRing(width=12, height=12, stroke_width=2, color="#483EB7")
         row_controls = ft.Row(
             spacing=6,
@@ -205,28 +218,64 @@ class HomePage(BasePage):
 
         def _load():
             from currency import fetch_rates
-            rates = fetch_rates()
-            rate = rates.get(currency) if rates else None
-            if rate is not None:
-                row_controls.controls = [
-                    ft.Icon(ft.Icons.CURRENCY_EXCHANGE, color="#483EB7", size=14),
-                    ft.Text(
-                        f"{currency}  {rate:,.2f} ₽",
-                        font_family="Montserrat SemiBold",
-                        size=13,
-                        color="#483EB7",
-                    ),
-                ]
+            rates = fetch_rates() or {}
+
+            # Вычисляем курс первой валюты в рублях (RUB → 1.0)
+            rate_primary = rates.get(currency) if currency != "RUB" else 1.0
+            rate_secondary = rates.get(secondary) if secondary != "RUB" else 1.0
+
+            parts = []
+
+            if rate_primary is not None and rate_secondary is not None and rate_secondary > 0:
+                # Курс: 1 <первая> = X <вторая>
+                cross_rate = rate_primary / rate_secondary
+                pri_sym = CURRENCY_SYMBOLS.get(currency, currency) if currency != "RUB" else "₽"
+                sec_sym = CURRENCY_SYMBOLS.get(secondary, secondary) if secondary != "RUB" else "₽"
+
+                # Форматируем cross_rate: для мелких значений (< 1) показываем 4 знака
+                if cross_rate < 0.01:
+                    rate_str = f"{cross_rate:.4f}"
+                elif cross_rate < 1:
+                    rate_str = f"{cross_rate:.3f}"
+                else:
+                    rate_str = f"{cross_rate:,.2f}"
+
+                parts.append(ft.Text(
+                    f"1 {pri_sym} = {rate_str} {sec_sym}",
+                    font_family="Montserrat SemiBold",
+                    size=13,
+                    color="#483EB7",
+                ))
+
+                # Разделитель
+                parts.append(ft.Text(
+                    "·",
+                    font_family="Montserrat SemiBold",
+                    size=13,
+                    color=ft.Colors.with_opacity(0.4, "#483EB7"),
+                ))
+
+                # Баланс во второй валюте
+                # balance_rub хранится в рублях, пересчитываем через rate_secondary
+                sec_balance = round(balance_rub / rate_secondary, 2)
+                parts.append(ft.Text(
+                    f"≈ {sec_balance:,.2f} {sec_sym}",
+                    font_family="Montserrat SemiBold",
+                    size=13,
+                    color="#483EB7",
+                ))
             else:
-                row_controls.controls = [
-                    ft.Icon(ft.Icons.CURRENCY_EXCHANGE, color="#9E9E9E", size=14),
-                    ft.Text(
-                        f"{currency}  —",
-                        font_family="Montserrat SemiBold",
-                        size=13,
-                        color="#9E9E9E",
-                    ),
-                ]
+                parts.append(ft.Text(
+                    "Курс недоступен",
+                    font_family="Montserrat SemiBold",
+                    size=13,
+                    color="#9E9E9E",
+                ))
+
+            row_controls.controls = [
+                ft.Icon(ft.Icons.CURRENCY_EXCHANGE, color="#483EB7", size=14),
+                *parts,
+            ]
             try:
                 self._rate_widget.update()
             except Exception:
@@ -269,6 +318,7 @@ class HomePage(BasePage):
                     ft.Container(
                         padding=24,
                         content=ft.Column(
+                            spacing=7,
                             controls=[
                                 ft.Text(
                                     "Общий баланс",
@@ -326,7 +376,6 @@ class HomePage(BasePage):
                                     run_spacing=8,
                                 ),
                             ],
-                            spacing=7,
                         ),
                     ),
                 ],
@@ -394,7 +443,7 @@ class HomePage(BasePage):
                                 ], spacing=2),
                             ], spacing=12),
                             ft.Text(
-                                f"{'+ ' if is_income else '− '}{t['amount']:,.0f} {get_currency_symbol(self.page_ref)}",
+                                format_amount(t['amount'], self.page_ref, '+ ' if is_income else '− '),
                                 color="#253A82" if is_income else ft.Colors.with_opacity(0.6, "#FF7E1C"),
                                 size=15, font_family="Montserrat SemiBold",
                                 weight=ft.FontWeight.W_600,

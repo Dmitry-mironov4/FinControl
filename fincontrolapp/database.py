@@ -158,6 +158,10 @@ def create_tables():
         cursor.execute("ALTER TABLE users ADD COLUMN currency_conversion TEXT DEFAULT 'as_is'")
     except Exception:
         pass
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN secondary_currency TEXT DEFAULT NULL")
+    except Exception:
+        pass
 
     # стартовые категории
     cursor.execute("SELECT COUNT(*) FROM categories")

@@ -680,30 +680,33 @@ def mark_purchase_timer_notified(timer_id: int) -> None:
 # ─── Настройки валюты ────────────────────────────────────────────────────────
 
 def get_user_currency(user_id: int) -> tuple:
-    """Возвращает (display_currency, currency_conversion) для пользователя.
+    """Возвращает (display_currency, currency_conversion, secondary_currency) для пользователя.
 
     display_currency   — код валюты отображения, напр. 'USD'
     currency_conversion — 'as_is' или 'convert'
+    secondary_currency — код второй валюты или None
     """
     with get_connection() as conn:
         row = conn.execute(
-            "SELECT display_currency, currency_conversion FROM users WHERE id = ?",
+            "SELECT display_currency, currency_conversion, secondary_currency FROM users WHERE id = ?",
             (user_id,),
         ).fetchone()
     if not row:
-        return ("RUB", "as_is")
+        return ("RUB", "as_is", None)
     return (
         row["display_currency"] or "RUB",
         row["currency_conversion"] or "as_is",
+        row["secondary_currency"] or None,
     )
 
 
-def set_user_currency(user_id: int, display_currency: str, currency_conversion: str) -> None:
+def set_user_currency(user_id: int, display_currency: str, currency_conversion: str,
+                      secondary_currency: str | None = None) -> None:
     """Сохранить настройки отображения валюты."""
     with get_connection() as conn:
         conn.execute(
-            "UPDATE users SET display_currency = ?, currency_conversion = ? WHERE id = ?",
-            (display_currency, currency_conversion, user_id),
+            "UPDATE users SET display_currency = ?, currency_conversion = ?, secondary_currency = ? WHERE id = ?",
+            (display_currency, currency_conversion, secondary_currency, user_id),
         )
         conn.commit()
 

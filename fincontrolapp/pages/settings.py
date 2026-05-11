@@ -335,13 +335,16 @@ class SettingsPage(BasePage):
             ("KZT", "₸  Казахстанский тенге"),
             ("BYN", "Br  Белорусский рубль"),
         ]
+        secondary_options = [ft.dropdown.Option("none", "Нет")] + [
+            ft.dropdown.Option(code, label) for code, label in currencies
+        ]
 
         user_id = self._ctrl._user_id
-        saved_currency, saved_conv = get_user_currency(user_id) if user_id else ("RUB", "as_is")
+        saved_currency, saved_conv, saved_secondary = get_user_currency(user_id) if user_id else ("RUB", "as_is", None)
         current = self.page_ref.data.get("_s_currency", saved_currency)
 
         dd = ft.Dropdown(
-            label="Валюта",
+            label="Основная валюта",
             value=current,
             border_color="#6976EB",
             text_style=ft.TextStyle(font_family="Montserrat Medium"),
@@ -369,7 +372,6 @@ class SettingsPage(BasePage):
         )
 
         conv_section = ft.Column(
-            visible=(current != "RUB"),
             spacing=6,
             tight=True,
             controls=[
@@ -383,8 +385,17 @@ class SettingsPage(BasePage):
             ],
         )
 
+        current_secondary = self.page_ref.data.get("_s_secondary_currency") or saved_secondary or "none"
+        dd_secondary = ft.Dropdown(
+            label="Вторая валюта (на карточке баланса)",
+            value=current_secondary,
+            border_color="#6976EB",
+            text_style=ft.TextStyle(font_family="Montserrat Medium"),
+            label_style=ft.TextStyle(font_family="Montserrat Medium"),
+            options=secondary_options,
+        )
+
         def on_dd_change(ev):
-            conv_section.visible = (dd.value != "RUB")
             try:
                 conv_section.update()
             except Exception:
@@ -400,11 +411,13 @@ class SettingsPage(BasePage):
         def on_submit(ev):
             chosen_currency = dd.value or "RUB"
             chosen_conv = rg.value or "as_is"
+            chosen_secondary = dd_secondary.value if dd_secondary.value and dd_secondary.value != "none" else None
             self.page_ref.data["_s_currency"] = chosen_currency
             self.page_ref.data["_s_currency_conv"] = chosen_conv
+            self.page_ref.data["_s_secondary_currency"] = chosen_secondary
             if user_id:
                 try:
-                    set_user_currency(user_id, chosen_currency, chosen_conv)
+                    set_user_currency(user_id, chosen_currency, chosen_conv, chosen_secondary)
                 except Exception:
                     pass
             if self._currency_subtitle is not None:
@@ -422,7 +435,7 @@ class SettingsPage(BasePage):
             self.page_ref.update()
 
         dlg.content = ft.Column(
-            [dd, conv_section],
+            [dd, conv_section, dd_secondary],
             tight=True,
             spacing=16,
             width=300,
