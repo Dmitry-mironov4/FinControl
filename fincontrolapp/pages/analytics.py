@@ -151,7 +151,7 @@ def _title(text: str) -> ft.Text:
 
 def _card(content: ft.Control) -> ft.Container:
     return ft.Container(
-                border=ft.border.all(1.5, ft.Colors.with_opacity(0.06, "#483EB7")),
+                border=ft.Border.all(1.5, ft.Colors.with_opacity(0.06, "#483EB7")),
                 bgcolor=ft.Colors.with_opacity(0.2, "#483EB7"), border_radius=16, padding=20, content=content,
     )
 
@@ -290,7 +290,7 @@ class AnalyticsPage(BasePage):
                 color="#483EB7" if active else "#A8A8A8",
                 text_align=ft.TextAlign.CENTER,
             ),
-            padding=ft.padding.symmetric(horizontal=16, vertical=8),
+            padding=ft.Padding.symmetric(horizontal=16, vertical=8),
             border_radius=20,
             gradient=ft.RadialGradient(
                 colors=["#ffffff", "#88A2FF"],
@@ -332,7 +332,7 @@ class AnalyticsPage(BasePage):
 
         def tile(label, value, color, icon):
             return ft.Container(
-                expand=True, border=ft.border.all(1.5, ft.Colors.with_opacity(0.06, "#483EB7")),
+                expand=True, border=ft.Border.all(1.5, ft.Colors.with_opacity(0.06, "#483EB7")),
                 bgcolor=ft.Colors.with_opacity(0.1, "#483EB7"), border_radius=14, padding=16,
                 content=ft.Column([
                     ft.Row([
@@ -351,7 +351,7 @@ class AnalyticsPage(BasePage):
             ft.Row([
                 tile("Экономия", savings, "#6C63FF", ft.Icons.SAVINGS_OUTLINED),
                 ft.Container(
-                    expand=True, border=ft.border.all(1.5, ft.Colors.with_opacity(0.06, "#483EB7")),
+                    expand=True, border=ft.Border.all(1.5, ft.Colors.with_opacity(0.06, "#483EB7")),
                     bgcolor=ft.Colors.with_opacity(0.1, "#483EB7"), border_radius=14, padding=16,
                     content=ft.Column([
                         ft.Row([

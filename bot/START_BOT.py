@@ -6,8 +6,12 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import asyncio
 from dotenv import load_dotenv
 from aiogram import Bot, Dispatcher
-from handlers import start, menu, quick_add, stats, add_dialog, subscriptions, goals, transactions
-from handlers.notify import setup_notify_scheduler
+from bot.handlers import start, quick_add, stats, add_dialog, subscriptions, goals, transactions
+from bot.handlers.purchase_timer import router as timer_router
+from bot.handlers.kb_buttons import router as kb_router
+from bot.handlers.settings import router as settings_router
+from bot.handlers.notify import setup_notify_scheduler
+from fincontrolapp.database import create_tables
 
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -19,21 +23,26 @@ bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 
 dp.include_router(start.router)
+dp.include_router(kb_router)          # reply-кнопки — до quick_add чтобы не перехватывал
+dp.include_router(settings_router)
 dp.include_router(add_dialog.router)
 dp.include_router(goals.router)
-dp.include_router(quick_add.router)  # must be before transactions.router to intercept cancel_tx
+dp.include_router(quick_add.router)   # must be before transactions.router
+dp.include_router(timer_router)
 dp.include_router(transactions.router)
 dp.include_router(stats.router)
 dp.include_router(subscriptions.router)
-dp.include_router(menu.router)
+
 
 async def main():
+    create_tables()  # гарантируем наличие всех таблиц
     scheduler = setup_notify_scheduler(bot)
     scheduler.start()
     try:
         await dp.start_polling(bot)
     finally:
         scheduler.shutdown()
+
 
 if __name__ == "__main__":
     asyncio.run(main())

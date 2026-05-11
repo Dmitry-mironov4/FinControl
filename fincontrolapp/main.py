@@ -1,6 +1,6 @@
-import json
 import os
 import flet as ft
+
 from pages import HomePage, TransactionsPage, GoalsPage, SettingsPage, SubscriptionsPage, IncomePage, ExpensesPage, AnalyticsPage, SimulatorPage
 from pages.auth import AuthPage
 from components import AppTheme
@@ -10,34 +10,6 @@ from controllers import (HomeController, GoalsController, SubscriptionsControlle
 from components import show_dialog, close_dialog
 from database import create_tables, get_connection
 
-
-
-
-_SESSION_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "session.json")
-
-
-def _save_session(user_id: int):
-    try:
-        with open(_SESSION_FILE, "w") as f:
-            json.dump({"user_id": user_id}, f)
-    except Exception:
-        pass
-
-
-def _load_session() -> int | None:
-    try:
-        with open(_SESSION_FILE) as f:
-            val = json.load(f).get("user_id")
-            return int(val) if val else None
-    except Exception:
-        return None
-
-
-def _clear_session():
-    try:
-        os.remove(_SESSION_FILE)
-    except Exception:
-        pass
 
 
 
@@ -86,7 +58,7 @@ def main(page: ft.Page):
 
     def on_auth_success(user_id: int, is_new: bool = False):
         page.data["user_id"] = user_id
-        _save_session(user_id)
+        page.session.store.set("user_id", user_id)
         show_main_app()
         _check_and_add_recurring_income(user_id)  # AUTO-1: автодобавить зарплату, если наступил новый месяц
         _check_and_charge_subscriptions(user_id)  # AUTO-2: списать подписки с charge_day ≤ сегодня
@@ -101,12 +73,29 @@ def main(page: ft.Page):
             label="Сумма на счёте",
             text_style=ft.TextStyle(font_family="Montserrat Medium"),
             label_style=ft.TextStyle(font_family="Montserrat Medium"),
+            error_style=ft.TextStyle(font_family="Montserrat Medium", size=10, color="#FF0000"),
             keyboard_type=ft.KeyboardType.NUMBER,
             prefix_icon=ft.Icons.ACCOUNT_BALANCE_WALLET_OUTLINED,
             border_color="#6976EB",
         )
 
-        dlg = ft.AlertDialog(modal=True, title=ft.Text("Начальный баланс",font_family="Montserrat SemiBold"))
+        def _validate_balance(e):
+            v = (amount_field.value or "").replace(" ", "").replace(",", ".").strip()
+            if not v:
+                amount_field.error = None
+            else:
+                try:
+                    amount_field.error = None if float(v) > 0 else "Сумма должна быть больше нуля"
+                except ValueError:
+                    amount_field.error = "Введите число, например: 50000"
+            try:
+                amount_field.update()
+            except Exception:
+                pass
+
+        amount_field.on_change = _validate_balance
+
+        dlg = ft.AlertDialog(modal=True, title=ft.Text("Начальный баланс", font_family="Montserrat SemiBold"))
 
         def on_skip(e):
             close_dialog(page, dlg)
@@ -116,27 +105,31 @@ def main(page: ft.Page):
                 close_dialog(page, dlg)
                 return
 
-            raw = (amount_field.value or "").replace(" ", "").strip()
+            raw = (amount_field.value or "").replace(" ", "").replace(",", ".").strip()
             if not raw:
-                close_dialog(page, dlg)
+                amount_field.error = "Введите сумму"
+                try:
+                    amount_field.update()
+                except Exception:
+                    pass
                 return
 
             try:
-                amount = float(raw.replace(",", "."))
+                amount = float(raw)
             except ValueError:
-                close_dialog(page, dlg)
-                page.show_dialog(ft.SnackBar(
-                    content=ft.Text("Введите корректную сумму", color="#FFFFFF", font_family="Montserrat Medium", size=14),
-                    bgcolor="#F44336",
-                    shape=ft.RoundedRectangleBorder(radius=12),
-                    behavior=ft.SnackBarBehavior.FLOATING,
-                    margin=ft.Margin.only(left=16, right=16, bottom=80),
-                    duration=3000,
-                ))
+                amount_field.error = "Введите число, например: 50000"
+                try:
+                    amount_field.update()
+                except Exception:
+                    pass
                 return
 
             if amount <= 0:
-                close_dialog(page, dlg)
+                amount_field.error = "Сумма должна быть больше нуля"
+                try:
+                    amount_field.update()
+                except Exception:
+                    pass
                 return
 
             try:
@@ -339,7 +332,7 @@ def main(page: ft.Page):
         }
 
         def logout():
-            _clear_session()
+            page.session.store.remove("user_id")
             page.data = {}
             page.data.setdefault("_s_currency", "RUB")
             show_auth()
@@ -363,7 +356,7 @@ def main(page: ft.Page):
 
     # ─── СТАРТ ────────────────────────────────────────────────────────────────
 
-    stored_id = _load_session()
+    stored_id = page.session.store.get("user_id") if page.session.store.contains_key("user_id") else None
     if stored_id:
         with get_connection() as conn:
             user = conn.execute("SELECT id FROM users WHERE id=?", (stored_id,)).fetchone()

@@ -144,7 +144,7 @@ class SimulatorPage(BasePage):
         """Small inline hint row that appears below the cost field."""
         return ft.Container(
             border_radius=10,
-            padding=ft.padding.symmetric(horizontal=12, vertical=8),
+            padding=ft.Padding.symmetric(horizontal=12, vertical=8),
             bgcolor="rgba(108,99,255,0.07)",
             content=ft.Row(
                 controls=[
@@ -173,7 +173,7 @@ class SimulatorPage(BasePage):
           cards.append(
             ft.Container(
                 border_radius=14,
-                padding=ft.padding.symmetric(horizontal=14, vertical=12),
+                padding=ft.Padding.symmetric(horizontal=14, vertical=12),
                 bgcolor="rgba(255,255,255,0.55)",
                 content=ft.Row(
                     alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
@@ -189,7 +189,7 @@ class SimulatorPage(BasePage):
                         ),
                         ft.Container(
                             expand=True,
-                            padding=ft.padding.only(left=10),
+                            padding=ft.Padding.only(left=10),
                             content=ft.Column(
                                 controls=[
                                     ft.Text(
@@ -262,7 +262,7 @@ class SimulatorPage(BasePage):
 
         return ft.Container(
             border_radius=14,
-            padding=ft.padding.symmetric(horizontal=14, vertical=12),
+            padding=ft.Padding.symmetric(horizontal=14, vertical=12),
             bgcolor="rgba(255,255,255,0.55)",
             content=ft.Column(
                 controls=[
@@ -308,12 +308,12 @@ class SimulatorPage(BasePage):
             if not v:
                 # пустое поле во время ввода — не считаем ошибкой; required-логика
                 # отрабатывает в _parse_amount при нажатии «Рассчитать»
-                field.error_text = None
+                field.error = None
             else:
                 try:
-                    field.error_text = None if float(v) > 0 else "Сумма должна быть больше нуля"
+                    field.error = None if float(v) > 0 else "Сумма должна быть больше нуля"
                 except ValueError:
-                    field.error_text = "Введите число, например: 5000"
+                    field.error = "Введите число, например: 5000"
             try:
                 field.update()
             except Exception:
@@ -325,18 +325,18 @@ class SimulatorPage(BasePage):
         def _validate(e):
             v = (field.value or "").strip()
             if not v:
-                field.error_text = None
+                field.error = None
             else:
                 try:
                     val = int(v)
                     if val < 1:
-                        field.error_text = "Период должен быть больше нуля"
+                        field.error = "Период должен быть больше нуля"
                     elif val > 360:
-                        field.error_text = "Максимум 360 месяцев"
+                        field.error = "Максимум 360 месяцев"
                     else:
-                        field.error_text = None
+                        field.error = None
                 except ValueError:
-                    field.error_text = "Введите целое число, например: 12"
+                    field.error = "Введите целое число, например: 12"
             try:
                 field.update()
             except Exception:
@@ -348,16 +348,16 @@ class SimulatorPage(BasePage):
         def _validate(e):
             v = (field.value or "").replace(",", ".").strip()
             if not v:
-                field.error_text = None
+                field.error = None
             else:
                 try:
                     val = float(v)
                     if val <= 0 or val >= 100:
-                        field.error_text = "Введите значение от 1 до 99"
+                        field.error = "Введите значение от 1 до 99"
                     else:
-                        field.error_text = None
+                        field.error = None
                 except ValueError:
-                    field.error_text = "Введите число, например: 10"
+                    field.error = "Введите число, например: 10"
             try:
                 field.update()
             except Exception:
@@ -513,54 +513,54 @@ class SimulatorPage(BasePage):
         raw = (field.value or "").replace(",", ".").replace(" ", "").replace("\u202f", "").strip()
         if not raw:
             if required:
-                field.error_text = f"Введите {label}"
+                field.error = f"Введите {label}"
                 return None, False
-            field.error_text = None
+            field.error = None
             return default, True
         try:
             val = float(raw)
             if val < 0:
-                field.error_text = "Значение не может быть отрицательным"
+                field.error = "Значение не может быть отрицательным"
                 return None, False
-            field.error_text = None
+            field.error = None
             return val, True
         except ValueError:
-            field.error_text = "Введите число, например: 50 000"
+            field.error = "Введите число, например: 50 000"
             return None, False
 
     def _parse_months(self, field: ft.TextField, default: int = 12):
         raw = (field.value or "").strip()
         if not raw:
-            field.error_text = None
+            field.error = None
             return default, True
         try:
             val = int(raw)
             if val <= 0:
-                field.error_text = "Период должен быть больше нуля"
+                field.error = "Период должен быть больше нуля"
                 return None, False
             if val > 360:
-                field.error_text = "Максимум 360 месяцев"
+                field.error = "Максимум 360 месяцев"
                 return None, False
-            field.error_text = None
+            field.error = None
             return val, True
         except ValueError:
-            field.error_text = "Введите целое число, например: 12"
+            field.error = "Введите целое число, например: 12"
             return None, False
 
     def _parse_percent(self, field: ft.TextField, default: float = 10.0):
         raw = (field.value or "").replace(",", ".").strip()
         if not raw:
-            field.error_text = None
+            field.error = None
             return default, True
         try:
             val = float(raw)
             if val <= 0 or val >= 100:
-                field.error_text = "Введите значение от 1 до 99"
+                field.error = "Введите значение от 1 до 99"
                 return None, False
-            field.error_text = None
+            field.error = None
             return val, True
         except ValueError:
-            field.error_text = "Введите число, например: 10"
+            field.error = "Введите число, например: 10"
             return None, False
 
     def _refresh_fields(self, *fields):
@@ -584,7 +584,8 @@ class SimulatorPage(BasePage):
         if not all([ok1, ok2, ok3, ok4]):
             return
         try:
-            result = self._ctrl.simulate_purchase(cost, income, expenses, savings)
+            result = self._ctrl.simulate_purchase(cost, income, expenses, savings,
+                                                   sym=get_currency_symbol(self.page_ref))
         except Exception as ex:
             self._show_error(f"Ошибка расчёта: {ex}")
             return
@@ -628,7 +629,8 @@ class SimulatorPage(BasePage):
         if not all([ok1, ok2, ok3, ok4]):
             return
         try:
-            result = self._ctrl.simulate_subscription(sub_cost, income, expenses, months)
+            result = self._ctrl.simulate_subscription(sub_cost, income, expenses, months,
+                                                       sym=get_currency_symbol(self.page_ref))
         except Exception as ex:
             self._show_error(f"Ошибка расчёта: {ex}")
             return
@@ -673,7 +675,8 @@ class SimulatorPage(BasePage):
         if not all([ok1, ok2, ok3, ok4]):
             return
         try:
-            result = self._ctrl.simulate_goal(goal, income, expenses, savings)
+            result = self._ctrl.simulate_goal(goal, income, expenses, savings,
+                                               sym=get_currency_symbol(self.page_ref))
         except Exception as ex:
             self._show_error(f"Ошибка расчёта: {ex}")
             return
@@ -699,7 +702,8 @@ class SimulatorPage(BasePage):
         if not all([ok1, ok2, ok3, ok4]):
             return
         try:
-            result = self._ctrl.simulate_cut(income, expenses, percent, months)
+            result = self._ctrl.simulate_cut(income, expenses, percent, months,
+                                              sym=get_currency_symbol(self.page_ref))
         except Exception as ex:
             self._show_error(f"Ошибка расчёта: {ex}")
             return
@@ -804,7 +808,7 @@ class SimulatorPage(BasePage):
             border_radius=16,
             padding=16,
             bgcolor=card_style["bgcolor"],
-            border=ft.border.all(1, card_style["border_color"]),
+            border=ft.Border.all(1, card_style["border_color"]),
             content=ft.Column(controls=controls, spacing=12),
         )
 
