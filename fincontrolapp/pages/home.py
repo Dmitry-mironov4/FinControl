@@ -1,5 +1,6 @@
 import flet as ft
 import os
+import threading
 from datetime import datetime
 from components.base_page import BasePage
 from utils import get_currency_symbol
@@ -46,6 +47,7 @@ class HomePage(BasePage):
 
     def __init__(self, page, ctrl):
         self._ctrl = ctrl
+        self._rate_widget: ft.Container | None = None
         super().__init__(page, "Главная")
 
     def build_header(self):
@@ -66,8 +68,20 @@ class HomePage(BasePage):
         monthly = self._ctrl.get_monthly_balance()
         transactions = self._ctrl.get_recent_transactions(limit=5)
 
+        # ── Загрузка настроек валюты из БД ───────────────────────────────────
+        user_id = self._ctrl._user_id
+        if user_id:
+            try:
+                from db_queries import get_user_currency
+                db_currency, db_conv = get_user_currency(user_id)
+                self.page_ref.data["_s_currency"] = db_currency
+                self.page_ref.data["_s_currency_conv"] = db_conv
+            except Exception:
+                pass
+
         controls = [
             self._balance_card(balance, monthly),
+            self._build_rate_widget(),
             ft.Text(
                 "Быстрые действия",
                 size=20,
@@ -163,7 +177,87 @@ class HomePage(BasePage):
 
         return ft.Column(controls=controls, spacing=20)
 
+    def _build_rate_widget(self) -> ft.Control:
+        """Плашка с курсом выбранной валюты к рублю. Скрыта для RUB."""
+        currency = self.page_ref.data.get("_s_currency", "RUB")
+        if currency == "RUB":
+            return ft.Container()
+
+        # Начальное состояние — индикатор загрузки
+        spinner = ft.ProgressRing(width=12, height=12, stroke_width=2, color="#483EB7")
+        row_controls = ft.Row(
+            spacing=6,
+            tight=True,
+            vertical_alignment=ft.CrossAxisAlignment.CENTER,
+            controls=[
+                ft.Icon(ft.Icons.CURRENCY_EXCHANGE, color="#483EB7", size=14),
+                spinner,
+            ],
+        )
+
+        self._rate_widget = ft.Container(
+            border_radius=12,
+            padding=ft.Padding(left=12, right=12, top=8, bottom=8),
+            bgcolor=ft.Colors.with_opacity(0.08, "#483EB7"),
+            alignment=ft.Alignment(-1, 0),
+            content=row_controls,
+        )
+
+        def _load():
+            from currency import fetch_rates
+            rates = fetch_rates()
+            rate = rates.get(currency) if rates else None
+            if rate is not None:
+                row_controls.controls = [
+                    ft.Icon(ft.Icons.CURRENCY_EXCHANGE, color="#483EB7", size=14),
+                    ft.Text(
+                        f"{currency}  {rate:,.2f} ₽",
+                        font_family="Montserrat SemiBold",
+                        size=13,
+                        color="#483EB7",
+                    ),
+                ]
+            else:
+                row_controls.controls = [
+                    ft.Icon(ft.Icons.CURRENCY_EXCHANGE, color="#9E9E9E", size=14),
+                    ft.Text(
+                        f"{currency}  —",
+                        font_family="Montserrat SemiBold",
+                        size=13,
+                        color="#9E9E9E",
+                    ),
+                ]
+            try:
+                self._rate_widget.update()
+            except Exception:
+                pass
+
+        threading.Thread(target=_load, daemon=True).start()
+        return self._rate_widget
+
     def _balance_card(self, balance, monthly):
+        # Применяем конвертацию баланса если нужно
+        currency = self.page_ref.data.get("_s_currency", "RUB")
+        conv_mode = self.page_ref.data.get("_s_currency_conv", "as_is")
+        symbol = get_currency_symbol(self.page_ref)
+
+        rub_balance = balance['balance']
+        rub_income = monthly['income']
+        rub_expense = monthly['expense']
+
+        if currency != "RUB" and conv_mode == "convert":
+            from currency import fetch_rates
+            rates = fetch_rates()
+            rate = rates.get(currency) if rates else None
+            if rate and rate > 0:
+                disp_balance = round(rub_balance / rate, 2)
+                disp_income = round(rub_income / rate, 2)
+                disp_expense = round(rub_expense / rate, 2)
+            else:
+                disp_balance, disp_income, disp_expense = rub_balance, rub_income, rub_expense
+        else:
+            disp_balance, disp_income, disp_expense = rub_balance, rub_income, rub_expense
+
         return ft.Container(
             height=195,
             border_radius=24,
@@ -183,7 +277,7 @@ class HomePage(BasePage):
                                     color="rgba(0,0,0,0.3)",
                                 ),
                                 ft.Text(
-                                    f"{balance['balance']:,.0f} {get_currency_symbol(self.page_ref)}",
+                                    f"{disp_balance:,.2f} {symbol}",
                                     font_family="Montserrat Semibold",
                                     size=36,
                                     color="#000000",
@@ -198,7 +292,7 @@ class HomePage(BasePage):
                                                 controls=[
                                                     ft.Icon(ft.Icons.ARROW_UPWARD, color="#2A4A00", size=16),
                                                     ft.Text(
-                                                        f"{monthly['income']:,.0f} {get_currency_symbol(self.page_ref)}",
+                                                        f"{disp_income:,.2f} {symbol}",
                                                         font_family="Montserrat Semibold",
                                                         color="#2A4A00",
                                                         size=14,
@@ -216,7 +310,7 @@ class HomePage(BasePage):
                                                 controls=[
                                                     ft.Icon(ft.Icons.ARROW_DOWNWARD, color="#4A3A00", size=16),
                                                     ft.Text(
-                                                        f"{monthly['expense']:,.0f} {get_currency_symbol(self.page_ref)}",
+                                                        f"{disp_expense:,.2f} {symbol}",
                                                         font_family="Montserrat Semibold",
                                                         color="#4A3A00",
                                                         size=14,

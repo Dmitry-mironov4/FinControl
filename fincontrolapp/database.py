@@ -135,6 +135,30 @@ def create_tables():
     except Exception:
         pass
 
+    # миграция: настройки уведомлений бота
+    try:
+        cursor.execute('ALTER TABLE users ADD COLUMN notify_subscriptions INTEGER DEFAULT 1')
+    except Exception:
+        pass
+    try:
+        cursor.execute('ALTER TABLE users ADD COLUMN notify_goals INTEGER DEFAULT 1')
+    except Exception:
+        pass
+    try:
+        cursor.execute('ALTER TABLE users ADD COLUMN notify_budget INTEGER DEFAULT 1')
+    except Exception:
+        pass
+
+    # миграция: настройки отображения валюты
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN display_currency TEXT DEFAULT 'RUB'")
+    except Exception:
+        pass
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN currency_conversion TEXT DEFAULT 'as_is'")
+    except Exception:
+        pass
+
     # стартовые категории
     cursor.execute("SELECT COUNT(*) FROM categories")
     if cursor.fetchone()[0] == 0:

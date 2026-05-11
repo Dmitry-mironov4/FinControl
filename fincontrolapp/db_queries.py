@@ -677,6 +677,37 @@ def mark_purchase_timer_notified(timer_id: int) -> None:
         conn.commit()
 
 
+# ─── Настройки валюты ────────────────────────────────────────────────────────
+
+def get_user_currency(user_id: int) -> tuple:
+    """Возвращает (display_currency, currency_conversion) для пользователя.
+
+    display_currency   — код валюты отображения, напр. 'USD'
+    currency_conversion — 'as_is' или 'convert'
+    """
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT display_currency, currency_conversion FROM users WHERE id = ?",
+            (user_id,),
+        ).fetchone()
+    if not row:
+        return ("RUB", "as_is")
+    return (
+        row["display_currency"] or "RUB",
+        row["currency_conversion"] or "as_is",
+    )
+
+
+def set_user_currency(user_id: int, display_currency: str, currency_conversion: str) -> None:
+    """Сохранить настройки отображения валюты."""
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE users SET display_currency = ?, currency_conversion = ? WHERE id = ?",
+            (display_currency, currency_conversion, user_id),
+        )
+        conn.commit()
+
+
 def set_purchase_timer_decision(timer_id: int, decision: str) -> None:
     """
     Записать решение пользователя.

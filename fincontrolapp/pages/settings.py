@@ -325,37 +325,108 @@ class SettingsPage(BasePage):
         _show_dialog(self.page_ref, dlg)
  
     def _open_currency_dialog(self, e):
+        from db_queries import get_user_currency, set_user_currency
         currencies = [
             ("RUB", "₽  Российский рубль"),
             ("USD", "$  Доллар США"),
             ("EUR", "€  Евро"),
+            ("CNY", "¥  Китайский юань"),
+            ("GBP", "£  Британский фунт"),
             ("KZT", "₸  Казахстанский тенге"),
             ("BYN", "Br  Белорусский рубль"),
         ]
-        current = self.page_ref.data.get("_s_currency", "RUB")
-        dd = ft.Dropdown(label="Валюта", value=current, border_color="#6976EB",
-            options=[ft.dropdown.Option(code, label) for code, label in currencies])
+
+        user_id = self._ctrl._user_id
+        saved_currency, saved_conv = get_user_currency(user_id) if user_id else ("RUB", "as_is")
+        current = self.page_ref.data.get("_s_currency", saved_currency)
+
+        dd = ft.Dropdown(
+            label="Валюта",
+            value=current,
+            border_color="#6976EB",
+            text_style=ft.TextStyle(font_family="Montserrat Medium"),
+            label_style=ft.TextStyle(font_family="Montserrat Medium"),
+            options=[ft.dropdown.Option(code, label) for code, label in currencies],
+        )
+
+        conv_value = self.page_ref.data.get("_s_currency_conv", saved_conv)
+        rg = ft.RadioGroup(
+            value=conv_value,
+            content=ft.Column([
+                ft.Radio(
+                    value="as_is",
+                    label="Оставить суммы как есть",
+                    label_style=ft.TextStyle(font_family="Montserrat Medium", size=13),
+                    active_color="#6976EB",
+                ),
+                ft.Radio(
+                    value="convert",
+                    label="Пересчитать по текущему курсу",
+                    label_style=ft.TextStyle(font_family="Montserrat Medium", size=13),
+                    active_color="#6976EB",
+                ),
+            ], spacing=4, tight=True),
+        )
+
+        conv_section = ft.Column(
+            visible=(current != "RUB"),
+            spacing=6,
+            tight=True,
+            controls=[
+                ft.Text(
+                    "Режим конвертации",
+                    size=13,
+                    color=ft.Colors.with_opacity(0.6, "#000000"),
+                    font_family="Montserrat SemiBold",
+                ),
+                rg,
+            ],
+        )
+
+        def on_dd_change(ev):
+            conv_section.visible = (dd.value != "RUB")
+            try:
+                conv_section.update()
+            except Exception:
+                pass
+
+        dd.on_change = on_dd_change
+
         dlg = ft.AlertDialog(modal=True, title=ft.Text("Валюта", font_family="Montserrat SemiBold"))
 
-        def on_cancel(e):
+        def on_cancel(ev):
             _close_dialog(self.page_ref, dlg)
- 
-        def on_submit(e):
-            self.page_ref.data["_s_currency"] = dd.value
+
+        def on_submit(ev):
+            chosen_currency = dd.value or "RUB"
+            chosen_conv = rg.value or "as_is"
+            self.page_ref.data["_s_currency"] = chosen_currency
+            self.page_ref.data["_s_currency_conv"] = chosen_conv
+            if user_id:
+                try:
+                    set_user_currency(user_id, chosen_currency, chosen_conv)
+                except Exception:
+                    pass
             if self._currency_subtitle is not None:
                 self._currency_subtitle.value = CURRENCY_LABELS.get(
-                    dd.value, CURRENCY_LABELS["RUB"]
+                    chosen_currency, CURRENCY_LABELS["RUB"]
                 )
                 try:
                     self._currency_subtitle.update()
                 except Exception:
                     pass
             _close_dialog(self.page_ref, dlg)
-            self.page_ref.snack_bar = ft.SnackBar(ft.Text("Валюта сохранена ✓", font_family="Montserrat SemiBold"), open=True)
+            self.page_ref.snack_bar = ft.SnackBar(
+                ft.Text("Валюта сохранена ✓", font_family="Montserrat SemiBold"), open=True
+            )
             self.page_ref.update()
 
-
-        dlg.content = ft.Column([dd], tight=True)
+        dlg.content = ft.Column(
+            [dd, conv_section],
+            tight=True,
+            spacing=16,
+            width=300,
+        )
         dlg.actions = [
             ft.TextButton("Отмена", style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_cancel),
             ft.TextButton("Сохранить", style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_submit),
