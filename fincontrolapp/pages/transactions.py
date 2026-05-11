@@ -5,7 +5,7 @@ from collections import OrderedDict
 from components.base_page import BasePage
 from components.dialogs import close_dialog as _close_dialog
 from components.form_utils import parse_amount, parse_date
-from utils import get_currency_symbol
+from utils import get_currency_symbol, format_amount
 
 
 CATEGORY_ICONS = {
@@ -312,7 +312,7 @@ class TransactionsPage(BasePage):
                             ], spacing=12, expand=True),
                             ft.Row([
                                 ft.Text(
-                                    f"{'+ ' if is_income else '− '}{t['amount']:,.0f} {get_currency_symbol(self.page_ref)}",
+                                    format_amount(t['amount'], self.page_ref, '+ ' if is_income else '− '),
                                     color="#253A82" if is_income else ft.Colors.with_opacity(0.6, "#FF7E1C"),
                                     size=14,
                                     font_family="Montserrat SemiBold",

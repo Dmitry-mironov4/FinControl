@@ -4,6 +4,7 @@ from datetime import date
 from components.base_page import BasePage
 from components.dialogs import close_dialog as _close_dialog
 from components.form_utils import parse_amount, parse_date
+from utils import get_currency_symbol, input_to_rub, format_amount, rub_to_display
 
 
 class IncomePage(BasePage):
@@ -47,7 +48,7 @@ class IncomePage(BasePage):
                     controls=[
                         ft.Icon(ft.Icons.CALENDAR_MONTH, size=14, color="#6976EB"),
                         ft.Text(f"Период: {period}", size=12, font_family="Montserrat SemiBold", color="#6976EB"),
-                        ft.Text(f"Итого: {month_total:,.0f} ₽", font_family="Montserrat SemiBold", size=12, color="#483EB7"),
+                        ft.Text(format_amount(month_total, self.page_ref, "Итого: "), font_family="Montserrat SemiBold", size=12, color="#483EB7"),
                     ],
                     alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                 ),
@@ -59,7 +60,7 @@ class IncomePage(BasePage):
                     ft.Text("Дополнительные доходы", size=16,
                             font_family="Montserrat SemiBold",
                             color=ft.Colors.with_opacity(0.6, "#000000")),
-                    ft.Text(f"{additional_total:,.0f} ₽", size=13,
+                    ft.Text(format_amount(additional_total, self.page_ref), size=13,
                             font_family="Montserrat SemiBold",
                             color="#483EB7") if additional_total else ft.Container(),
                 ],
@@ -89,7 +90,7 @@ class IncomePage(BasePage):
         ], spacing=16)
 
     def _salary_card(self, salary):
-        amount_text = f"{salary['amount']:,.0f} ₽" if salary else "Не указана"
+        amount_text = format_amount(salary['amount'], self.page_ref) if salary else "Не указана"
         return ft.Container(
             padding=16,
             border_radius=16,
@@ -182,7 +183,7 @@ class IncomePage(BasePage):
                         ft.Row(
                             [
                                 ft.Text(
-                                    f"+ {t['amount']:,.0f} ₽",
+                                    format_amount(t['amount'], self.page_ref, "+ "),
                                     color="#483EB7",
                                     size=14,
                                     font_family="Montserrat SemiBold",
@@ -482,8 +483,9 @@ class IncomePage(BasePage):
             font_family="Montserrat Medium", size=10, color="#FF0000"
         )
 
+        _sym = get_currency_symbol(self.page_ref)
         amount_field = ft.TextField(
-            label="Сумма зарплаты",
+            label=f"Сумма зарплаты ({_sym})",
             text_style=ft.TextStyle(font_family="Montserrat SemiBold", size=15),
             border_color="#6976EB",
             error_style=error_style,
@@ -534,15 +536,16 @@ class IncomePage(BasePage):
             parsed_date = parse_date(date_field.value)
 
             try:
+                rub_amount = input_to_rub(amount, self.page_ref)
                 existing = self._ctrl.get_salary()
                 if existing:
                     self._ctrl.update_transaction(
-                        existing["id"], amount,
+                        existing["id"], rub_amount,
                         existing["category_id"], existing["description"], str(parsed_date)
                     )
                 else:
                     self._ctrl.add_transaction(
-                        amount=amount,
+                        amount=rub_amount,
                         category_id=salary_cat.id,
                         description="Зарплата",
                         date=str(parsed_date),
@@ -623,14 +626,15 @@ class IncomePage(BasePage):
             value=str(_other.id) if _other else None,
             error_style=error_style,
         )
+        _sym = get_currency_symbol(self.page_ref)
         amount_field = ft.TextField(
-            label="Сумма",
+            label=f"Сумма ({_sym})",
             text_style=ft.TextStyle(font_family="Montserrat SemiBold", size=15),
             border_color="#6976EB",
             error_style=error_style,
         )
         desc_field = ft.TextField(
-            label="Описание (необязательно)", 
+            label="Описание (необязательно)",
             border_color="#6976EB", text_style=ft.TextStyle(font_family="Montserrat SemiBold", size=10),
         )
         date_field = self._make_date_field("Дата", date.today().strftime("%d.%m.%Y"))
@@ -690,7 +694,7 @@ class IncomePage(BasePage):
 
             try:
                 self._ctrl.add_transaction(
-                    amount=amount,
+                    amount=input_to_rub(amount, self.page_ref),
                     category_id=int(category_dd.value),
                     description=desc_field.value or None,
                     date=str(parsed_date),
