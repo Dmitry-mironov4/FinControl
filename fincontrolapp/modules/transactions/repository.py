@@ -36,8 +36,8 @@ class TransactionRepository:
 
         return self.con.execute(query, tuple(params)).fetchall()
 
-    def delete_transaction(self, transaction_id):
-        self.con.execute('DELETE FROM transactions WHERE id = ?', (transaction_id,))
+    def delete_transaction(self, transaction_id, user_id):
+        self.con.execute('DELETE FROM transactions WHERE id = ? AND user_id = ?', (transaction_id, user_id))
 
 
     def update_transaction(self, transaction_id, type_, amount, category_id, description, date):

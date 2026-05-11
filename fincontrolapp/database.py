@@ -149,6 +149,22 @@ def create_tables():
     except Exception:
         pass
 
+    # миграция: временный пароль для восстановления через бота
+    try:
+        cursor.execute('ALTER TABLE users ADD COLUMN reset_password TEXT')
+    except Exception:
+        pass
+
+    # миграция: токен привязки Telegram (15 минут)
+    try:
+        cursor.execute('ALTER TABLE users ADD COLUMN link_token TEXT')
+    except Exception:
+        pass
+    try:
+        cursor.execute('ALTER TABLE users ADD COLUMN link_token_expires_at TIMESTAMP')
+    except Exception:
+        pass
+
     # миграция: настройки отображения валюты
     try:
         cursor.execute("ALTER TABLE users ADD COLUMN display_currency TEXT DEFAULT 'RUB'")
@@ -160,6 +176,23 @@ def create_tables():
         pass
     try:
         cursor.execute("ALTER TABLE users ADD COLUMN secondary_currency TEXT DEFAULT NULL")
+    except Exception:
+        pass
+
+    # миграция: нормализация телефонов к формату +7XXXXXXXXXX
+    try:
+        rows = cursor.execute("SELECT id, phone FROM users WHERE phone IS NOT NULL").fetchall()
+        for row in rows:
+            phone = row[1]
+            import re as _re
+            digits = _re.sub(r'\D', '', phone)
+            if len(digits) == 11 and digits[0] in ('7', '8'):
+                digits = '7' + digits[1:]
+            elif len(digits) == 10:
+                digits = '7' + digits
+            normalized = '+' + digits if digits else phone
+            if normalized != phone:
+                cursor.execute("UPDATE users SET phone=? WHERE id=?", (normalized, row[0]))
     except Exception:
         pass
 

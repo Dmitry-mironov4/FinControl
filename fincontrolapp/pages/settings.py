@@ -49,6 +49,8 @@ class SettingsPage(BasePage):
             self._group([
                 self._setting_item(ft.Icons.PERSON_OUTLINE, "Профиль", "Настройте своё имя",
                     on_click=self._open_profile_dialog),
+                self._setting_item(ft.Icons.LOCK_OUTLINE, "Сменить пароль", "Изменить пароль аккаунта",
+                    on_click=self._open_change_password_dialog, divider=True),
                 self._setting_item(ft.Icons.NOTIFICATIONS_OUTLINED, "Уведомления", "Напоминания о расходах",
                     on_click=self._open_notifications_dialog, divider=True),
                 self._setting_item(ft.Icons.CURRENCY_RUBLE, "Валюта", self._currency_subtitle,
@@ -265,6 +267,63 @@ class SettingsPage(BasePage):
         ]
         _show_dialog(self.page_ref, dlg)
  
+    def _open_change_password_dialog(self, e):
+        def _pwd_field(label):
+            return ft.TextField(
+                label=label, password=True, can_reveal_password=True,
+                border_color="#6976EB", border_radius=12,
+                label_style=ft.TextStyle(font_family="Montserrat SemiBold"),
+                text_style=ft.TextStyle(font_family="Montserrat SemiBold"),
+            )
+
+        old_field = _pwd_field("Текущий пароль")
+        new_field = _pwd_field("Новый пароль")
+        confirm_field = _pwd_field("Повторите новый пароль")
+        err = ft.Text("", color=ft.Colors.with_opacity(0.8, "#FF7E1C"),
+                      size=12, font_family="Montserrat SemiBold")
+
+        dlg = ft.AlertDialog(modal=True, title=ft.Text("Сменить пароль", font_family="Montserrat SemiBold"))
+
+        def on_cancel(e):
+            _close_dialog(self.page_ref, dlg)
+
+        def on_submit(e):
+            old = old_field.value or ""
+            new = new_field.value or ""
+            confirm = confirm_field.value or ""
+            if not old or not new or not confirm:
+                err.value = "Заполните все поля"
+                self.page_ref.update()
+                return
+            if new != confirm:
+                err.value = "Новые пароли не совпадают"
+                self.page_ref.update()
+                return
+            if len(new) < 6:
+                err.value = "Пароль минимум 6 символов"
+                self.page_ref.update()
+                return
+            if not self._ctrl.change_password(old, new):
+                err.value = "Текущий пароль неверный"
+                self.page_ref.update()
+                return
+            _close_dialog(self.page_ref, dlg)
+            self.page_ref.snack_bar = ft.SnackBar(
+                ft.Text("Пароль изменён ✓", font_family="Montserrat SemiBold"), open=True)
+            self.page_ref.update()
+
+        dlg.content = ft.Column(
+            [old_field, new_field, confirm_field, err],
+            tight=True, spacing=12, width=300,
+        )
+        dlg.actions = [
+            ft.TextButton("Отмена", style=ft.ButtonStyle(color="#483EB7",
+                text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_cancel),
+            ft.TextButton("Сохранить", style=ft.ButtonStyle(color="#483EB7",
+                text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_submit),
+        ]
+        _show_dialog(self.page_ref, dlg)
+
     def _open_notifications_dialog(self, e):
         from db_queries import get_notify_prefs, set_notify_prefs
         user_id = self._ctrl._user_id
@@ -447,20 +506,34 @@ class SettingsPage(BasePage):
         _show_dialog(self.page_ref, dlg)
  
     def _open_telegram_dialog(self, e):
+        from db_queries import generate_link_token
         user_id = self._ctrl._user_id
         if user_id is None:
             self._show_error("Не удалось получить данные пользователя")
             return
-        deep_link = f"https://t.me/F1nC0ntrolBot?start={user_id}"
+
+        try:
+            token = generate_link_token(user_id)
+        except Exception:
+            self._show_error("Не удалось создать ссылку")
+            return
+
+        deep_link = f"https://t.me/F1nC0ntrolBot?start={token}"
         dlg = ft.AlertDialog(modal=True, title=ft.Text("Telegram-бот", font_family="Montserrat SemiBold"))
 
         def on_cancel(e):
             _close_dialog(self.page_ref, dlg)
 
         dlg.content = ft.Column([
-            ft.Text("Нажми «Открыть Telegram» — бот автоматически привяжет твой аккаунт.",
-                    size=13, color=ft.Colors.with_opacity(0.6, "#000000"), font_family="Montserrat SemiBold"),
-        ], tight=True, spacing=12)
+            ft.Text(
+                "Нажми «Открыть Telegram» — бот автоматически привяжет твой аккаунт.",
+                size=13, color=ft.Colors.with_opacity(0.6, "#000000"), font_family="Montserrat SemiBold",
+            ),
+            ft.Text(
+                "Ссылка действует 15 минут.",
+                size=11, color=ft.Colors.with_opacity(0.4, "#000000"), font_family="Montserrat SemiBold",
+            ),
+        ], tight=True, spacing=8)
         dlg.actions = [
             ft.TextButton("Отмена", style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_cancel),
             ft.TextButton("Открыть Telegram", url=deep_link, style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold"))),

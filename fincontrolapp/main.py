@@ -177,7 +177,7 @@ def main(page: ft.Page):
                 close_dialog(page, dlg)
                 home = page.data.get("pages", {}).get(0)
                 if home:
-                    home.rebuild()
+                    home.refresh()
 
         dlg.content = ft.Column([
             ft.Text("Сколько денег у тебя сейчас?",font_family="Montserrat SemiBold", color="#000000", size=14),

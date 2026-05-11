@@ -128,9 +128,25 @@ def _goals_pick_keyboard(timer_id: int, goals: list) -> InlineKeyboardMarkup:
 
 # ─── Обработчики решений ──────────────────────────────────────────────────────
 
+async def _get_owned_timer(call: CallbackQuery, timer_id: int) -> dict | None:
+    """Возвращает таймер только если он принадлежит вызывающему пользователю."""
+    timer = await asyncio.to_thread(get_purchase_timer, timer_id)
+    if not timer:
+        await call.answer("Таймер не найден", show_alert=True)
+        return None
+    user = await asyncio.to_thread(get_user_by_telegram_id, call.from_user.id)
+    if not user or timer["user_id"] != user["id"]:
+        await call.answer("Нет доступа", show_alert=True)
+        return None
+    return timer
+
+
 @router.callback_query(F.data.startswith("timer_cancelled:"))
 async def cb_cancelled(call: CallbackQuery):
     timer_id = int(call.data.split(":")[1])
+    timer = await _get_owned_timer(call, timer_id)
+    if not timer:
+        return
     await asyncio.to_thread(set_purchase_timer_decision, timer_id, "cancelled")
     await call.message.edit_text(
         call.message.text + "\n\n❌ *Молодец! Сэкономил деньги.*",
@@ -143,9 +159,8 @@ async def cb_cancelled(call: CallbackQuery):
 async def cb_bought_now(call: CallbackQuery):
     """Купил сразу — добавляет расход в историю."""
     timer_id = int(call.data.split(":")[1])
-    timer = await asyncio.to_thread(get_purchase_timer, timer_id)
+    timer = await _get_owned_timer(call, timer_id)
     if not timer:
-        await call.answer("Таймер не найден", show_alert=True)
         return
 
     # Находим категорию «Покупки»
@@ -174,9 +189,8 @@ async def cb_bought_now(call: CallbackQuery):
 async def cb_to_goal(call: CallbackQuery):
     """Показать список целей для пополнения."""
     timer_id = int(call.data.split(":")[1])
-    timer = await asyncio.to_thread(get_purchase_timer, timer_id)
+    timer = await _get_owned_timer(call, timer_id)
     if not timer:
-        await call.answer("Таймер не найден", show_alert=True)
         return
 
     goals = await asyncio.to_thread(get_goals, timer["user_id"])
@@ -201,9 +215,8 @@ async def cb_goal_pick(call: CallbackQuery):
     timer_id = int(timer_id_str)
     goal_id = int(goal_id_str)
 
-    timer = await asyncio.to_thread(get_purchase_timer, timer_id)
+    timer = await _get_owned_timer(call, timer_id)
     if not timer:
-        await call.answer("Таймер не найден", show_alert=True)
         return
 
     amount = float(timer["amount"])
@@ -226,9 +239,8 @@ async def cb_goal_pick(call: CallbackQuery):
 async def cb_decision_back(call: CallbackQuery):
     """Вернуться к исходным кнопкам таймера."""
     timer_id = int(call.data.split(":")[1])
-    timer = await asyncio.to_thread(get_purchase_timer, timer_id)
+    timer = await _get_owned_timer(call, timer_id)
     if not timer:
-        await call.answer()
         return
     await call.message.edit_reply_markup(reply_markup=make_decision_keyboard(timer_id))
     await call.answer()

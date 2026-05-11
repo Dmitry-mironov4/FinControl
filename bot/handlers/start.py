@@ -8,6 +8,7 @@ from fincontrolapp.db_queries import (
     create_user,
     update_user_phone,
     link_telegram_to_user_by_id,
+    link_telegram_by_token,
     get_user_by_id,
 )
 
@@ -29,10 +30,27 @@ async def cmd_start(message: Message):
         )
         return
 
-    if deep_link_user_id and deep_link_user_id.isdigit():
+    if deep_link_user_id:
+        # Новый формат: токен (не число)
+        if not deep_link_user_id.isdigit():
+            linked = link_telegram_by_token(deep_link_user_id, telegram_id)
+            if linked:
+                username = linked.get('username') or message.from_user.first_name
+                await message.answer(
+                    f"✅ Аккаунт {username} успешно привязан!",
+                    reply_markup=main_keyboard(),
+                )
+            else:
+                await message.answer(
+                    "Ссылка недействительна или устарела.\n"
+                    "Открой Настройки → Telegram-бот и получи новую ссылку.",
+                    reply_markup=phone_keyboard(),
+                )
+            return
+
+        # Старый формат: user_id (обратная совместимость)
         user_id_from_app = int(deep_link_user_id)
         user_from_app = get_user_by_id(user_id_from_app)
-
         if user_from_app:
             existing_tg = user_from_app['telegram_id']
             if existing_tg and existing_tg != telegram_id:
@@ -41,12 +59,11 @@ async def cmd_start(message: Message):
                     "Если это ошибка, обратитесь в поддержку."
                 )
                 return
-
             success = link_telegram_to_user_by_id(user_id_from_app, telegram_id)
             if success:
                 username = user_from_app['username'] or message.from_user.first_name
                 await message.answer(
-                    f"Аккаунт {username} успешно привязан!",
+                    f"✅ Аккаунт {username} успешно привязан!",
                     reply_markup=main_keyboard(),
                 )
             else:

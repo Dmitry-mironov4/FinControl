@@ -17,6 +17,8 @@ from fincontrolapp.db_queries import (
     mark_purchase_timer_notified,
     get_users_to_notify,
     get_notify_prefs,
+    get_users_pending_reset,
+    clear_reset_password,
 )
 from bot.handlers.purchase_timer import make_decision_keyboard
 
@@ -100,6 +102,24 @@ async def _notify_user(bot: Bot, user: dict) -> None:
             logger.warning("Ошибка при отправке уведомления %s: %s", tg_id, e)
 
 
+async def _reset_password_job(bot: Bot) -> None:
+    """Рассылает временные пароли пользователям, запросившим сброс."""
+    users = await asyncio.to_thread(get_users_pending_reset)
+    for u in users:
+        try:
+            await bot.send_message(
+                u["telegram_id"],
+                f"🔐 Твой временный пароль: `{u['reset_password']}`\n"
+                "Войди в приложение и смени его в Настройках → Сменить пароль.",
+                parse_mode="Markdown",
+            )
+            await asyncio.to_thread(clear_reset_password, u["id"])
+        except TelegramForbiddenError:
+            await asyncio.to_thread(clear_reset_password, u["id"])
+        except Exception as ex:
+            logger.warning("Ошибка при отправке временного пароля user %s: %s", u["id"], ex)
+
+
 async def _timer_job(bot: Bot) -> None:
     """Проверяет таймеры покупок. Запускается каждые 5 минут."""
     timers = await asyncio.to_thread(get_due_purchase_timers)
@@ -133,6 +153,15 @@ async def _hourly_job(bot: Bot) -> None:
 
 def setup_notify_scheduler(bot: Bot) -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler()
+
+    # Сброс пароля — каждые 30 секунд (доставка почти мгновенная)
+    scheduler.add_job(
+        _reset_password_job,
+        "interval",
+        seconds=30,
+        args=[bot],
+        id="password_reset",
+    )
 
     # Таймеры покупок — каждые 5 минут (точность ±5 мин)
     scheduler.add_job(

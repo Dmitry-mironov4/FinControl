@@ -28,7 +28,7 @@ class TransactionsController:
 
     def delete_transaction(self, transaction_id: int):
         with get_connection() as con:
-            TransactionService(TransactionRepository(con)).delete_transaction(transaction_id)
+            TransactionService(TransactionRepository(con)).delete_transaction(transaction_id, self._user_id)
 
     def update_transaction(self, transaction_id: int, type_: str, amount: float,
                            category_id: int, description: str | None, date: str):

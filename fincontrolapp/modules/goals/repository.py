@@ -17,10 +17,12 @@ class GoalRepository:
             (user_id, name, target_amount, deadline)
         )
     def deposit_to_goal(self, user_id, goal_id, amount):
-        self.con.execute(
-            'UPDATE goals SET current_amount = current_amount + ? WHERE id = ?',
-            (amount, goal_id)
+        cursor = self.con.execute(
+            'UPDATE goals SET current_amount = current_amount + ? WHERE id = ? AND user_id = ?',
+            (amount, goal_id, user_id)
         )
+        if cursor.rowcount == 0:
+            return
         savings_cat = self.con.execute(
             "SELECT id FROM categories WHERE name='Накопления' AND type='expense'"
         ).fetchone()

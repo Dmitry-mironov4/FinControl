@@ -1,5 +1,7 @@
-from datetime import date
+from datetime import date, datetime, timedelta
 import calendar
+import re
+import secrets
 import sqlite3
 import os
 
@@ -11,6 +13,16 @@ def get_connection():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row  # доступ к полям по имени: row['amount']
     return conn
+
+
+def normalize_phone(phone: str) -> str:
+    """Приводит телефон к формату +7XXXXXXXXXX."""
+    digits = re.sub(r'\D', '', phone)
+    if len(digits) == 11 and digits[0] in ('7', '8'):
+        digits = '7' + digits[1:]
+    elif len(digits) == 10:
+        digits = '7' + digits
+    return '+' + digits if digits else phone
 
 
 def create_tables():
@@ -198,7 +210,7 @@ def create_user(telegram_id: int, username: str | None, phone: str | None) -> in
     conn = get_connection()
     cursor = conn.execute(
         "INSERT INTO users (telegram_id, username, phone) VALUES (?, ?, ?)",
-        (telegram_id, username, phone),
+        (telegram_id, username, normalize_phone(phone) if phone else None),
     )
     user_id = cursor.lastrowid
     conn.commit()
@@ -209,10 +221,105 @@ def create_user(telegram_id: int, username: str | None, phone: str | None) -> in
 def update_user_phone(telegram_id: int, phone: str) -> None:
     conn = get_connection()
     conn.execute(
-        "UPDATE users SET phone = ? WHERE telegram_id = ?", (phone, telegram_id)
+        "UPDATE users SET phone = ? WHERE telegram_id = ?", (normalize_phone(phone), telegram_id)
     )
     conn.commit()
     conn.close()
+
+
+def request_password_reset(user_id: int) -> bool:
+    """Генерирует временный пароль, сохраняет хэш и plain для отправки ботом.
+    Возвращает False если у пользователя нет привязанного Telegram."""
+    import string
+    from pages.auth import hash_password
+    with get_connection() as conn:
+        row = conn.execute(
+            'SELECT telegram_id FROM users WHERE id=?', (user_id,)
+        ).fetchone()
+        if not row or not row['telegram_id']:
+            return False
+        alphabet = string.ascii_letters + string.digits
+        temp_pwd = ''.join(secrets.choice(alphabet) for _ in range(10))
+        conn.execute(
+            'UPDATE users SET password_hash=?, reset_password=? WHERE id=?',
+            (hash_password(temp_pwd), temp_pwd, user_id)
+        )
+    return True
+
+
+def get_users_pending_reset() -> list:
+    """Пользователи с ожидающим сбросом пароля (для бота)."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            'SELECT id, telegram_id, reset_password FROM users '
+            'WHERE reset_password IS NOT NULL AND telegram_id IS NOT NULL'
+        ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def clear_reset_password(user_id: int) -> None:
+    with get_connection() as conn:
+        conn.execute('UPDATE users SET reset_password=NULL WHERE id=?', (user_id,))
+
+
+def change_password(user_id: int, old_pwd: str, new_pwd: str) -> bool:
+    """Меняет пароль после проверки старого. Возвращает False если старый неверный."""
+    from pages.auth import hash_password, verify_password
+    with get_connection() as conn:
+        row = conn.execute(
+            'SELECT password_hash FROM users WHERE id=?', (user_id,)
+        ).fetchone()
+        if not row or not verify_password(row['password_hash'], old_pwd):
+            return False
+        conn.execute(
+            'UPDATE users SET password_hash=? WHERE id=?',
+            (hash_password(new_pwd), user_id)
+        )
+    return True
+
+
+def get_user_by_contact(contact: str) -> dict | None:
+    """Ищет пользователя по email или телефону (с нормализацией номера)."""
+    phone_norm = normalize_phone(contact) if re.search(r'\d{7,}', contact) else contact
+    with get_connection() as conn:
+        row = conn.execute(
+            'SELECT id, telegram_id FROM users WHERE email=? OR phone=?',
+            (contact, phone_norm)
+        ).fetchone()
+    return dict(row) if row else None
+
+
+def generate_link_token(user_id: int) -> str:
+    """Генерирует одноразовый токен привязки Telegram (действует 15 минут)."""
+    token = secrets.token_urlsafe(16)
+    expires_at = (datetime.now() + timedelta(minutes=15)).strftime('%Y-%m-%d %H:%M:%S')
+    with get_connection() as conn:
+        conn.execute(
+            'UPDATE users SET link_token=?, link_token_expires_at=? WHERE id=?',
+            (token, expires_at, user_id)
+        )
+    return token
+
+
+def link_telegram_by_token(token: str, telegram_id: int) -> dict | None:
+    """Привязывает telegram_id к аккаунту по токену. Возвращает пользователя или None."""
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT * FROM users WHERE link_token=? AND link_token_expires_at > datetime('now', 'localtime')",
+            (token,)
+        ).fetchone()
+        if not row:
+            return None
+        existing = conn.execute(
+            "SELECT id FROM users WHERE telegram_id=? AND id!=?", (telegram_id, row['id'])
+        ).fetchone()
+        if existing:
+            return None
+        conn.execute(
+            'UPDATE users SET telegram_id=?, link_token=NULL, link_token_expires_at=NULL WHERE id=?',
+            (telegram_id, row['id'])
+        )
+    return dict(row)
 
 
 def link_telegram_to_user_by_id(user_id: int, telegram_id: int) -> bool:
@@ -295,18 +402,12 @@ def get_last_transactions(user_id: int, limit: int = 10, offset: int = 0):
     return rows
 
 
-def delete_transaction(transaction_id: int, user_id: int | None = None) -> bool:
+def delete_transaction(transaction_id: int, user_id: int) -> bool:
     with get_connection() as conn:
-        if user_id is not None:
-            cursor = conn.execute(
-                'DELETE FROM transactions WHERE id = ? AND user_id = ?',
-                (transaction_id, user_id)
-            )
-        else:
-            cursor = conn.execute(
-                'DELETE FROM transactions WHERE id = ?',
-                (transaction_id,)
-            )
+        cursor = conn.execute(
+            'DELETE FROM transactions WHERE id = ? AND user_id = ?',
+            (transaction_id, user_id)
+        )
         return cursor.rowcount > 0
 
 
@@ -436,10 +537,12 @@ def add_goal(user_id, name, target_amount, deadline=None):
 def deposit_to_goal(user_id, goal_id, amount):
     """Пополняет цель и создаёт расход с категорией Накопления."""
     with get_connection() as conn:
-        conn.execute(
+        cursor = conn.execute(
             'UPDATE goals SET current_amount = current_amount + ? WHERE id = ? AND user_id = ?',
             (amount, goal_id, user_id)
         )
+        if cursor.rowcount == 0:
+            return False
         savings_cat = conn.execute(
             "SELECT id FROM categories WHERE name='Накопления' AND type='expense'"
         ).fetchone()
@@ -449,6 +552,7 @@ def deposit_to_goal(user_id, goal_id, amount):
                    VALUES (?, 'expense', ?, ?, 'Накопления на цель', ?)''',
                 (user_id, amount, savings_cat['id'], str(date.today()))
             )
+        return True
 
 
 def delete_goal(goal_id: int, user_id: int) -> bool:
