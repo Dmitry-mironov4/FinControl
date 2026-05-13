@@ -1,0 +1,10 @@
+[project]
+name = "fincontrolapp"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "flet==0.85.0",
+    "flet-charts==0.85.0",
+]

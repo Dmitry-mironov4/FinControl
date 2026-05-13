@@ -5,7 +5,7 @@ from collections import OrderedDict
 from components.base_page import BasePage
 from components.dialogs import close_dialog as _close_dialog
 from components.form_utils import parse_amount, parse_date
-from utils import get_currency_symbol, format_amount
+from utils import format_amount
 
 
 CATEGORY_ICONS = {

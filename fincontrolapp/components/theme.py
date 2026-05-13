@@ -46,13 +46,6 @@ class AppTheme:
 
     # ── Отступы ───────────────────────────────────────────────────────────────
 
-    PAD_SM  = ft.padding.all(8)
-    PAD_MD  = ft.padding.all(16)
-    PAD_LG  = ft.padding.all(24)
-    PAD_ROW = ft.padding.symmetric(horizontal=16, vertical=12)
-
-    # ── Отступы (новый API) ───────────────────────────────────────────────────
-
     PAD_SM  = ft.Padding.all(8)
     PAD_MD  = ft.Padding.all(16)
     PAD_LG  = ft.Padding.all(24)

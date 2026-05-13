@@ -4,7 +4,7 @@ from datetime import date
 from components.base_page import BasePage
 from components.dialogs import close_dialog as _close_dialog
 from components.form_utils import parse_amount, parse_date
-from utils import get_currency_symbol, input_to_rub, format_amount, rub_to_display
+from utils import get_currency_symbol, input_to_rub, format_amount
 from components.empty_state import empty_state
 
 

@@ -1,4 +1,4 @@
-import os
+import os  # noqa: F401
 import flet as ft
 from pages import HomePage, TransactionsPage, GoalsPage, SettingsPage, SubscriptionsPage, IncomePage, ExpensesPage, AnalyticsPage, SimulatorPage
 from pages.auth import AuthPage
