@@ -1,12 +1,24 @@
 import flet as ft
 from components.base_page import BasePage
 from components.dialogs import show_dialog as _show_dialog, close_dialog as _close_dialog
+from utils import CURRENCY_LABELS
 
 
 class SettingsPage(BasePage):
     def __init__(self, page: ft.Page, ctrl):
         self._ctrl = ctrl
+        self._username_text: ft.Text | None = None
+        self._initials_text: ft.Text | None = None
+        self._contact_text: ft.Text | None = None
+        self._currency_subtitle: ft.Text | None = None
         super().__init__(page, "Настройки")
+
+    @staticmethod
+    def _calc_initials(username: str) -> str:
+        parts = (username or "User").strip().split()
+        if not parts:
+            return "U"
+        return (parts[0][0] + (parts[1][0] if len(parts) > 1 else "")).upper()
 
     def build_header(self):
         return ft.AppBar(
@@ -22,65 +34,25 @@ class SettingsPage(BasePage):
         )
 
     def build_body(self):
-        user = self._ctrl.get_user()
-        username = (user["username"] or "User") if user else "User"
-        contact = (user["email"] or user["phone"] or "") if user else ""
-    
-        # Инициалы из имени
-        parts = username.strip().split()
-        initials = (parts[0][0] + (parts[1][0] if len(parts) > 1 else "")).upper()
-
-        avatar_block = ft.Container(
-    padding=ft.padding.symmetric(horizontal=16, vertical=12),
-    border_radius=18,
-    border=ft.border.all(1.5, ft.Colors.with_opacity(0.06, "#483EB7")),
-    bgcolor=ft.Colors.with_opacity(0.04, "#483EB7"),
-    content=ft.Row([
-        ft.Container(
-            width=64, height=64,
-            border_radius=32,
-            gradient=ft.LinearGradient(
-                colors=["#ffffff", "#88A2FF"],
-                begin=ft.Alignment(-1, -1),
-                end=ft.Alignment(1, 1),
-            ),
-            alignment=ft.Alignment(0, 0),
-            content=ft.Text(
-                initials,
-                size=24,
-                font_family="Montserrat SemiBold",
-                color="#483EB7",
-                weight=ft.FontWeight.BOLD,
-            ),
-        ),
-        ft.Column([
-            ft.Text(
-                username,
-                size=18,
-                font_family="Montserrat SemiBold",
-                color="#000000",
-                weight=ft.FontWeight.W_600,
-            ),
-            ft.Text(
-                contact,
-                size=13,
-                font_family="Montserrat SemiBold",
-                color=ft.Colors.with_opacity(0.5, "#000000"),
-            ) if contact else ft.Container(),
-        ], spacing=2),
-    ], spacing=16, vertical_alignment=ft.CrossAxisAlignment.CENTER),
-)
+        currency_code = (self.page_ref.data or {}).get("_s_currency", "RUB")
+        currency_label = CURRENCY_LABELS.get(currency_code, CURRENCY_LABELS["RUB"])
+        self._currency_subtitle = ft.Text(
+            currency_label,
+            size=12,
+            color=ft.Colors.with_opacity(0.6, "#000000"),
+            font_family="Montserrat SemiBold",
+        )
 
         return ft.Column([
-            avatar_block,
+            self._build_avatar_block(),
             # ── Группа: Аккаунт ──────────────────────────────────────────
             self._section_header("Аккаунт"),
             self._group([
-                self._setting_item(ft.Icons.PERSON_OUTLINE, "Профиль", "Настройте своё имя",
-                    on_click=self._open_profile_dialog),
+                self._setting_item(ft.Icons.LOCK_OUTLINE, "Сменить пароль", "Изменить пароль аккаунта",
+                    on_click=self._open_change_password_dialog),
                 self._setting_item(ft.Icons.NOTIFICATIONS_OUTLINED, "Уведомления", "Напоминания о расходах",
                     on_click=self._open_notifications_dialog, divider=True),
-                self._setting_item(ft.Icons.CURRENCY_RUBLE, "Валюта", "Рубль (₽)",
+                self._setting_item(ft.Icons.CURRENCY_RUBLE, "Валюта", self._currency_subtitle,
                     on_click=self._open_currency_dialog, divider=True),
                 self._setting_item(ft.Icons.TELEGRAM, "Telegram-бот", "Подключить бота",
                     on_click=self._open_telegram_dialog, divider=True),
@@ -121,10 +93,69 @@ class SettingsPage(BasePage):
 
     # ── Вспомогательные методы ───────────────────────────────────────────
 
+    def _build_avatar_block(self) -> ft.Container:
+        user = self._ctrl.get_user()
+        username = (user["username"] or "User") if user else "User"
+        contact = (user["email"] or user["phone"] or "") if user else ""
+        initials = self._calc_initials(username)
+
+        self._username_text = ft.Text(
+            username,
+            size=18,
+            font_family="Montserrat SemiBold",
+            color="#000000",
+            weight=ft.FontWeight.W_600,
+        )
+        self._initials_text = ft.Text(
+            initials,
+            size=24,
+            font_family="Montserrat SemiBold",
+            color="#483EB7",
+            weight=ft.FontWeight.BOLD,
+        )
+
+        return ft.Container(
+            padding=ft.Padding.symmetric(horizontal=16, vertical=12),
+            border_radius=18,
+            border=ft.Border.all(1.5, ft.Colors.with_opacity(0.06, "#483EB7")),
+            bgcolor=ft.Colors.with_opacity(0.04, "#483EB7"),
+            ink=True,
+            on_click=self._open_profile_dialog,
+            content=ft.Row([
+                ft.Container(
+                    width=64, height=64,
+                    border_radius=32,
+                    gradient=ft.LinearGradient(
+                        colors=["#ffffff", "#88A2FF"],
+                        begin=ft.Alignment(-1, -1),
+                        end=ft.Alignment(1, 1),
+                    ),
+                    alignment=ft.Alignment(0, 0),
+                    content=self._initials_text,
+                ),
+                ft.Column([
+                    self._username_text,
+                    self._build_contact_text(contact),
+                ], spacing=2, expand=True),
+                ft.Icon(ft.Icons.CHEVRON_RIGHT,
+                        color=ft.Colors.with_opacity(0.35, "#483EB7"), size=20),
+            ], spacing=16, vertical_alignment=ft.CrossAxisAlignment.CENTER),
+        )
+
+    def _build_contact_text(self, contact: str) -> ft.Control:
+        self._contact_text = ft.Text(
+            contact,
+            size=13,
+            font_family="Montserrat SemiBold",
+            color=ft.Colors.with_opacity(0.5, "#000000"),
+            visible=bool(contact),
+        )
+        return self._contact_text
+
     def _section_header(self, label: str) -> ft.Container:
         """Заголовок группы (серый текст, как 'Account' / 'Preferences' на картинке)."""
         return ft.Container(
-            padding=ft.padding.only(left=4, top=12, bottom=4),
+            padding=ft.Padding.only(left=4, top=12, bottom=4),
             content=ft.Text(
                 label,
                 size=12,
@@ -153,9 +184,17 @@ class SettingsPage(BasePage):
         """
         Один пункт настроек внутри группы.
         divider=True добавляет тонкую разделительную линию сверху.
+        subtitle может быть строкой или готовым ft.Text — это позволяет
+        обновлять подзаголовок без перестроения всей страницы.
         """
+        subtitle_widget = subtitle if isinstance(subtitle, ft.Text) else ft.Text(
+            subtitle,
+            size=12,
+            color=ft.Colors.with_opacity(0.6, "#000000"),
+            font_family="Montserrat SemiBold",
+        )
         row = ft.Container(
-            padding=ft.padding.symmetric(horizontal=16, vertical=14),
+            padding=ft.Padding.symmetric(horizontal=16, vertical=14),
             ink=True,
             on_click=on_click,
             content=ft.Row([
@@ -193,135 +232,386 @@ class SettingsPage(BasePage):
 
     def _open_profile_dialog(self, e):
         user = self._ctrl.get_user()
-        username_field = ft.TextField(
-            label="Имя пользователя",
-            text_style=ft.TextStyle(font_family="Montserrat Medium"),
-            label_style=ft.TextStyle(font_family="Montserrat Medium"),
-            value=user["username"] or "" if user else "",
-            border_color="#6976EB",
-        )
-        contact_hint = (user["email"] or user["phone"] or "") if user else ""
+
+        def _field(label, value, keyboard_type=ft.KeyboardType.TEXT):
+            return ft.TextField(
+                label=label,
+                value=value or "",
+                border_color="#6976EB",
+                border_radius=12,
+                keyboard_type=keyboard_type,
+                text_style=ft.TextStyle(font_family="Montserrat Medium"),
+                label_style=ft.TextStyle(font_family="Montserrat Medium"),
+            )
+
+        username_field = _field("Имя пользователя", user["username"] if user else "")
+        email_field = _field("E-mail", user["email"] if user else "", ft.KeyboardType.EMAIL)
+        phone_field = _field("Телефон", user["phone"] if user else "", ft.KeyboardType.PHONE)
+
+        tg_connected = bool(user["telegram_id"]) if user else False
+        tg_status_color = "#483EB7" if tg_connected else ft.Colors.with_opacity(0.45, "#000000")
+        tg_status_text = "Подключён" if tg_connected else "Не подключён"
+        tg_row = ft.Row([
+            ft.Icon(ft.Icons.TELEGRAM, color=tg_status_color, size=20),
+            ft.Text("Telegram-бот", font_family="Montserrat SemiBold", size=13, expand=True),
+            ft.Container(
+                padding=ft.Padding.symmetric(horizontal=10, vertical=4),
+                border_radius=20,
+                bgcolor=ft.Colors.with_opacity(0.12, "#483EB7") if tg_connected
+                        else ft.Colors.with_opacity(0.06, "#000000"),
+                content=ft.Text(
+                    tg_status_text,
+                    size=11,
+                    font_family="Montserrat SemiBold",
+                    color=tg_status_color,
+                ),
+            ),
+        ], spacing=10, vertical_alignment=ft.CrossAxisAlignment.CENTER)
+
+        err = ft.Text("", color=ft.Colors.with_opacity(0.8, "#FF7E1C"),
+                      size=12, font_family="Montserrat SemiBold")
+
         dlg = ft.AlertDialog(modal=True, title=ft.Text("Профиль", font_family="Montserrat SemiBold"))
+
+        def on_cancel(ev):
+            _close_dialog(self.page_ref, dlg)
+
+        def on_submit(ev):
+            new_name = (username_field.value or "").strip()
+            new_email = (email_field.value or "").strip() or None
+            new_phone = (phone_field.value or "").strip() or None
+            try:
+                self._ctrl.update_username(new_name or None)
+                self._ctrl.update_email(new_email)
+                self._ctrl.update_phone(new_phone)
+            except Exception:
+                err.value = "Не удалось сохранить — возможно, email или телефон уже используются"
+                try:
+                    self.page_ref.update()
+                except Exception:
+                    pass
+                return
+            display_name = new_name or "User"
+            if self._username_text is not None:
+                self._username_text.value = display_name
+                try:
+                    self._username_text.update()
+                except Exception:
+                    pass
+            if self._initials_text is not None:
+                self._initials_text.value = self._calc_initials(display_name)
+                try:
+                    self._initials_text.update()
+                except Exception:
+                    pass
+            if self._contact_text is not None:
+                new_contact = new_email or new_phone or ""
+                self._contact_text.value = new_contact
+                self._contact_text.visible = bool(new_contact)
+                try:
+                    self._contact_text.update()
+                except Exception:
+                    pass
+            _close_dialog(self.page_ref, dlg)
+            self.page_ref.snack_bar = ft.SnackBar(
+                ft.Text("Профиль сохранён ✓", font_family="Montserrat SemiBold"), open=True)
+            self.page_ref.update()
+
+        dlg.content = ft.Column([
+            username_field,
+            email_field,
+            phone_field,
+            ft.Divider(height=1, thickness=0.5, color=ft.Colors.with_opacity(0.1, "#000000")),
+            tg_row,
+            err,
+        ], tight=True, spacing=12, width=300)
+        dlg.actions = [
+            ft.TextButton("Отмена", style=ft.ButtonStyle(color="#483EB7",
+                text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_cancel),
+            ft.TextButton("Сохранить", style=ft.ButtonStyle(color="#483EB7",
+                text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_submit),
+        ]
+        _show_dialog(self.page_ref, dlg)
+ 
+    def _open_change_password_dialog(self, e):
+        def _pwd_field(label):
+            return ft.TextField(
+                label=label, password=True, can_reveal_password=True,
+                border_color="#6976EB", border_radius=12,
+                label_style=ft.TextStyle(font_family="Montserrat SemiBold"),
+                text_style=ft.TextStyle(font_family="Montserrat SemiBold"),
+            )
+
+        old_field = _pwd_field("Текущий пароль")
+        new_field = _pwd_field("Новый пароль")
+        confirm_field = _pwd_field("Повторите новый пароль")
+        err = ft.Text("", color=ft.Colors.with_opacity(0.8, "#FF7E1C"),
+                      size=12, font_family="Montserrat SemiBold")
+
+        dlg = ft.AlertDialog(modal=True, title=ft.Text("Сменить пароль", font_family="Montserrat SemiBold"))
 
         def on_cancel(e):
             _close_dialog(self.page_ref, dlg)
 
         def on_submit(e):
-            try:
-                self._ctrl.update_username(username_field.value.strip() or None)
-            except Exception:
-                self._show_error("Не удалось сохранить имя")
+            old = old_field.value or ""
+            new = new_field.value or ""
+            confirm = confirm_field.value or ""
+            if not old or not new or not confirm:
+                err.value = "Заполните все поля"
+                self.page_ref.update()
+                return
+            if new != confirm:
+                err.value = "Новые пароли не совпадают"
+                self.page_ref.update()
+                return
+            if len(new) < 6:
+                err.value = "Пароль минимум 6 символов"
+                self.page_ref.update()
+                return
+            if not self._ctrl.change_password(old, new):
+                err.value = "Текущий пароль неверный"
+                self.page_ref.update()
                 return
             _close_dialog(self.page_ref, dlg)
-            self.page_ref.snack_bar = ft.SnackBar(ft.Text("Имя сохранено ✓", font_family="Montserrat SemiBold"), open=True)
+            self.page_ref.snack_bar = ft.SnackBar(
+                ft.Text("Пароль изменён ✓", font_family="Montserrat SemiBold"), open=True)
             self.page_ref.update()
 
-        dlg.content = ft.Column([
-            ft.Text(contact_hint, size=12, color=ft.Colors.with_opacity(0.6, "#000000"),
-                    font_family="Montserrat SemiBold") if contact_hint else ft.Container(),
-            username_field,
-        ], tight=True, spacing=12)
+        dlg.content = ft.Column(
+            [old_field, new_field, confirm_field, err],
+            tight=True, spacing=12, width=300,
+        )
         dlg.actions = [
-            ft.TextButton("Отмена", style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_cancel),
-            ft.TextButton("Сохранить", style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_submit),
+            ft.TextButton("Отмена", style=ft.ButtonStyle(color="#483EB7",
+                text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_cancel),
+            ft.TextButton("Сохранить", style=ft.ButtonStyle(color="#483EB7",
+                text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_submit),
         ]
         _show_dialog(self.page_ref, dlg)
 
     def _open_notifications_dialog(self, e):
-        enabled = self.page_ref.data.get("_s_notifications", False)
-        switch = ft.Switch(value=enabled, active_color="#6976EB")
-        switch_row = ft.Row([switch, ft.Text("Напоминания о расходах",
-            font_family="Montserrat SemiBold", size=13,
-            color=ft.Colors.with_opacity(0.6, "#000000"))], spacing=8)
-        dlg = ft.AlertDialog(modal=True, title=ft.Text("Уведомления", font_family="Montserrat SemiBold"))
+        from db_queries import get_notify_prefs, set_notify_prefs
+        user_id = self._ctrl._user_id
+        if not user_id:
+            return
+        prefs = get_notify_prefs(user_id)
+
+        sw_subs = ft.Switch(value=bool(prefs["notify_subscriptions"]), active_color="#6976EB")
+        sw_goals = ft.Switch(value=bool(prefs["notify_goals"]), active_color="#6976EB")
+        sw_budget = ft.Switch(value=bool(prefs["notify_budget"]), active_color="#6976EB")
+
+        def _row(sw, label, hint):
+            return ft.Column([
+                ft.Row([
+                    sw,
+                    ft.Column([
+                        ft.Text(label, font_family="Montserrat SemiBold", size=13),
+                        ft.Text(hint, font_family="Montserrat SemiBold", size=11,
+                                color=ft.Colors.with_opacity(0.5, "#000000")),
+                    ], spacing=0, expand=True),
+                ], spacing=8),
+            ], spacing=0)
+
+        dlg = ft.AlertDialog(modal=True, title=ft.Text("Уведомления в боте", font_family="Montserrat SemiBold"))
 
         def on_cancel(e):
             _close_dialog(self.page_ref, dlg)
 
         def on_submit(e):
-            self.page_ref.data["_s_notifications"] = switch.value
-            msg = "Уведомления включены" if switch.value else "Уведомления выключены"
+            set_notify_prefs(
+                user_id,
+                int(sw_subs.value),
+                int(sw_goals.value),
+                int(sw_budget.value),
+            )
             _close_dialog(self.page_ref, dlg)
-            self.page_ref.snack_bar = ft.SnackBar(ft.Text(msg, font_family="Montserrat SemiBold"), open=True)
+            self.page_ref.snack_bar = ft.SnackBar(
+                ft.Text("Настройки уведомлений сохранены ✓", font_family="Montserrat SemiBold"), open=True)
             self.page_ref.update()
 
         dlg.content = ft.Column([
-            ft.Text("Push-уведомления работают после сборки на устройстве.",
-                    size=12, color=ft.Colors.with_opacity(0.6, "#000000"), font_family="Montserrat SemiBold"),
-            switch_row,
-        ], tight=True, spacing=12)
+            ft.Text(
+                "Управляй тем, что Telegram-бот присылает тебе каждый день.",
+                size=12, color=ft.Colors.with_opacity(0.6, "#000000"),
+                font_family="Montserrat SemiBold",
+            ),
+            ft.Divider(height=1, thickness=0.5, color=ft.Colors.with_opacity(0.1, "#000000")),
+            _row(sw_subs, "Подписки", "За день до списания"),
+            _row(sw_goals, "Цели", "Прогресс — по понедельникам"),
+            _row(sw_budget, "Бюджет", "Если потрачено ≥80% — по понедельникам"),
+        ], tight=True, spacing=10, width=300)
         dlg.actions = [
-            ft.TextButton("Отмена", style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_cancel),
-            ft.TextButton("Сохранить", style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_submit),
+            ft.TextButton("Отмена", style=ft.ButtonStyle(color="#483EB7",
+                text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_cancel),
+            ft.TextButton("Сохранить", style=ft.ButtonStyle(color="#483EB7",
+                text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_submit),
         ]
         _show_dialog(self.page_ref, dlg)
-
+ 
     def _open_currency_dialog(self, e):
+        from db_queries import get_user_currency, set_user_currency
         currencies = [
             ("RUB", "₽  Российский рубль"),
             ("USD", "$  Доллар США"),
             ("EUR", "€  Евро"),
+            ("CNY", "¥  Китайский юань"),
+            ("GBP", "£  Британский фунт"),
             ("KZT", "₸  Казахстанский тенге"),
             ("BYN", "Br  Белорусский рубль"),
         ]
-        current = self.page_ref.data.get("_s_currency", "RUB")
-        dd = ft.Dropdown(label="Валюта", value=current, border_color="#6976EB",
-            options=[ft.dropdown.Option(code, label) for code, label in currencies])
+        secondary_options = [ft.dropdown.Option("none", "Нет")] + [
+            ft.dropdown.Option(code, label) for code, label in currencies
+        ]
+
+        user_id = self._ctrl._user_id
+        saved_currency, saved_conv, saved_secondary = get_user_currency(user_id) if user_id else ("RUB", "as_is", None)
+        current = self.page_ref.data.get("_s_currency", saved_currency)
+
+        dd = ft.Dropdown(
+            label="Основная валюта",
+            value=current,
+            border_color="#6976EB",
+            text_style=ft.TextStyle(font_family="Montserrat Medium"),
+            label_style=ft.TextStyle(font_family="Montserrat Medium"),
+            options=[ft.dropdown.Option(code, label) for code, label in currencies],
+        )
+
+        conv_value = self.page_ref.data.get("_s_currency_conv", saved_conv)
+        rg = ft.RadioGroup(
+            value=conv_value,
+            content=ft.Column([
+                ft.Radio(
+                    value="as_is",
+                    label="Оставить суммы как есть",
+                    label_style=ft.TextStyle(font_family="Montserrat Medium", size=13),
+                    active_color="#6976EB",
+                ),
+                ft.Radio(
+                    value="convert",
+                    label="Пересчитать по текущему курсу",
+                    label_style=ft.TextStyle(font_family="Montserrat Medium", size=13),
+                    active_color="#6976EB",
+                ),
+            ], spacing=4, tight=True),
+        )
+
+        conv_section = ft.Column(
+            spacing=6,
+            tight=True,
+            controls=[
+                ft.Text(
+                    "Режим конвертации",
+                    size=13,
+                    color=ft.Colors.with_opacity(0.6, "#000000"),
+                    font_family="Montserrat SemiBold",
+                ),
+                rg,
+            ],
+        )
+
+        current_secondary = self.page_ref.data.get("_s_secondary_currency") or saved_secondary or "none"
+        dd_secondary = ft.Dropdown(
+            label="Вторая валюта (на карточке баланса)",
+            value=current_secondary,
+            border_color="#6976EB",
+            text_style=ft.TextStyle(font_family="Montserrat Medium"),
+            label_style=ft.TextStyle(font_family="Montserrat Medium"),
+            options=secondary_options,
+        )
+
+        def on_dd_change(ev):
+            try:
+                conv_section.update()
+            except Exception:
+                pass
+
+        dd.on_change = on_dd_change
+
         dlg = ft.AlertDialog(modal=True, title=ft.Text("Валюта", font_family="Montserrat SemiBold"))
 
-        def on_cancel(e):
+        def on_cancel(ev):
             _close_dialog(self.page_ref, dlg)
 
-        def on_submit(e):
-            self.page_ref.data["_s_currency"] = dd.value
+        def on_submit(ev):
+            chosen_currency = dd.value or "RUB"
+            chosen_conv = rg.value or "as_is"
+            chosen_secondary = dd_secondary.value if dd_secondary.value and dd_secondary.value != "none" else None
+            self.page_ref.data["_s_currency"] = chosen_currency
+            self.page_ref.data["_s_currency_conv"] = chosen_conv
+            self.page_ref.data["_s_secondary_currency"] = chosen_secondary
+            if user_id:
+                try:
+                    set_user_currency(user_id, chosen_currency, chosen_conv, chosen_secondary)
+                except Exception:
+                    pass
+            if self._currency_subtitle is not None:
+                self._currency_subtitle.value = CURRENCY_LABELS.get(
+                    chosen_currency, CURRENCY_LABELS["RUB"]
+                )
+                try:
+                    self._currency_subtitle.update()
+                except Exception:
+                    pass
             _close_dialog(self.page_ref, dlg)
-            self.page_ref.snack_bar = ft.SnackBar(ft.Text("Валюта сохранена ✓", font_family="Montserrat SemiBold"), open=True)
+            self.page_ref.snack_bar = ft.SnackBar(
+                ft.Text("Валюта сохранена ✓", font_family="Montserrat SemiBold"), open=True
+            )
             self.page_ref.update()
 
-        dlg.content = ft.Column([dd], tight=True)
+        dlg.content = ft.Column(
+            [dd, conv_section, dd_secondary],
+            tight=True,
+            spacing=16,
+            width=300,
+        )
         dlg.actions = [
             ft.TextButton("Отмена", style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_cancel),
             ft.TextButton("Сохранить", style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_submit),
         ]
         _show_dialog(self.page_ref, dlg)
-
+ 
     def _open_telegram_dialog(self, e):
-        import webbrowser
-        bot_username = "FinControlBot"
-        deep_link = "https://t.me/f1nc0ntr0l_bot#"
+        from db_queries import generate_link_token
+        user_id = self._ctrl._user_id
+        if user_id is None:
+            self._show_error("Не удалось получить данные пользователя")
+            return
+
+        try:
+            token = generate_link_token(user_id)
+        except Exception:
+            self._show_error("Не удалось создать ссылку")
+            return
+
+        deep_link = f"https://t.me/F1nC0ntrolBot?start={token}"
         dlg = ft.AlertDialog(modal=True, title=ft.Text("Telegram-бот", font_family="Montserrat SemiBold"))
 
         def on_cancel(e):
             _close_dialog(self.page_ref, dlg)
 
-        def on_open(e):
-            try:
-                webbrowser.open(deep_link)
-            finally:
-                _close_dialog(self.page_ref, dlg)
-
         dlg.content = ft.Column([
-            ft.Text("Открой бота и нажми /start — он привяжется к твоему аккаунту.",
-                    size=13, color=ft.Colors.with_opacity(0.6, "#000000"), font_family="Montserrat SemiBold"),
-            ft.Container(
-                bgcolor="#6976EB", border_radius=10,
-                padding=ft.padding.symmetric(horizontal=12, vertical=10),
-                content=ft.Text(f"@{bot_username}", size=14, color="#000000",
-                                weight=ft.FontWeight.W_600, font_family="Montserrat SemiBold"),
+            ft.Text(
+                "Нажми «Открыть Telegram» — бот автоматически привяжет твой аккаунт.",
+                size=13, color=ft.Colors.with_opacity(0.6, "#000000"), font_family="Montserrat SemiBold",
             ),
-        ], tight=True, spacing=12)
+            ft.Text(
+                "Ссылка действует 15 минут.",
+                size=11, color=ft.Colors.with_opacity(0.4, "#000000"), font_family="Montserrat SemiBold",
+            ),
+        ], tight=True, spacing=8)
         dlg.actions = [
             ft.TextButton("Отмена", style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_cancel),
-            ft.TextButton("Открыть Telegram", style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_open),
+            ft.TextButton("Открыть Telegram", url=deep_link, style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold"))),
         ]
         _show_dialog(self.page_ref, dlg)
-
+ 
     def _confirm_reset(self, e):
         dlg = ft.AlertDialog(modal=True, title=ft.Text("Сбросить данные?", font_family="Montserrat SemiBold"))
 
         def on_cancel(e):
             _close_dialog(self.page_ref, dlg)
-
+ 
         def on_confirm(e):
             try:
                 self._ctrl.reset_data()
@@ -338,13 +628,13 @@ class SettingsPage(BasePage):
                 text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_confirm),
         ]
         _show_dialog(self.page_ref, dlg)
-
+ 
     def _confirm_delete_account(self, e):
         dlg = ft.AlertDialog(modal=True, title=ft.Text("Удалить аккаунт?", font_family="Montserrat SemiBold"))
 
         def on_cancel(e):
             _close_dialog(self.page_ref, dlg)
-
+ 
         def on_confirm(e):
             try:
                 self._ctrl.delete_account()
@@ -355,7 +645,7 @@ class SettingsPage(BasePage):
                 self._show_error("Не удалось удалить аккаунт")
             finally:
                 _close_dialog(self.page_ref, dlg)
-
+ 
         dlg.content = ft.Text(
             "Профиль, транзакции, цели и подписки будут удалены без возможности восстановления.",
             font_family="Montserrat SemiBold", color=ft.Colors.with_opacity(0.6, "#000000"))

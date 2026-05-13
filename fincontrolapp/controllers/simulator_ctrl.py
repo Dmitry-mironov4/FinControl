@@ -4,8 +4,8 @@ SimulatorController — прослойка между SimulatorPage и calculati
 from calculations import sim_purchase, sim_new_subscription, sim_goal_impact, sim_cut_category
 
 
-def _m(v: float) -> str:
-    return f"{v:,.0f} ₽"
+def _m(v: float, sym: str = "₽") -> str:
+    return f"{v:,.0f} {sym}"
 
 def _mo(v: int) -> str:
     return f"{v} мес."
@@ -20,7 +20,7 @@ class SimulatorController:
     # sim_purchase(balance, purchase_amount, days_to_salary, daily_avg_expense)
 
     def simulate_purchase(self, cost, monthly_income, monthly_expenses,
-                          current_savings=0.0):
+                          current_savings=0.0, sym="₽"):
         daily_avg = monthly_expenses / 30
         days_to_salary = 30
         r = sim_purchase(
@@ -35,8 +35,8 @@ class SimulatorController:
             return {
                 "status": "error",
                 "metrics": [
-                    {"label": "Не хватает", "value": _m(cost - current_savings), "tone": "bad"},
-                    {"label": "Текущий баланс", "value": _m(current_savings), "tone": "neutral"},
+                    {"label": "Не хватает", "value": _m(cost - current_savings, sym), "tone": "bad"},
+                    {"label": "Текущий баланс", "value": _m(current_savings, sym), "tone": "neutral"},
                     {"label": r["message"], "value": "—", "tone": "bad"},
                 ],
             }
@@ -52,9 +52,9 @@ class SimulatorController:
         return {
             "status": "ok" if (months_needed is not None and months_needed <= 12) else "warning",
             "metrics": [
-                {"label": "Остаток после покупки", "value": _m(r["remaining_after_purchase"]), "tone": tone},
+                {"label": "Остаток после покупки", "value": _m(r["remaining_after_purchase"], sym), "tone": tone},
                 {"label": "Дней хватит", "value": f"{r['days_covered']} дн." if r["days_covered"] is not None else "—", "tone": tone},
-                {"label": "Свободно в месяц", "value": _m(monthly_free), "tone": "neutral"},
+                {"label": "Свободно в месяц", "value": _m(monthly_free, sym), "tone": "neutral"},
             ],
             "projection": projection,
         }
@@ -63,7 +63,7 @@ class SimulatorController:
     # sim_new_subscription(income, fixed_expenses, current_subs, new_sub_cost)
 
     def simulate_subscription(self, subscription_cost, monthly_income,
-                               monthly_expenses, months=12):
+                               monthly_expenses, months=12, sym="₽"):
         r = sim_new_subscription(
             income=monthly_income,
             fixed_expenses=monthly_expenses,
@@ -78,9 +78,9 @@ class SimulatorController:
         return {
             "status": status,
             "metrics": [
-                {"label": "Свободно сейчас / мес.", "value": _m(r["old_free"]), "tone": "neutral"},
-                {"label": "Свободно с подпиской / мес.", "value": _m(r["new_free"]), "tone": tone_new},
-                {"label": f"Потрачено за {_mo(months)}", "value": _m(total_cost), "tone": "bad"},
+                {"label": "Свободно сейчас / мес.", "value": _m(r["old_free"], sym), "tone": "neutral"},
+                {"label": "Свободно с подпиской / мес.", "value": _m(r["new_free"], sym), "tone": tone_new},
+                {"label": f"Потрачено за {_mo(months)}", "value": _m(total_cost, sym), "tone": "bad"},
                 {"label": "Доля свободных денег", "value": _pct(r["new_rate"] * 100), "tone": tone_new},
             ],
             "projection": projection,
@@ -90,13 +90,13 @@ class SimulatorController:
     # sim_goal_impact(goal_target, current_savings, monthly_savings, purchase_amount)
 
     def simulate_goal(self, goal_amount, monthly_income, monthly_expenses,
-                      current_savings=0.0):
+                      current_savings=0.0, sym="₽"):
         monthly_savings = monthly_income - monthly_expenses
         if monthly_savings <= 0:
             return {
                 "status": "error",
                 "metrics": [
-                    {"label": "Ежемесячный остаток", "value": _m(monthly_savings), "tone": "bad"},
+                    {"label": "Ежемесячный остаток", "value": _m(monthly_savings, sym), "tone": "bad"},
                     {"label": "Цель недостижима — доход ≤ расходов", "value": "—", "tone": "bad"},
                 ],
             }
@@ -118,7 +118,7 @@ class SimulatorController:
             return {
                 "status": "ok",
                 "metrics": [
-                    {"label": "Цель уже достигнута!", "value": _m(current_savings), "tone": "good"},
+                    {"label": "Цель уже достигнута!", "value": _m(current_savings, sym), "tone": "good"},
                     {"label": "Прогресс", "value": _pct(progress_pct), "tone": "good"},
                 ],
             }
@@ -126,7 +126,7 @@ class SimulatorController:
             "status": status,
             "metrics": [
                 {"label": "Срок до цели", "value": _mo(months), "tone": tone},
-                {"label": "Ежемесячный остаток", "value": _m(monthly_savings), "tone": "neutral"},
+                {"label": "Ежемесячный остаток", "value": _m(monthly_savings, sym), "tone": "neutral"},
                 {"label": "Прогресс", "value": _pct(progress_pct), "tone": "neutral"},
             ],
             "projection": projection,
@@ -135,7 +135,7 @@ class SimulatorController:
     # ── Урезать ───────────────────────────────────────────────────────────────
     # sim_cut_category(monthly_expense, category_share, cut_pct, goal_remaining, income)
 
-    def simulate_cut(self, monthly_income, current_expenses, cut_percent, months=12):
+    def simulate_cut(self, monthly_income, current_expenses, cut_percent, months=12, sym="₽"):
         r = sim_cut_category(
             monthly_expense=current_expenses,
             category_share=1.0,
@@ -152,10 +152,10 @@ class SimulatorController:
         return {
             "status": status,
             "metrics": [
-                {"label": "Экономия в месяц", "value": _m(saved_monthly), "tone": "good"},
-                {"label": f"Доп. накопления за {_mo(months)}", "value": _m(saved_monthly * months), "tone": tone},
-                {"label": "Новые расходы / мес.", "value": _m(new_expenses), "tone": "neutral"},
-                {"label": "Свободно после сокращения", "value": _m(new_free), "tone": tone},
+                {"label": "Экономия в месяц", "value": _m(saved_monthly, sym), "tone": "good"},
+                {"label": f"Доп. накопления за {_mo(months)}", "value": _m(saved_monthly * months, sym), "tone": tone},
+                {"label": "Новые расходы / мес.", "value": _m(new_expenses, sym), "tone": "neutral"},
+                {"label": "Свободно после сокращения", "value": _m(new_free, sym), "tone": tone},
             ],
             "projection": projection,
         }

@@ -35,4 +35,4 @@ class ExpensesController:
 
     def delete_transaction(self, transaction_id: int):
         with get_connection() as con:
-            TransactionService(TransactionRepository(con)).delete_transaction(transaction_id)
+            TransactionService(TransactionRepository(con)).delete_transaction(transaction_id, self._user_id)

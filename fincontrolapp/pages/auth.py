@@ -4,6 +4,8 @@ import os
 import threading
 import time
 from database import get_connection
+from components.dialogs import show_dialog as _show_dialog, close_dialog as _close_dialog
+from db_queries import normalize_phone
 
 
 def hash_password(password: str) -> str:
@@ -22,7 +24,7 @@ def verify_password(stored: str, provided: str) -> bool:
         return False
 
 
-# ── Shared style constants ────────────────────────────────────────────────────
+# ── Shared style constants (same as other pages) ─────────────────────────────
 
 _CARD_GRADIENT = ft.LinearGradient(
     colors=["#ffffff", "#88A2FF"],
@@ -276,11 +278,62 @@ class AuthPage(ft.Container):
             border_radius=20,
             border=ft.Border.all(1.5, ft.Colors.with_opacity(0.09, "#6976EB")),
             bgcolor=ft.Colors.with_opacity(0.4, "#6976EB") if active else None,
+            
             on_click=lambda e, v=value: self._set_method(v),
             ink=True,
         )
 
     # ── Handlers ──────────────────────────────────────────────────────────────
+
+    def _open_forgot_dialog(self):
+        from db_queries import get_user_by_contact, request_password_reset
+        contact_field = ft.TextField(
+            label="Email или телефон",
+            border_color="#6976EB", border_radius=12,
+            label_style=ft.TextStyle(font_family="Montserrat SemiBold"),
+            text_style=ft.TextStyle(font_family="Montserrat SemiBold"),
+        )
+        msg = ft.Text("", size=12, font_family="Montserrat SemiBold",
+                      color=ft.Colors.with_opacity(0.6, "#000000"))
+        dlg = ft.AlertDialog(modal=True, title=ft.Text("Восстановление пароля",
+                             font_family="Montserrat SemiBold"))
+
+        def on_cancel(e):
+            _close_dialog(self.page_ref, dlg)
+
+        def on_submit(e):
+            contact = (contact_field.value or "").strip()
+            if not contact:
+                msg.value = "Введите email или телефон"
+                self.page_ref.update()
+                return
+            user = get_user_by_contact(contact)
+            if not user:
+                msg.value = "Аккаунт не найден"
+                self.page_ref.update()
+                return
+            try:
+                ok = request_password_reset(user['id'])
+                if ok:
+                    msg.value = "Временный пароль отправлен в Telegram-бот"
+                    msg.color = "#4CAF50"
+                else:
+                    msg.value = "Привяжи Telegram в настройках — только через него можно восстановить пароль"
+            except Exception:
+                msg.value = "Ошибка при сбросе пароля, попробуй позже"
+            try:
+                msg.update()
+            except Exception:
+                self.page_ref.update()
+
+        dlg.content = ft.Column([contact_field, msg], tight=True, spacing=10, width=300)
+        dlg.actions = [
+            ft.TextButton("Закрыть", style=ft.ButtonStyle(color="#483EB7",
+                text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_cancel),
+            ft.TextButton("Отправить", style=ft.ButtonStyle(color="#483EB7",
+                text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_submit),
+        ]
+        _show_dialog(self.page_ref, dlg)
 
     def _rebuild(self):
         self._error_text = ft.Text(
@@ -324,8 +377,12 @@ class AuthPage(ft.Container):
         else:
             self._login(contact, password)
 
+    _FIELD = {"email": "email", "phone": "phone"}
+
     def _register(self, contact, password):
-        is_email = self._method == 'email'
+        field = self._FIELD[self._method]
+        if self._method == 'phone':
+            contact = normalize_phone(contact)
         with get_connection() as conn:
             field    = "email" if is_email else "phone"
             existing = conn.execute(
@@ -346,8 +403,9 @@ class AuthPage(ft.Container):
         self.on_success(user_id, is_new=True)
 
     def _login(self, contact, password):
-        is_email = self._method == 'email'
-        field    = "email" if is_email else "phone"
+        field = self._FIELD[self._method]
+        if self._method == 'phone':
+            contact = normalize_phone(contact)
         with get_connection() as conn:
             user = conn.execute(
                 f"SELECT id, password_hash FROM users WHERE {field}=?", (contact,)

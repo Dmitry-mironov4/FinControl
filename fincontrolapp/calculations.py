@@ -82,7 +82,7 @@ def sim_purchase(balance: float, purchase_amount: float, days_to_salary: int, da
         shortfall = days_to_salary - days_covered
         message = f" Денег хватит только на {days_covered} дней. До зарплаты не хватит на {shortfall} дней."
     else:
-        message = f" После покупки денег не останется. До зарплаты придётся обходиться без трат."
+        message = f" После покупки денег не останется. До зарплаты придётся обходиться без трат."  # noqa: F541
 
     return {
         "can_afford": True,

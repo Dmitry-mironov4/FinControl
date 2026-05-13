@@ -30,6 +30,7 @@ from flet_charts.bar_chart import BarChartTooltip
 from datetime import datetime
 from database import get_connection
 from components.base_page import BasePage
+from utils import get_currency_symbol
 
 
 MONTH_NAMES = ["Янв", "Фев", "Мар", "Апр", "Май", "Июн",
@@ -73,6 +74,7 @@ def get_monthly_summary(user_id: int, year: int) -> list[dict]:
             (user_id, str(year)),
         ).fetchall()
 
+    # собираем словарь {номер_месяца: данные} из того, что есть в БД
     db_data = {}
     for r in rows:
         db_data[int(r["m"])] = {
@@ -80,6 +82,7 @@ def get_monthly_summary(user_id: int, year: int) -> list[dict]:
             "expense": r["expense"] or 0.0,
         }
 
+    # проходим по всем 12 месяцам — пропущенные получают нули
     result = []
     for month_num in range(1, 13):
         d = db_data.get(month_num, {"income": 0.0, "expense": 0.0})
@@ -89,6 +92,7 @@ def get_monthly_summary(user_id: int, year: int) -> list[dict]:
             "expense": d["expense"],
         })
     return result
+
 
 
 def get_expense_breakdown_by_year(user_id: int, year: int) -> list[dict]:
@@ -126,11 +130,30 @@ def _title(text: str) -> ft.Text:
 
 def _card(content: ft.Control) -> ft.Container:
     return ft.Container(
+feature/new-design
         border=ft.border.all(1.5, ft.Colors.with_opacity(0.06, "#483EB7")),
         bgcolor=ft.Colors.with_opacity(0.2, "#483EB7"),
         border_radius=16,
         padding=20,
         content=content,
+
+def _stub(message: str) -> ft.Container:
+    """Заглушка при недостатке данных."""
+    return ft.Container(
+        height=130,
+        alignment=ft.Alignment(0, 0),
+        content=ft.Column(
+            [
+                ft.Icon(ft.Icons.BAR_CHART_OUTLINED, color="#3A3A50", size=44),
+                ft.Text(
+                    message,
+                    size=13, font_family="Montserrat SemiBold", color="#666677",
+                    text_align=ft.TextAlign.CENTER,
+                ),
+            ],
+            horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+            spacing=10,
+        ),
     )
 
 
@@ -179,6 +202,8 @@ class AnalyticsPage(BasePage):
             elevation=0,
             toolbar_height=50,
         )
+
+    # ── Построение тела ──────────────────────────────────────────────────────
 
     def _build_chart_controls(self) -> list[ft.Control]:
         monthly    = get_monthly_summary(self.user_id, self.selected_year)
@@ -272,10 +297,10 @@ class AnalyticsPage(BasePage):
         savings       = total_income - total_expense
         savings_pct   = round(savings / total_income * 100) if total_income else 0
 
-       
+        sym = get_currency_symbol(self.page_ref)
 
         def fmt(v: float) -> str:
-            return f"{int(v):,}".replace(",", " ") + " ₽"
+            return f"{int(v):,}".replace(",", " ") + f" {sym}"
 
         def tile(label, value, color, icon):
             return ft.Container(
@@ -395,8 +420,23 @@ class AnalyticsPage(BasePage):
             ],
             label_size=32,
         )
+        for i in range(n)
+    ]
 
-        chart_width = max(360, n * (bar_w * 2 + 28))
+     bottom_axis = ChartAxis(
+        labels=[
+            ChartAxisLabel(
+                value=i,
+                label=ft.Text(
+                    months[i],
+                    font_family="Montserrat SemiBold",
+                    size=11,
+                    color=ft.Colors.with_opacity(0.9, "#483EB7"),
+                ),
+            )
+            for i in range(n)
+        ],
+    )
 
         return ft.Column([
             ft.Row(

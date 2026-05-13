@@ -1,4 +1,3 @@
-import json
 import os
 import flet as ft
 from pages import HomePage, TransactionsPage, GoalsPage, SettingsPage, SubscriptionsPage, IncomePage, ExpensesPage, AnalyticsPage, SimulatorPage
@@ -7,44 +6,12 @@ from components import AppTheme
 from controllers import (HomeController, GoalsController, SubscriptionsController,
                          TransactionsController, ExpensesController, IncomeController,
                          SettingsController, SimulatorController)
+from components import show_dialog, close_dialog
 from database import create_tables, get_connection
 from components.dialogs import close_dialog 
 
 
 
-_SESSION_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "session.json")
-
-
-def _save_session(user_id: int):
-    try:
-        with open(_SESSION_FILE, "w") as f:
-            json.dump({"user_id": user_id}, f)
-    except Exception:
-        pass
-
-
-def _load_session() -> int | None:
-    try:
-        with open(_SESSION_FILE) as f:
-            val = json.load(f).get("user_id")
-            return int(val) if val else None
-    except Exception:
-        return None
-
-
-def _clear_session():
-    try:
-        os.remove(_SESSION_FILE)
-    except Exception:
-        pass
-
-
-def _show_dialog(page, dlg):
-    page.show_dialog(dlg)
-
-
-def _close_dialog(page, dlg):
-    page.pop_dialog()
 
 
 def main(page: ft.Page):
@@ -65,6 +32,7 @@ def main(page: ft.Page):
     page.bgcolor = AppTheme.BACKGROUND
     page.padding = 0
     page.data = {}
+    page.data.setdefault("_s_currency", "RUB")
 
     page.theme = ft.Theme(
         color_scheme=ft.ColorScheme(
@@ -90,7 +58,7 @@ def main(page: ft.Page):
 
     def on_auth_success(user_id: int, is_new: bool = False):
         page.data["user_id"] = user_id
-        _save_session(user_id)
+        page.session.store.set("user_id", user_id)
         show_main_app()
         _check_and_add_recurring_income(user_id)  # AUTO-1: автодобавить зарплату, если наступил новый месяц
         _check_and_charge_subscriptions(user_id)  # AUTO-2: списать подписки с charge_day ≤ сегодня
@@ -100,48 +68,68 @@ def main(page: ft.Page):
 
     def _show_initial_balance_dialog(user_id: int):
         from datetime import date
-        from db_queries import add_transaction
-
+        
         amount_field = ft.TextField(
             label="Сумма на счёте",
             text_style=ft.TextStyle(font_family="Montserrat Medium"),
             label_style=ft.TextStyle(font_family="Montserrat Medium"),
+            error_style=ft.TextStyle(font_family="Montserrat Medium", size=10, color="#FF0000"),
             keyboard_type=ft.KeyboardType.NUMBER,
             prefix_icon=ft.Icons.ACCOUNT_BALANCE_WALLET_OUTLINED,
             border_color="#6976EB",
         )
 
-        dlg = ft.AlertDialog(modal=True, title=ft.Text("Начальный баланс",font_family="Montserrat SemiBold"))
+        def _validate_balance(e):
+            v = (amount_field.value or "").replace(" ", "").replace(",", ".").strip()
+            if not v:
+                amount_field.error = None
+            else:
+                try:
+                    amount_field.error = None if float(v) > 0 else "Сумма должна быть больше нуля"
+                except ValueError:
+                    amount_field.error = "Введите число, например: 50000"
+            try:
+                amount_field.update()
+            except Exception:
+                pass
+
+        amount_field.on_change = _validate_balance
+
+        dlg = ft.AlertDialog(modal=True, title=ft.Text("Начальный баланс", font_family="Montserrat SemiBold"))
 
         def on_skip(e):
-            _close_dialog(page, dlg)
+            close_dialog(page, dlg)
 
         def on_submit(e):
             if not user_id:
-                _close_dialog(page, dlg)
+                close_dialog(page, dlg)
                 return
 
-            raw = (amount_field.value or "").replace(" ", "").strip()
+            raw = (amount_field.value or "").replace(" ", "").replace(",", ".").strip()
             if not raw:
-                _close_dialog(page, dlg)
+                amount_field.error = "Введите сумму"
+                try:
+                    amount_field.update()
+                except Exception:
+                    pass
                 return
 
             try:
-                amount = float(raw.replace(",", "."))
+                amount = float(raw)
             except ValueError:
-                _close_dialog(page, dlg)
-                page.show_dialog(ft.SnackBar(
-                    content=ft.Text("Введите корректную сумму", color="#FFFFFF", font_family="Montserrat Medium", size=14),
-                    bgcolor="#F44336",
-                    shape=ft.RoundedRectangleBorder(radius=12),
-                    behavior=ft.SnackBarBehavior.FLOATING,
-                    margin=ft.Margin.only(left=16, right=16, bottom=80),
-                    duration=3000,
-                ))
+                amount_field.error = "Введите число, например: 50000"
+                try:
+                    amount_field.update()
+                except Exception:
+                    pass
                 return
 
             if amount <= 0:
-                _close_dialog(page, dlg)
+                amount_field.error = "Сумма должна быть больше нуля"
+                try:
+                    amount_field.update()
+                except Exception:
+                    pass
                 return
 
             try:
@@ -201,7 +189,7 @@ def main(page: ft.Page):
             ft.TextButton("Пропустить",style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_skip),
             ft.TextButton("Сохранить",style=ft.ButtonStyle(color="#483EB7", text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_submit),
         ]
-        _show_dialog(page, dlg)
+        show_dialog(page, dlg)
 
     def show_auth():
         inner.content = AuthPage(page, on_success=on_auth_success)
@@ -350,18 +338,25 @@ def main(page: ft.Page):
             pages[index].key = str(index) + "_" + str(id(pages[index]))
             content.content = pages[index]
             nav_container.content = build_nav(index)
-            # Обновляем всё сразу
-            page.update()
-            # Только потом перестраиваем данные
-            try:
-                pages[index].rebuild()
-                page.update()
-            except Exception as e:
-                print(f"navigate rebuild error: {e}")
+            nav_container.update()
+
+        uid = page.data["user_id"]
+        pages = {
+            0: HomePage(page, HomeController(uid)),
+            1: AnalyticsPage(page, uid),
+            2: GoalsPage(page, GoalsController(uid)),
+            3: SettingsPage(page, SettingsController(uid)),
+            4: SubscriptionsPage(page, SubscriptionsController(uid)),
+            5: IncomePage(page, IncomeController(uid)),
+            6: ExpensesPage(page, ExpensesController(uid)),
+            7: TransactionsPage(page, TransactionsController(uid)),
+            8: SimulatorPage(page, SimulatorController()),
+        }
 
         def logout():
-            _clear_session()
+            page.session.store.remove("user_id")
             page.data = {}
+            page.data.setdefault("_s_currency", "RUB")
             show_auth()
 
         page.data["navigate"] = navigate
@@ -386,7 +381,7 @@ def main(page: ft.Page):
 
     # ─── СТАРТ ────────────────────────────────────────────────────────────────
 
-    stored_id = _load_session()
+    stored_id = page.session.store.get("user_id") if page.session.store.contains_key("user_id") else None
     if stored_id:
         with get_connection() as conn:
             user = conn.execute("SELECT id FROM users WHERE id=?", (stored_id,)).fetchone()

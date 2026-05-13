@@ -5,6 +5,8 @@ import time
 from components.base_page import BasePage
 from components.dialogs import show_dialog as _show_dialog, close_dialog as _close_dialog
 from components.empty_state import empty_state
+from utils import get_currency_symbol
+
 
 class GoalsPage(BasePage):
     def __init__(self, page, ctrl):
@@ -246,13 +248,13 @@ class GoalsPage(BasePage):
                             alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                             controls=[
                                 ft.Text(
-                                    f"{current:,.0f} ₽",
+                                    f"{current:,.0f} {get_currency_symbol(self.page_ref)}",
                                     size=13,
                                     color="rgba(37, 58, 130, 0.4)",
                                     font_family="Montserrat SemiBold",
                                 ),
                                 ft.Text(
-                                    f"из {target:,.0f} ₽",
+                                    f"из {target:,.0f} {get_currency_symbol(self.page_ref)}",
                                     size=13,
                                     color="rgba(37, 58, 130, 0.4)",
                                     font_family="Montserrat SemiBold",

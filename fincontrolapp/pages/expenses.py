@@ -5,6 +5,8 @@ from components.base_page import BasePage
 from components.dialogs import close_dialog as _close_dialog
 from components.form_utils import parse_amount, parse_date
 from components.empty_state import empty_state
+from utils import get_currency_symbol, input_to_rub, format_amount
+
 
 CATEGORY_ICONS = {
     "Еда": (ft.Icons.RESTAURANT, "#FFC549"),
@@ -351,8 +353,9 @@ class ExpensesPage(BasePage):
             value=str(self._selected_category_id) if self._selected_category_id else (str(_other.id) if _other else None),
             error_style=error_style,
         )
+        _sym = get_currency_symbol(self.page_ref)
         amount_field = ft.TextField(
-            label="Сумма",
+            label=f"Сумма ({_sym})",
             text_style=ft.TextStyle(font_family="Montserrat SemiBold", size=15),
             border_color="#6976EB",
             error_style=error_style,
@@ -448,7 +451,7 @@ class ExpensesPage(BasePage):
 
             try:
                 self._ctrl.add_transaction(
-                    amount=amount,
+                    amount=input_to_rub(amount, self.page_ref),
                     category_id=int(category_dd.value),
                     description=desc_field.value or None,
                     date=str(parsed_date),

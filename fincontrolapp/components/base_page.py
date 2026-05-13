@@ -172,3 +172,4 @@ class BasePage(ft.Container):
     def _current_period_label(self):
         today = date.today()
         return f"{MONTH_NAMES[today.month - 1]} {today.year}"
+

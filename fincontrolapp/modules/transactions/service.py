@@ -11,8 +11,8 @@ class TransactionService:
     def get_transactions(self, user_id, type_=None, category_id=None, limit=None):
         return self.repository.get_transactions(user_id, type_, category_id, limit)
 
-    def delete_transaction(self, transaction_id):
-        self.repository.delete_transaction(transaction_id)
+    def delete_transaction(self, transaction_id, user_id):
+        self.repository.delete_transaction(transaction_id, user_id)
 
     def update_transaction(self, transaction_id, type_, amount, category_id, description, date):
         self.repository.update_transaction(transaction_id, type_, amount, category_id, description, date)
