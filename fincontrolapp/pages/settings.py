@@ -170,9 +170,9 @@ class SettingsPage(BasePage):
         return ft.Container(
             gradient=ft.RadialGradient(
                 colors=["#ffffff", "#88A2FF"],
-                center=ft.Alignment(0.6, -0.2),
-                radius=10.0,
-                stops=[0.0, 0.75],
+                center=ft.Alignment(0.3, 0.9),
+                radius=7.0,
+                stops=[0.0, 0.8],
             ),
             border_radius=12,
             clip_behavior=ft.ClipBehavior.ANTI_ALIAS,
@@ -207,12 +207,7 @@ class SettingsPage(BasePage):
                         font_family="Montserrat SemiBold",
                         weight=ft.FontWeight.W_600,
                     ),
-                    ft.Text(
-                        subtitle,
-                        size=12,
-                        color=ft.Colors.with_opacity(0.6, "#000000"),
-                        font_family="Montserrat SemiBold",
-                    ),
+                    subtitle_widget,
                 ], spacing=2, expand=True),
                 ft.Icon(ft.Icons.CHEVRON_RIGHT,
                         color=ft.Colors.with_opacity(0.45, "#000000"), size=20),

@@ -1,10 +1,8 @@
 import flet as ft
 import os
 import threading
-import time
-from components.base_page import BasePage
-from components.empty_state import empty_state
 from datetime import datetime
+from components.base_page import BasePage
 from utils import get_currency_symbol, format_amount
 
 
@@ -44,74 +42,6 @@ def _find_graph_asset_src() -> str | None:
 
 GRAPH_ASSET_SRC = _find_graph_asset_src()
 
-# ── Skeleton helpers ──────────────────────────────────────────────────────────
-
-_SKEL_COLOR = "rgba(72,62,183,0.10)"
-
-
-def _skel_box(width, height, radius=12) -> ft.Container:
-    return ft.Container(
-        width=width,
-        height=height,
-        border_radius=radius,
-        bgcolor=_SKEL_COLOR,
-    )
-
-
-def _transaction_skel_row() -> ft.Container:
-    return ft.Container(
-        padding=ft.Padding(left=0, right=0, top=12, bottom=12),
-        border=ft.Border(bottom=ft.BorderSide(1, "rgba(72,62,183,0.08)")),
-        content=ft.Row(
-            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-            controls=[
-                ft.Row([
-                    _skel_box(width=36, height=36, radius=18),
-                    ft.Column([
-                        _skel_box(width=100, height=13, radius=6),
-                        _skel_box(width=70,  height=11, radius=6),
-                    ], spacing=5),
-                ], spacing=12),
-                _skel_box(width=70, height=13, radius=6),
-            ],
-        ),
-    )
-
-
-def _skeleton_body() -> ft.Column:
-    return ft.Column(
-        controls=[
-            # Карточка баланса
-            _skel_box(width=float("inf"), height=195, radius=24),
-
-            # Быстрые действия
-            _skel_box(width=160, height=20, radius=8),
-            ft.Row(
-                controls=[_skel_box(width=78, height=88, radius=18) for _ in range(4)],
-                spacing=12,
-            ),
-
-            # График
-            _skel_box(width=120, height=20, radius=8),
-            _skel_box(width=float("inf"), height=180, radius=16),
-
-            # Транзакции
-            _skel_box(width=200, height=20, radius=8),
-            ft.Container(
-                border_radius=16,
-                bgcolor=_SKEL_COLOR,
-                padding=ft.Padding(left=16, right=16, top=4, bottom=4),
-                content=ft.Column(
-                    controls=[_transaction_skel_row() for _ in range(4)],
-                    spacing=0,
-                ),
-            ),
-        ],
-        spacing=20,
-    )
-
-
-# ── Page ──────────────────────────────────────────────────────────────────────
 
 class HomePage(BasePage):
 
@@ -134,50 +64,22 @@ class HomePage(BasePage):
         )
 
     def build_body(self):
-        self._body_container = ft.Container(
-            content=_skeleton_body(),
-            opacity=1,
-            animate_opacity=ft.Animation(400, ft.AnimationCurve.EASE_OUT),
-        )
-        threading.Thread(target=self._load_data, daemon=True).start()
-        return self._body_container
+        balance = self._ctrl.get_balance()
+        monthly = self._ctrl.get_monthly_balance()
+        transactions = self._ctrl.get_recent_transactions(limit=5)
 
-    def _load_data(self):
-        try:
-            balance      = self._ctrl.get_balance()
-            monthly      = self._ctrl.get_monthly_balance()
-            transactions = self._ctrl.get_recent_transactions(limit=5)
-        except Exception:
-            return
-
-        # Fade out скелетон
-        self._body_container.opacity = 0
-        try: self._body_container.update()
-        except: return
-
-        # Собираем реальное содержимое страницы, но рендерим контейнер с opacity=0
-        # и затем плавно показываем его через отдельный поток (fade-in).
-        self._body_container = ft.Container(
-            content=self._real_body(balance, monthly, transactions),
-            opacity=0,
-        )
-
-        def _fade_in():
-            import time
-            time.sleep(0.25)
+        # ── Загрузка настроек валюты из БД ───────────────────────────────────
+        user_id = self._ctrl._user_id
+        if user_id:
             try:
-                self._body_container.opacity = 1
-                self._body_container.update()
+                from db_queries import get_user_currency
+                db_currency, db_conv, db_secondary = get_user_currency(user_id)
+                self.page_ref.data["_s_currency"] = db_currency
+                self.page_ref.data["_s_currency_conv"] = db_conv
+                self.page_ref.data["_s_secondary_currency"] = db_secondary
             except Exception:
                 pass
 
-        threading.Thread(target=_fade_in, daemon=True).start()
-
-        return self._body_container
-
-    # ── Real content ──────────────────────────────────────────────────────────
-
-    def _real_body(self, balance, monthly, transactions) -> ft.Column:
         rub_balance = balance['balance']
         rate_widget = self._build_rate_widget(rub_balance)
         top_block_controls = [self._balance_card(balance, monthly)]
@@ -227,8 +129,7 @@ class HomePage(BasePage):
 
         if GRAPH_ASSET_SRC:
             controls.extend([
-                ft.Text("Графики", size=20,
-                        font_family="Montserrat Semibold", color="#000000"),
+                ft.Text("Графики", size=20, font_family="Montserrat Semibold", color="#000000"),
                 self._graph_svg_preview(),
             ])
 
@@ -240,7 +141,7 @@ class HomePage(BasePage):
                     controls=[
                         ft.Row(
                             alignment=ft.MainAxisAlignment.START,
-                            spacing=8,
+                            spacing = 8,
                             vertical_alignment=ft.CrossAxisAlignment.CENTER,
                             controls=[
                                 ft.Text(
@@ -249,19 +150,21 @@ class HomePage(BasePage):
                                     font_family="Montserrat Semibold",
                                     color="#000000",
                                 ),
+                                # Кнопка «Все →» — явный сигнал, что можно тапнуть
                                 ft.Container(
                                     border_radius=20,
-                                    padding=ft.Padding(left=10, right=10, top=5, bottom=5),
+                                    padding=ft.Padding.symmetric(horizontal=10, vertical=5),
                                     gradient=ft.LinearGradient(
                                         colors=["#ffffff", "#88A2FF"],
-                                        begin=ft.Alignment(-4, -1),
-                                        end=ft.Alignment(1, 7),
+                                        begin=ft.Alignment(-1, -1),
+                                        end=ft.Alignment(1, 1),
                                     ),
                                     content=ft.Row(
                                         spacing=2,
                                         tight=True,
                                         vertical_alignment=ft.CrossAxisAlignment.CENTER,
                                         controls=[
+                                            
                                             ft.Icon(
                                                 ft.Icons.ARROW_FORWARD_IOS_ROUNDED,
                                                 size=16,
@@ -405,15 +308,8 @@ class HomePage(BasePage):
             disp_balance, disp_income, disp_expense = rub_balance, rub_income, rub_expense
 
         return ft.Container(
-            height=190,
+            height=195,
             border_radius=24,
-            padding=24,
-            gradient=ft.LinearGradient(
-                                        colors=["#ffffff", "#88A2FF"],
-                                        begin=ft.Alignment(-1, -1),
-                                        end=ft.Alignment(1, 3),
-                                    ),
-            content=ft.Column(
             clip_behavior=ft.ClipBehavior.HARD_EDGE,
             content=ft.Stack(
                 expand=True,
@@ -425,19 +321,22 @@ class HomePage(BasePage):
                             spacing=7,
                             controls=[
                                 ft.Text(
-                                    "Общий баланс", size=20,
+                                    "Общий баланс",
+                                    size=20,
                                     font_family="Montserrat Semibold",
                                     color="rgba(0,0,0,0.3)",
                                 ),
                                 ft.Text(
                                     f"{disp_balance:,.2f} {symbol}",
                                     font_family="Montserrat Semibold",
-                                    size=36, color="#000000",
+                                    size=36,
+                                    color="#000000",
                                 ),
                                 ft.Row(
                                     controls=[
                                         ft.Container(
-                                            bgcolor="#E3FC87", border_radius=16,
+                                            bgcolor="#E3FC87",
+                                            border_radius=16,
                                             padding=ft.Padding(left=12, right=12, top=8, bottom=8),
                                             content=ft.Row(
                                                 controls=[
@@ -449,11 +348,13 @@ class HomePage(BasePage):
                                                         size=14,
                                                     ),
                                                 ],
-                                                spacing=8, tight=True,
+                                                spacing=4,
+                                                tight=True,
                                             ),
                                         ),
                                         ft.Container(
-                                            bgcolor="#FFEC60", border_radius=16,
+                                            bgcolor="#FFEC60",
+                                            border_radius=16,
                                             padding=ft.Padding(left=12, right=12, top=8, bottom=8),
                                             content=ft.Row(
                                                 controls=[
@@ -465,17 +366,21 @@ class HomePage(BasePage):
                                                         size=14,
                                                     ),
                                                 ],
-                                                spacing=8, tight=True,
+                                                spacing=4,
+                                                tight=True,
                                             ),
                                         ),
                                     ],
-                                    spacing=10, wrap=True, run_spacing=8,
+                                    spacing=8,
+                                    wrap=True,
+                                    run_spacing=8,
                                 ),
                             ],
-                            spacing=15,
                         ),
-                    )
-                
+                    ),
+                ],
+            ),
+        )
 
     def _graph_svg_preview(self):
         return ft.Container(
@@ -483,19 +388,31 @@ class HomePage(BasePage):
             border_radius=16,
             gradient=ft.LinearGradient(
                 colors=["#ffffff", "#88A2FF"],
-                begin=ft.Alignment(-4, -1),
-                end=ft.Alignment(1, 7),
+                begin=ft.Alignment(-1, -1),
+                end=ft.Alignment(1, 1),
             ),
             padding=12,
-            content=ft.Image(src=GRAPH_ASSET_SRC, fit="contain", expand=True),
+            content=ft.Image(src=GRAPH_ASSET_SRC, fit=ft.ImageFit.CONTAIN, expand=True),
         )
 
     def _transactions_list(self, transactions):
         if not transactions:
-            return empty_state(
-                icon=ft.Icons.RECEIPT_LONG_OUTLINED,
-                title="Операций пока нет",
-                subtitle="Добавьте первый доход или расход",
+            return ft.Container(
+                height=80,
+                expand=True,
+                border_radius=16,
+                gradient=ft.LinearGradient(
+                    colors=["#ffffff", "#88A2FF"],
+                    begin=ft.Alignment(-1, -1),
+                    end=ft.Alignment(1, 1),
+                ),
+                alignment=ft.Alignment(0, 0),
+                content=ft.Text(
+                    "Операций пока нет",
+                    color="#000000",
+                    font_family="Montserrat Semibold",
+                    size=14,
+                ),
             )
 
         rows = []
@@ -510,7 +427,8 @@ class HomePage(BasePage):
                         controls=[
                             ft.Row([
                                 ft.Container(
-                                    width=36, height=36, border_radius=18,
+                                    width=36, height=36,
+                                    border_radius=18,
                                     bgcolor=ft.Colors.with_opacity(0.6, "#FFFFFF"),
                                     content=ft.Icon(
                                         ft.Icons.ARROW_UPWARD if is_income else ft.Icons.ARROW_DOWNWARD,
@@ -539,8 +457,8 @@ class HomePage(BasePage):
             border_radius=16,
             gradient=ft.LinearGradient(
                 colors=["#ffffff", "#88A2FF"],
-                begin=ft.Alignment(-4, -1),
-                end=ft.Alignment(1, 7),
+                begin=ft.Alignment(-1, -1),
+                end=ft.Alignment(1, 1),
             ),
             padding=ft.Padding(left=16, right=16, top=4, bottom=4),
             content=ft.Column(rows, spacing=0),
@@ -723,14 +641,35 @@ class HomePage(BasePage):
         return ft.Container(
             border_radius=18,
             padding=10,
-            width=58,
+            width=78,
             on_click=on_click,
             gradient=ft.LinearGradient(
                 colors=["#ffffff", "#88A2FF"],
-                begin=ft.Alignment(-4, -1),
-                end=ft.Alignment(1, 7),
+                begin=ft.Alignment(-1, -1),
+                end=ft.Alignment(1, 1),
             ),
-            content=ft.Icon(icon, color=color, size=28),
-            alignment=ft.Alignment(0, 0),
+            content=ft.Column(
+                controls=[
+                    ft.Container(
+                        width=44,
+                        height=44,
+                        border_radius=14,
+                        bgcolor=color + "33",
+                        content=ft.Icon(icon, color=color, size=26),
+                        alignment=ft.Alignment(0, 0),
+                    ),
+                    ft.Text(
+                        label,
+                        font_family="Montserrat Medium",
+                        size=12,
+                        color="#1a1a1a",
+                        text_align=ft.TextAlign.CENTER,
+                        max_lines=1,
+                        overflow=ft.TextOverflow.ELLIPSIS,
+                    ),
+                ],
+                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
+                spacing=6,
+            ),
             ink=True,
         )

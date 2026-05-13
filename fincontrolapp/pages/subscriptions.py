@@ -3,7 +3,6 @@ import datetime
 from datetime import date
 from components.base_page import BasePage
 from components.dialogs import close_dialog as _close_dialog
-from components.empty_state import empty_state
 from utils import get_currency_symbol
 
 MONTH_SHORT = ["янв", "фев", "мар", "апр", "май", "июн",
@@ -69,8 +68,8 @@ class SubscriptionsPage(BasePage):
                 border_radius=16,
                 gradient=ft.LinearGradient(
                     colors=["#ffffff", "#88A2FF"],
-                    begin=ft.Alignment(-2, -1),
-                    end=ft.Alignment(1, 8),
+                    begin=ft.Alignment(-1, -1),
+                    end=ft.Alignment(1, 1),
                 ),
                 content=ft.Column([
                     ft.Text("Сумма подписок в месяц", size=14,font_family="Montserrat SemiBold", color=ft.Colors.with_opacity(0.8, "#000000")),
@@ -88,7 +87,7 @@ class SubscriptionsPage(BasePage):
                     gradient=ft.RadialGradient(
                         colors=["#ffffff", "#88A2FF"],
                         center=ft.Alignment(0, -0.2),
-                        radius=8.0,
+                        radius=4.0,
                         stops=[0.0, 0.8],
                     ),
                     alignment=ft.Alignment(0, 0),
@@ -104,11 +103,15 @@ class SubscriptionsPage(BasePage):
 
     def _subscriptions_list(self, subscriptions):
         if not subscriptions:
-            return empty_state(
-                icon=ft.Icons.SUBSCRIPTIONS_OUTLINED,
-                title="Подписок нет",
-                subtitle="Добавьте подписки чтобы отслеживать регулярные списания",
-                icon_color="#DB5C0D",
+            return ft.Container(
+                padding=16,
+                border_radius=16,
+                gradient=ft.LinearGradient(
+                    colors=["#ffffff", "#88A2FF"],
+                    begin=ft.Alignment(-1, -1),
+                    end=ft.Alignment(1, 1),
+                ),
+                content=ft.Text("Подписок нет",font_family="Montserrat SemiBold", color=ft.Colors.with_opacity(0.8, "#000000"), size=14),
             )
 
         rows = []
@@ -129,7 +132,7 @@ class SubscriptionsPage(BasePage):
                     alignment=ft.MainAxisAlignment.END,
                     controls=[
                         ft.Icon(ft.Icons.DELETE_OUTLINE, color=ft.Colors.with_opacity(0.8, "#FF7E1C"), size=22),
-                        ft.Text("Удалить", color=ft.Colors.with_opacity(0.8, "#FF7E1C"),font_family="Montserrat SemiBold", size=13),
+                        ft.Text("Удалить", color=ft.Colors.with_opacity(0.8, "#FF7E1C"), size=13),
                     ],
                     spacing=4,
                 ),
@@ -156,8 +159,8 @@ class SubscriptionsPage(BasePage):
                 ) if urgent else ft.Border(),
                 gradient=ft.LinearGradient(
                     colors=["#ffffff", "#88A2FF"],
-                    begin=ft.Alignment(-2, -1),
-                    end=ft.Alignment(1, 8),
+                    begin=ft.Alignment(-1, -1),
+                    end=ft.Alignment(1, 1),
                 ),
                 content=ft.Row(
                     alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
@@ -791,21 +794,18 @@ class SubscriptionsPage(BasePage):
         amount_field = ft.TextField(
             label="Сумма",
             value=str(int(subscription["amount"]) if subscription["amount"] == int(subscription["amount"]) else subscription["amount"]),
-            border_color="#6976EB",
-            text_style=ft.TextStyle(font_family="Montserrat SemiBold", size=15),
+            border_color="#6C63FF",
             error_style=error_style,
         )
         day_field = ft.TextField(
             label="День списания (1–31)",
             value=str(subscription["charge_day"]),
-            border_color="#6976EB",
-            text_style=ft.TextStyle(font_family="Montserrat SemiBold", size=15),
+            border_color="#6C63FF",
             error_style=error_style,
         )
         period_dd = ft.Dropdown(
             label="Период",
-            border_color="#6976EB",
-            text_style=ft.TextStyle(font_family="Montserrat SemiBold", size=15),
+            border_color="#6C63FF",
             options=[
                 ft.dropdown.Option("monthly", "Ежемесячно"),
                 ft.dropdown.Option("yearly", "Ежегодно"),
@@ -817,8 +817,7 @@ class SubscriptionsPage(BasePage):
             label="Дата начала",
             value=subscription["start_date"],
             read_only=True,
-            border_color="#6976EB",
-            text_style=ft.TextStyle(font_family="Montserrat SemiBold", size=15),
+            border_color="#6C63FF",
             suffix_icon=ft.Icons.CALENDAR_MONTH,
             error_style=error_style,
         )

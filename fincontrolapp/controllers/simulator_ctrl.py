@@ -30,14 +30,12 @@ class SimulatorController:
             daily_avg_expense=daily_avg,
         )
         monthly_free = monthly_income - monthly_expenses
-        status = "ok" if r["can_afford"] else "error"
         if not r["can_afford"]:
             return {
                 "status": "error",
                 "metrics": [
                     {"label": "Не хватает", "value": _m(cost - current_savings, sym), "tone": "bad"},
                     {"label": "Текущий баланс", "value": _m(current_savings, sym), "tone": "neutral"},
-                    {"label": r["message"], "value": "—", "tone": "bad"},
                 ],
             }
 
@@ -71,7 +69,6 @@ class SimulatorController:
             new_sub_cost=subscription_cost,
         )
         total_cost = subscription_cost * months
-        free_with = r["new_free"] * months
         status = "error" if r["new_free"] < 0 else ("warning" if r["new_rate"] < 0.1 else "ok")
         tone_new = "bad" if r["new_free"] < 0 else ("warn" if r["new_rate"] < 0.1 else "good")
         projection = [r["old_free"] * i - subscription_cost * i for i in range(1, months + 1)]

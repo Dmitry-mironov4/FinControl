@@ -1,8 +1,6 @@
 import flet as ft
 import hashlib
 import os
-import threading
-import time
 from database import get_connection
 from components.dialogs import show_dialog as _show_dialog, close_dialog as _close_dialog
 from db_queries import normalize_phone
@@ -54,33 +52,12 @@ class AuthPage(ft.Container):
             size=13, font_family="Montserrat SemiBold",
         )
         self.content = self._build()
-        # Запускаем анимацию после сборки UI
-        
-
-    # ── Animation ─────────────────────────────────────────────────────────────
-
-    def _start_animation(self):
-        time.sleep(0.6)
-        self._logo_anim.opacity = 1
-        try: self._logo_anim.update()
-        except: pass
-
-        time.sleep(0.15)
-        self._form_anim.opacity = 1
-        self._form_anim.offset  = ft.Offset(0, 0)
-        try: self._form_anim.update()
-        except: pass
-
-        time.sleep(0.15)
-        self._bottom_anim.opacity = 1
-        try: self._bottom_anim.update()
-        except: pass
 
     # ── Build UI ──────────────────────────────────────────────────────────────
 
     def _build(self):
-        is_email    = self._method == 'email'
-        is_register = self._mode == 'register'
+        is_email     = self._method == 'email'
+        is_register  = self._mode == 'register'
 
         self._contact_field = self._field(
             label="Email" if is_email else "Номер телефона",
@@ -102,142 +79,140 @@ class AuthPage(ft.Container):
         if self._confirm_field:
             fields.append(self._confirm_field)
 
-        # ── Анимированные блоки ───────────────────────────────────────────────
-
-        self._logo_anim = ft.Container(
-            opacity=1,
-            
-            content=ft.Column(
-                horizontal_alignment=ft.CrossAxisAlignment.CENTER,
-                spacing=0,
-                controls=[
-                    ft.Container(
-                        width=80,
-                        border_radius=22,
-                        alignment=ft.Alignment(0, 0),
-                        padding=0,
-                        margin=0,
-                        content=ft.Image(
-                            src="logo.svg",
-                            width=80,
-                            height=80,
-                            fit="contain",
-                        ),
-                    ),
-                    ft.Row(
-                        spacing=0,
-                        tight=True,
-                        controls=[
-                            ft.Text(
-                                "Fin",
-                                size=32,
-                                font_family="Montserrat Extrabold",
-                                color="#6976EB",
-                                weight=ft.FontWeight.W_800,
-                            ),
-                            ft.Text(
-                                "Control",
-                                size=32,
-                                font_family="Montserrat Extrabold",
-                                color="#000000",
-                                weight=ft.FontWeight.W_800,
-                            ),
-                        ],
-                    ),
-                    ft.Text(
-                        "Управляй своими финансами",
-                        size=14,
-                        font_family="Montserrat SemiBold",
-                        color=ft.Colors.with_opacity(0.45, "#000000"),
-                    ),
-                ],
-            ),
-        )
-
-        self._form_anim = ft.Container(
-            opacity=1,
-            offset=ft.Offset(0, 0),
-            
-            content=ft.Container(
-                border_radius=24,
-                padding=20,
-                width=float("inf"),
-                gradient=_CARD_GRADIENT,
-                content=ft.Column([
-                    ft.Text(
-                        "Вход" if self._mode == 'login' else "Регистрация",
-                        size=20,
-                        font_family="Montserrat Semibold",
-                        color="#000000",
-                        weight=ft.FontWeight.W_700,
-                    ),
-                    ft.Container(height=2),
-                    ft.Row([
-                        self._method_chip("Email",   "email"),
-                        self._method_chip("Телефон", "phone"),
-                    ], spacing=8),
-                    ft.Container(height=2),
-                    *fields,
-                    self._error_text,
-                    ft.Container(
-                        width=float("inf"),
-                        height=48,
-                        border_radius=24,
-                        border=ft.Border.all(1.5, ft.Colors.with_opacity(0.09, "#483EB7")),
-                        bgcolor=ft.Colors.with_opacity(0.08, "#483EB7"),
-                        alignment=ft.Alignment(0, 0),
-                        ink=True,
-                        on_click=self._on_submit,
-                        content=ft.Text(
-                            "Войти" if self._mode == 'login' else "Зарегистрироваться",
-                            font_family="Montserrat SemiBold",
-                            size=16,
-                            color="#000000",
-                        ),
-                    ),
-                ], spacing=12),
-            ),
-        )
-
-        self._bottom_anim = ft.Container(
-            opacity=1,
-            
-            content=ft.Row(
-                alignment=ft.MainAxisAlignment.CENTER,
-                controls=[
-                    ft.Text(
-                        "Уже есть аккаунт? " if is_register else "Нет аккаунта? ",
-                        color=ft.Colors.with_opacity(0.5, "#000000"),
-                        size=13,
-                        font_family="Montserrat SemiBold",
-                    ),
-                    ft.GestureDetector(
-                        on_tap=lambda e: self._toggle_mode(),
-                        content=ft.Text(
-                            "Войти" if is_register else "Зарегистрироваться",
-                            size=13,
-                            font_family="Montserrat SemiBold",
-                            color="#6976EB",
-                        ),
-                    ),
-                ],
-            ),
-        )
-
         return ft.Column(
             horizontal_alignment=ft.CrossAxisAlignment.CENTER,
             scroll=ft.ScrollMode.AUTO,
             spacing=0,
             controls=[
-                self._logo_anim,
+                # ── Логотип ──────────────────────────────────────────────────
+                ft.Container(
+                    width=80, 
+                    border_radius=22,
+                    alignment=ft.Alignment(0, 0),
+                    padding=0,
+                    margin=0,
+                    content=ft.Image(
+                             src="logo.svg",   # путь относительно папки assets/
+                             width=80,
+                             height=80,
+                             fit="contain",
+                        ),
+                
+                ),
+                ft.Row(
+                       spacing=0,
+                       tight=True,
+                       controls=[
+                ft.Text(
+                    "Fin",
+                    size=32,
+                    font_family="Montserrat Extrabold",
+                    color="#6976EB",
+                    weight=ft.FontWeight.W_800,
+                ),
+                ft.Text(
+                    "Control",
+                    size=32,
+                    font_family="Montserrat Extrabold",
+                    color="#000000",
+                    weight=ft.FontWeight.W_800,
+                ),
+                       ],
+                ),
+                ft.Text(
+                    "Управляй своими финансами",
+                    size=14,
+                    font_family="Montserrat SemiBold",
+                    color=ft.Colors.with_opacity(0.45, "#000000"),
+                ),
                 ft.Container(height=28),
-                self._form_anim,
-                ft.Container(height=16),
-                self._bottom_anim,
+
+                # ── Карточка формы ───────────────────────────────────────────
+                ft.Container(
+                    border_radius=24,
+                    padding=20,
+                    width=float("inf"),
+                    gradient=_CARD_GRADIENT,
+                    content=ft.Column([
+                        ft.Text(
+                            "Вход" if self._mode == 'login' else "Регистрация",
+                            size=20,
+                            font_family="Montserrat Semibold",
+                            color="#000000",
+                            weight=ft.FontWeight.W_700,
+                        ),
+                        ft.Container(height=2),
+
+                        # Переключатель email / телефон
+                        ft.Row([
+                            self._method_chip("Email",   "email"),
+                            self._method_chip("Телефон", "phone"),
+                        ], spacing=8),
+
+                        ft.Container(height=2),
+                        *fields,
+                        self._error_text,
+
+                        # Кнопка submit
+                        ft.Container(
+                            width=float("inf"),
+                            height=48,
+                            border_radius=24,
+                            border=ft.Border.all(1.5, ft.Colors.with_opacity(0.09, "#483EB7")),
+                            bgcolor=ft.Colors.with_opacity(0.08, "#483EB7"),
+                            alignment=ft.Alignment(0, 0),
+                            ink=True,
+                            on_click=self._on_submit,
+                            content=ft.Text(
+                                "Войти" if self._mode == 'login' else "Зарегистрироваться",
+                                font_family="Montserrat SemiBold",
+                                size=16,
+                                color="#000000",
+                            ),
+                        ),
+                    ], spacing=12),
+                ),
+
+                ft.Container(height=8),
+
+                # Забыл пароль (только в режиме входа)
+                ft.GestureDetector(
+                    on_tap=lambda e: self._open_forgot_dialog(),
+                    content=ft.Text(
+                        "Забыл пароль",
+                        size=13,
+                        font_family="Montserrat SemiBold",
+                        color=ft.Colors.with_opacity(0.5, "#6976EB"),
+                    ),
+                ) if not is_register else ft.Container(height=0),
+
+                ft.Container(height=8),
+
+                # Переключатель login / register
+                ft.Row(
+                    alignment=ft.MainAxisAlignment.CENTER,
+                    controls=[
+                        ft.Text(
+                            "Уже есть аккаунт? " if is_register else "Нет аккаунта? ",
+                            color=ft.Colors.with_opacity(0.5, "#000000"),
+                            size=13,
+                            font_family="Montserrat SemiBold",
+                        ),
+                        ft.GestureDetector(
+                            on_tap=lambda e: self._toggle_mode(),
+                            content=ft.Text(
+                                "Войти" if is_register else "Зарегистрироваться",
+                                size=13,
+                                font_family="Montserrat SemiBold",
+                                color="#6976EB",
+                            ),
+                        ),
+                    ],
+                ),
             ],
         )
 
-    # ── Field factory ─────────────────────────────────────────────────────────
+    # ── Field factory  ───────────────────────────
 
     def _field(self, label: str, icon=None, password: bool = False,
                keyboard=ft.KeyboardType.TEXT) -> ft.TextField:
@@ -263,7 +238,7 @@ class AuthPage(ft.Container):
             ),
         )
 
-    # ── Method chip ───────────────────────────────────────────────────────────
+    # ── Method chip  ────────────
 
     def _method_chip(self, label: str, value: str) -> ft.Container:
         active = self._method == value
@@ -342,8 +317,6 @@ class AuthPage(ft.Container):
         )
         self.content = self._build()
         self.page_ref.update()
-        # Перезапускаем анимацию при смене режима
-       
 
     def _set_method(self, method):
         self._method = method
@@ -384,7 +357,6 @@ class AuthPage(ft.Container):
         if self._method == 'phone':
             contact = normalize_phone(contact)
         with get_connection() as conn:
-            field    = "email" if is_email else "phone"
             existing = conn.execute(
                 f"SELECT id FROM users WHERE {field}=?", (contact,)
             ).fetchone()

@@ -4,7 +4,6 @@ from datetime import date
 from components.base_page import BasePage
 from components.dialogs import close_dialog as _close_dialog
 from components.form_utils import parse_amount, parse_date
-from components.empty_state import empty_state
 from utils import get_currency_symbol, input_to_rub, format_amount, rub_to_display
 
 
@@ -76,7 +75,7 @@ class IncomePage(BasePage):
                     gradient=ft.RadialGradient(
                         colors=["#ffffff", "#88A2FF"],
                         center=ft.Alignment(0, -0.2),
-                        radius=8.0,
+                        radius=4.0,
                         stops=[0.0, 0.8],
                     ),
                     alignment=ft.Alignment(0, 0),
@@ -94,11 +93,11 @@ class IncomePage(BasePage):
         amount_text = format_amount(salary['amount'], self.page_ref) if salary else "Не указана"
         return ft.Container(
             padding=16,
-            border_radius=24,
+            border_radius=16,
             gradient=ft.LinearGradient(
                 colors=["#ffffff", "#88A2FF"],
-                begin=ft.Alignment(-2, -1),
-                end=ft.Alignment(1, 8),
+                begin=ft.Alignment(-1, -1),
+                end=ft.Alignment(1, 1),
             ),
             content=ft.Column([
                 ft.Row([
@@ -133,98 +132,123 @@ class IncomePage(BasePage):
         )
 
     def _income_list(self, incomes):
-     if not incomes:
-        return empty_state(
-            icon=ft.Icons.SAVINGS_OUTLINED,
-            title="Нет дополнительных доходов",
-            subtitle="Нажмите «Добавить доход» чтобы записать поступление",
-        )
+        if not incomes:
+            return ft.Container(
+                padding=16,
+                border_radius=16,
+                gradient=ft.LinearGradient(
+                    colors=["#ffffff", "#88A2FF"],
+                    begin=ft.Alignment(-1, -1),
+                    end=ft.Alignment(1, 1),
+                ),
+                content=ft.Text(
+                    "Нет записей",
+                    font_family="Montserrat SemiBold",
+                    color=ft.Colors.with_opacity(0.8, "#000000"),
+                    size=14,
+                ),
+            )
 
-     rows = []
-     for i, t in enumerate(incomes):
-        is_last = i == len(incomes) - 1
+        rows = []
+        for i, t in enumerate(incomes):
+            is_last = i == len(incomes) - 1
 
-        row_content = ft.Container(
-            padding=ft.Padding(left=16, right=8, top=10, bottom=10),
-            # Разделитель снизу — как в HomePage, но не у последнего элемента
-            border=ft.Border(
-                bottom=ft.BorderSide(1, "#E0E0E0") if not is_last else ft.BorderSide(0)
-            ),
-            content=ft.Row([
-    ft.Column([
-        ft.Text(
-            t["category_name"],
-            size=14,
-            color="#000000",
-            font_family="Montserrat SemiBold",
-            weight=ft.FontWeight.W_500,
-        ),
-        ft.Text(
-            t["description"] or t["date"],
-            font_family="Montserrat SemiBold",
-            size=12,
-            color=ft.Colors.with_opacity(0.6, "#000000"),
-        ),
-    ], spacing=2, expand=True),
-    ft.Row([
-        ft.Text(
-            f"+ {t['amount']:,.0f} ₽",
-            color="#483EB7",
-            size=14,
-            font_family="Montserrat SemiBold",
-            weight=ft.FontWeight.W_600,
-        ),
-        ft.IconButton(
-            ft.Icons.EDIT_OUTLINED,
-            icon_color=ft.Colors.with_opacity(0.6, "#000000"),
-            icon_size=18,
-            on_click=lambda e, tr=t: self._open_edit_dialog(tr),
-        ),
-        ft.IconButton(
-            ft.Icons.DELETE_OUTLINE,
-            icon_color=ft.Colors.with_opacity(0.6, "#000000"),
-            icon_size=18,
-            on_click=lambda e, tid=t["id"], cat=t["category_name"]: (
-                self._confirm_delete(tid, cat)
-            ),
-        ),
-    ], spacing=0),
-], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
-        )
+            row_content = ft.Container(
+                padding=ft.Padding(left=16, right=8, top=10, bottom=10),
+                # Разделитель снизу — как в HomePage, но не у последнего элемента
+                border=ft.Border(
+                    bottom=ft.BorderSide(1, "#E0E0E0") if not is_last else ft.BorderSide(0)
+                ),
+                content=ft.Row(
+                    [
+                        ft.Column(
+                            [
+                                ft.Text(
+                                    t["category_name"],
+                                    size=14,
+                                    color="#000000",
+                                    font_family="Montserrat SemiBold",
+                                    weight=ft.FontWeight.W_500,
+                                ),
+                                ft.Text(
+                                    t["description"] or t["date"],
+                                    font_family="Montserrat SemiBold",
+                                    size=12,
+                                    color=ft.Colors.with_opacity(0.6, "#000000"),
+                                ),
+                            ],
+                            spacing=2,
+                            expand=True,
+                        ),
+                        ft.Row(
+                            [
+                                ft.Text(
+                                    format_amount(t['amount'], self.page_ref, "+ "),
+                                    color="#483EB7",
+                                    size=14,
+                                    font_family="Montserrat SemiBold",
+                                    weight=ft.FontWeight.W_600,
+                                ),
+                                ft.IconButton(
+                                    ft.Icons.EDIT_OUTLINED,
+                                    icon_color=ft.Colors.with_opacity(0.6, "#000000"),
+                                    icon_size=18,
+                                    on_click=lambda e, tr=t: self._open_edit_dialog(tr),
+                                ),
+                                ft.IconButton(
+                                    ft.Icons.DELETE_OUTLINE,
+                                    icon_color=ft.Colors.with_opacity(0.6, "#000000"),
+                                    icon_size=18,
+                                    on_click=lambda e, tid=t["id"], cat=t["category_name"]: (
+                                        self._confirm_delete(tid, cat)
+                                    ),
+                                ),
+                            ],
+                            spacing=0,
+                        ),
+                    ],
+                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                ),
+            )
 
-        # Свайп для удаления сохраняем
-        delete_bg = ft.Container(
-            border_radius=16,
-            padding=ft.Padding.only(right=16),
-            alignment=ft.Alignment(1, 0),
-            bgcolor=ft.Colors.TRANSPARENT,
-            content=ft.Row(
-                alignment=ft.MainAxisAlignment.END,
-                controls=[
-                    ft.Icon(ft.Icons.DELETE_OUTLINE,
-                            color=ft.Colors.with_opacity(0.8, "#FF7E1C"), size=22),
-                    ft.Text("Удалить",
-                            color=ft.Colors.with_opacity(0.8, "#FF7E1C"),font_family="Montserrat SemiBold", size=13),
-                ],
-                spacing=4,
-            ),
-            visible=False,
-        )
+            # Свайп для удаления сохраняем
+            delete_bg = ft.Container(
+                border_radius=16,
+                padding=ft.Padding.only(right=16),
+                alignment=ft.Alignment(1, 0),
+                bgcolor=ft.Colors.TRANSPARENT,
+                content=ft.Row(
+                    alignment=ft.MainAxisAlignment.END,
+                    controls=[
+                        ft.Icon(
+                            ft.Icons.DELETE_OUTLINE,
+                            color=ft.Colors.with_opacity(0.8, "#FF7E1C"),
+                            size=22,
+                        ),
+                        ft.Text(
+                            "Удалить",
+                            color=ft.Colors.with_opacity(0.8, "#FF7E1C"),
+                            size=13,
+                        ),
+                    ],
+                    spacing=4,
+                ),
+                visible=False,
+            )
 
-        stack = ft.Container(
-            bgcolor=ft.Colors.TRANSPARENT,
-            border=ft.Border(),
-            content=ft.Stack(
-                controls=[delete_bg, row_content],
-                clip_behavior=ft.ClipBehavior.HARD_EDGE,
-            ),
-        )
+            stack = ft.Container(
+                bgcolor=ft.Colors.TRANSPARENT,
+                content=ft.Stack(
+                    controls=[delete_bg, row_content],
+                    clip_behavior=ft.ClipBehavior.HARD_EDGE,
+                ),
+            )
 
-        swipe = {"start_x": 0.0, "last_x": 0.0}
+            swipe = {"start_x": 0.0, "last_x": 0.0}
 
-        def on_pan_start(e, sw=swipe):
-            sw["start_x"] = e.local_position.x
-            sw["last_x"] = e.local_position.x
+            def on_pan_start(e, sw=swipe):
+                sw["start_x"] = e.local_position.x
+                sw["last_x"] = e.local_position.x
 
             def on_pan_update(e, cc=row_content, db=delete_bg, sw=swipe):
                 sw["last_x"] = e.local_position.x
@@ -249,40 +273,29 @@ class IncomePage(BasePage):
                     self._confirm_delete(tid, cat)
                 cc.offset = ft.Offset(0, 0)
                 cc.update()
-                if db.visible:
-                    db.visible = False
-                    db.update()
+                db.visible = False
+                db.update()
 
-        def on_pan_end(e, cc=row_content, db=delete_bg, sw=swipe,
-                       tid=t["id"], cat=t["category_name"]):
-            delta = sw["last_x"] - sw["start_x"]
-            if delta < -80:
-                self._confirm_delete(tid, cat)
-            cc.offset = ft.Offset(0, 0)
-            cc.update()
-            db.visible = False
-            db.update()
-
-        rows.append(
-            ft.GestureDetector(
-                on_pan_start=on_pan_start,
-                on_pan_update=on_pan_update,
-                on_pan_end=on_pan_end,
-                content=stack,
+            rows.append(
+                ft.GestureDetector(
+                    on_pan_start=on_pan_start,
+                    on_pan_update=on_pan_update,
+                    on_pan_end=on_pan_end,
+                    content=stack,
+                )
             )
-        )
 
-    # Все строки внутри одного градиентного контейнера — как в HomePage
-     return ft.Container(
-        border_radius=24,
-        gradient=ft.LinearGradient(
-            colors=["#ffffff", "#88A2FF"],
-            begin=ft.Alignment(-2, -1),
-            end=ft.Alignment(1, 8),
-        ),
-        padding=ft.Padding(left=0, right=0, top=4, bottom=4),
-        content=ft.Column(rows, spacing=0),
-    )
+        # Все строки внутри одного градиентного контейнера — как в HomePage
+        return ft.Container(
+            border_radius=16,
+            gradient=ft.LinearGradient(
+                colors=["#ffffff", "#88A2FF"],
+                begin=ft.Alignment(-1, -1),
+                end=ft.Alignment(1, 1),
+            ),
+            padding=ft.Padding(left=0, right=0, top=4, bottom=4),
+            content=ft.Column(rows, spacing=0),
+        )
 
     def _confirm_delete(self, transaction_id, category_name):
         page = self.page_ref
@@ -621,7 +634,7 @@ class IncomePage(BasePage):
             error_style=error_style,
         )
         desc_field = ft.TextField(
-            label="Описание (необязательно)", 
+            label="Описание (необязательно)",
             border_color="#6976EB", text_style=ft.TextStyle(font_family="Montserrat SemiBold", size=10),
         )
         date_field = self._make_date_field("Дата", date.today().strftime("%d.%m.%Y"))
@@ -913,14 +926,13 @@ class IncomePage(BasePage):
         amount_field = ft.TextField(
             label="Сумма",
             value=str(int(transaction["amount"]) if transaction["amount"] == int(transaction["amount"]) else transaction["amount"]),
-            text_style=ft.TextStyle(font_family="Montserrat SemiBold", size=15),
-            border_color="#6976EB",
+            border_color="#6C63FF",
             error_style=error_style,
         )
         desc_field = ft.TextField(
             label="Описание (необязательно)",
             value=transaction["description"] or "",
-            border_color="#6976EB", text_style=ft.TextStyle(font_family="Montserrat SemiBold", size=15),
+            border_color="#6C63FF",
         )
         date_field = self._make_date_field(
             "Дата",
