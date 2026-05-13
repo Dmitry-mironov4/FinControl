@@ -4,6 +4,7 @@ from datetime import date
 from components.base_page import BasePage
 from components.dialogs import close_dialog as _close_dialog
 from components.form_utils import parse_amount, parse_date
+from components.empty_state import empty_state
 from utils import get_currency_symbol, input_to_rub, format_amount
 
 
@@ -14,6 +15,8 @@ CATEGORY_ICONS = {
     "Покупки": (ft.Icons.SHOPPING_BAG, "#FF7684"),
     "Развлечения": (ft.Icons.SPORTS_ESPORTS, "#00B487"),
     "Жильё": (ft.Icons.HOME, "#6DD0F0"),
+    "Подписки": (ft.Icons.SUBSCRIPTIONS_OUTLINED, "#DB5C0D"),
+    "Накопления": (ft.Icons.MONETIZATION_ON_OUTLINED, "#F9F522"),
     "Образование": (ft.Icons.SCHOOL, "#775Aff"),
     "Другое": (ft.Icons.MORE_HORIZ, "#000000"),
 }
@@ -93,7 +96,7 @@ class ExpensesPage(BasePage):
                     gradient=ft.RadialGradient(
                         colors=["#ffffff", "#88A2FF"],
                         center=ft.Alignment(0, -0.2),
-                        radius=4.0,
+                        radius=8.0,
                         stops=[0.0, 0.8],
                     ),
                     alignment=ft.Alignment(0, 0),
@@ -119,7 +122,7 @@ class ExpensesPage(BasePage):
         radius=7.0,
         stops=[0.0, 0.8],
     ) if not active else None,
-    bgcolor="#88A2FF" if active else None,
+    bgcolor=ft.Colors.with_opacity(0.3,"#88A2FF") if active else None,
     border_radius=12, padding=8, ink=True,
     on_click=lambda e, c=category: self._set_filter(c.id, c.name),
     content=ft.Column([
@@ -141,15 +144,11 @@ class ExpensesPage(BasePage):
 
     def _expense_list(self, expenses):
         if not expenses:
-            return ft.Container(
-                                padding=16,
-                border_radius=16,
-                gradient=ft.LinearGradient(
-                    colors=["#ffffff", "#88A2FF"],
-                    begin=ft.Alignment(-1, -1),
-                    end=ft.Alignment(1, 1),
-                ),
-                content=ft.Text("Нет записей", font_family="Montserrat SemiBold", color=ft.Colors.with_opacity(0.8, "#000000"), size=14),
+            return empty_state(
+                icon=ft.Icons.SHOPPING_CART_OUTLINED,
+                title="Нет расходов за этот период",
+                subtitle="Нажмите «Добавить расход» чтобы начать отслеживать траты",
+                icon_color="#FF7E1C",
             )
 
         rows = []
@@ -167,7 +166,7 @@ class ExpensesPage(BasePage):
                     alignment=ft.MainAxisAlignment.END,
                     controls=[
                         ft.Icon(ft.Icons.DELETE_OUTLINE, color=ft.Colors.with_opacity(0.8, "#FF7E1C"), size=22),
-                        ft.Text("Удалить", color=ft.Colors.with_opacity(0.8, "#FF7E1C"), size=13),
+                        ft.Text("Удалить", color=ft.Colors.with_opacity(0.8, "#FF7E1C"), font_family="Montserrat SemiBold", size=13),
                     ],
                     spacing=4,
                 ),
@@ -176,13 +175,13 @@ class ExpensesPage(BasePage):
 
             row_content = ft.Container(
                 padding=ft.Padding.only(left=16, right=8, top=10, bottom=10),
-                border_radius=16,
+                border_radius=24,
                 shadow=None,
                 border=ft.Border(),
                 gradient=ft.LinearGradient(
                     colors=["#ffffff", "#88A2FF"],
-                    begin=ft.Alignment(-1, -1),
-                    end=ft.Alignment(1, 1),
+                    begin=ft.Alignment(-2, -1),
+                    end=ft.Alignment(1, 10),
                 ),
                 content=ft.Row(
                     alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
@@ -203,7 +202,7 @@ class ExpensesPage(BasePage):
                         ], spacing=12, expand=True),
                         ft.Row([
                             ft.Text(
-                                format_amount(t['amount'], self.page_ref, "− "),
+                                f"− {t['amount']:,.0f} ₽",
                                 color="#483EB7", size=14,font_family="Montserrat SemiBold",
                                 weight=ft.FontWeight.W_600,
                             ),

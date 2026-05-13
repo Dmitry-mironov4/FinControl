@@ -1,5 +1,3 @@
-
-#sim
 import math
 
 def savings_rate(income, expense):

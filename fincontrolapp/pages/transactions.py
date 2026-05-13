@@ -46,24 +46,33 @@ class TransactionsPage(BasePage):
         return ft.Column([
             self._filter_row(),
             self._transactions_list(transactions),
+        ], spacing=16)
+
+    # ── Фильтр ──────────────────────────────────────────────────────────────
+
+    def _filter_row(self):
+         filters = [("Все", None), ("Пополнение", "income"), ("Траты", "expense")]
+         buttons = []
+         for label, value in filters:
+             active = self._filter == value
+             buttons.append(
             ft.GestureDetector(
-                on_tap=self._open_add_dialog,
+                on_tap=lambda e, v=value: self._set_filter(v),
                 content=ft.Container(
-                    width=float("inf"),
-                    height=48,
-                    border_radius=12,
+                    padding=ft.Padding.only(left=20, right=20, top=9, bottom=9),
+                    border_radius=24,
                     gradient=ft.RadialGradient(
-                        colors=["#ffffff", "#6C63FF"],
+                        colors=["#ffffff", "#88A2FF"],
                         center=ft.Alignment(0, -0.2),
-                        radius=4.0,
+                        radius=8.0,
                         stops=[0.0, 0.8],
-                    ),
-                    alignment=ft.Alignment(0, 0),
+                    ) if active else None,
+                    bgcolor=ft.Colors.with_opacity(0.07, "#483EB7") if not active else None,
                     content=ft.Text(
-                        "＋ Добавить",
-                        color=ft.Colors.BLACK,
-                        font_family="Montserrat SemiBold",
+                        label,
                         size=16,
+                        font_family="Montserrat SemiBold",
+                        color="#253A82" if active else ft.Colors.with_opacity(0.5, "#253A82"),
                     ),
                 ),
             ),
@@ -105,7 +114,7 @@ class TransactionsPage(BasePage):
                 gradient=ft.LinearGradient(
                     colors=["#ffffff", "#88A2FF"],
                     begin=ft.Alignment(-1, -1),
-                    end=ft.Alignment(5, 5),
+                    end=ft.Alignment(5, 8),
                 ),
                 padding=ft.Padding.only(left=4, right=4, top=4, bottom=4),
                 content=ft.Row(buttons, spacing=4, tight=True),
@@ -198,8 +207,8 @@ class TransactionsPage(BasePage):
                 padding=24,
                 gradient=ft.LinearGradient(
                     colors=["#ffffff", "#88A2FF"],
-                    begin=ft.Alignment(-1, -1),
-                    end=ft.Alignment(1, 1),
+                    begin=ft.Alignment(-2, -1),
+                    end=ft.Alignment(1, 8),
                 ),
                 content=ft.Column([
                     ft.Icon(
@@ -217,7 +226,7 @@ class TransactionsPage(BasePage):
                 ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=8),
             )
 
-        # Группируем по дате (сохраняем порядок)
+        # Группируем по дате 
         groups: OrderedDict = OrderedDict()
         for t in transactions:
             groups.setdefault(t["date"], []).append(t)
@@ -273,12 +282,12 @@ class TransactionsPage(BasePage):
 
                 row_content = ft.Container(
                     padding=ft.Padding.only(left=12, right=8, top=10, bottom=10),
-                    border_radius=12,
+                    border_radius=24,
                     border=ft.Border(),
                     gradient=ft.LinearGradient(
                         colors=["#ffffff", "#88A2FF"],
                         begin=ft.Alignment(-2, -2),
-                        end=ft.Alignment(2, 3),
+                        end=ft.Alignment(2, 8),
                     ),
                     content=ft.Row(
                         alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
@@ -445,7 +454,6 @@ class TransactionsPage(BasePage):
 
         date_field.on_click = open_date_picker
 
-        # Валидация on_change
         def validate_amount(e):
             v = (amount_field.value or "").replace(",", ".")
             if not v:
@@ -490,7 +498,6 @@ class TransactionsPage(BasePage):
         def on_submit(e):
             category_dd.error = None
             amount_field.error = None
-            date_field.error = None
 
             if not category_dd.value:
                 category_dd.error = "Выберите категорию"
@@ -505,8 +512,6 @@ class TransactionsPage(BasePage):
                         amount_field.error = "Сумма должна быть больше нуля"
                 except ValueError:
                     amount_field.error = "Введите число, например: 500"
-
-            parsed_date = parse_date(date_field.value)
 
             if any(f.error for f in (category_dd, amount_field)):
                 category_dd.update()
@@ -524,7 +529,7 @@ class TransactionsPage(BasePage):
                     date=str(parsed_date),
                 )
             except Exception:
-                self._show_error("Не удалось добавить транзакцию", close_bs=bs)
+                self._show_error("Не удалось добавить транзакцию")
                 return
             bs.open = False
             self.page.update()
@@ -532,51 +537,22 @@ class TransactionsPage(BasePage):
             self._show_success("Транзакция добавлена")
 
         bs.content = ft.Container(
-            padding=ft.Padding.only(left=20, right=20, top=16, bottom=16),
+            padding=ft.Padding.only(left=20, right=20, top=24, bottom=32),
             content=ft.Column(
-                tight=True,
-                spacing=8,
-                scroll=ft.ScrollMode.AUTO,
+                tight=True, spacing=16, scroll=ft.ScrollMode.AUTO,
                 controls=[
-                    ft.Row(
-                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                        controls=[
-                            ft.Text(
-                                "Добавить транзакцию",
-                                color="#000000",
-                                font_family="Montserrat SemiBold",
-                                size=24,
-                            ),
-                        ],
-                    ),
-                    type_field,
-                    category_dd,
-                    amount_field,
-                    desc_field,
-                    date_field,
+                    ft.Text("Добавить транзакцию", color="#000000",
+                            font_family="Montserrat SemiBold", size=24),
+                    type_field, category_dd, amount_field, desc_field, date_field,
                     ft.Row(
                         alignment=ft.MainAxisAlignment.END,
                         controls=[
-                            ft.TextButton(
-                                "Отмена",
-                                on_click=on_cancel,
-                                style=ft.ButtonStyle(
-                                    color="#483EB7",
-                                    text_style=ft.TextStyle(
-                                        font_family="Montserrat SemiBold", size=14
-                                    ),
-                                ),
-                            ),
-                            ft.TextButton(
-                                "Добавить",
-                                on_click=on_submit,
-                                style=ft.ButtonStyle(
-                                    color="#483EB7",
-                                    text_style=ft.TextStyle(
-                                        font_family="Montserrat SemiBold", size=14
-                                    ),
-                                ),
-                            ),
+                            ft.TextButton("Отмена", on_click=on_cancel,
+                                style=ft.ButtonStyle(color="#483EB7",
+                                    text_style=ft.TextStyle(font_family="Montserrat SemiBold", size=14))),
+                            ft.TextButton("Добавить", on_click=on_submit,
+                                style=ft.ButtonStyle(color="#483EB7",
+                                    text_style=ft.TextStyle(font_family="Montserrat SemiBold", size=14))),
                         ],
                     ),
                 ],
@@ -587,14 +563,13 @@ class TransactionsPage(BasePage):
         bs.open = True
         self.page.update()
 
+    # ── Редактирование ────────────────────────────────────────────────────────
+
     def _open_edit_dialog(self, transaction):
         error_style = ft.TextStyle(
-            font_family="Montserrat Medium",
-            size=10,
-            color="#FF0000",
+            font_family="Montserrat Medium", size=10, color="#FF0000"
         )
 
-        # Форматируем дату из ISO (YYYY-MM-DD) в DD.MM.YYYY для отображения
         raw_date = transaction["date"]
         try:
             d = datetime.datetime.strptime(raw_date, "%Y-%m-%d").date()
@@ -603,8 +578,7 @@ class TransactionsPage(BasePage):
             display_date = raw_date
 
         type_field = ft.Dropdown(
-            label="Тип",
-            border_color="#6C63FF",
+            label="Тип", border_color="#6976EB",
             options=[
                 ft.dropdown.Option("income", "Доход"),
                 ft.dropdown.Option("expense", "Расход"),
@@ -612,29 +586,29 @@ class TransactionsPage(BasePage):
             value=transaction["type"],
         )
         category_dd = ft.Dropdown(
-            label="Категория",
-            border_color="#6C63FF",
-            options=[],
-            error_style=error_style,
+            label="Категория", border_color="#6976EB",
+            options=[], error_style=error_style,
         )
         amount_field = ft.TextField(
             label="Сумма",
-            value=str(int(transaction["amount"]) if transaction["amount"] == int(transaction["amount"]) else transaction["amount"]),
-            border_color="#6C63FF",
+            value=str(int(transaction["amount"])
+                      if transaction["amount"] == int(transaction["amount"])
+                      else transaction["amount"]),
+            border_color="#6976EB",
+            text_style=ft.TextStyle(font_family="Montserrat SemiBold", size=15),
             error_style=error_style,
         )
         desc_field = ft.TextField(
             label="Описание (необязательно)",
             value=transaction["description"] or "",
-            border_color="#6C63FF",
+            border_color="#6976EB",
+            text_style=ft.TextStyle(font_family="Montserrat SemiBold", size=15),
         )
         date_field = ft.TextField(
-            label="Дата",
-            value=display_date,
-            read_only=True,
-            border_color="#6C63FF",
+            label="Дата", value=display_date,
+            read_only=True, border_color="#6976EB",
+            text_style=ft.TextStyle(font_family="Montserrat SemiBold", size=15),
             suffix_icon=ft.Icons.CALENDAR_MONTH,
-            error_style=error_style,
         )
 
         def on_date_selected(e):
@@ -719,12 +693,12 @@ class TransactionsPage(BasePage):
                 except ValueError:
                     amount_field.error = "Введите число, например: 500"
 
-            parsed_date = parse_date(date_field.value)
-
             if any(f.error for f in (category_dd, amount_field)):
                 category_dd.update()
                 amount_field.update()
                 return
+
+            parsed_date = parse_date(date_field.value)
 
             try:
                 self._ctrl.update_transaction(
@@ -736,7 +710,7 @@ class TransactionsPage(BasePage):
                     date=str(parsed_date),
                 )
             except Exception:
-                self._show_error("Не удалось сохранить транзакцию", close_bs=bs)
+                self._show_error("Не удалось сохранить транзакцию")
                 return
             bs.open = False
             self.page.update()
