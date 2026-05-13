@@ -1,8 +1,19 @@
-import sqlite3
 import os
+import platform
+import sqlite3
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, 'database.db')
+
+
+def get_db_path():
+    db_name = 'database.db'
+    if platform.system() == 'Darwin' and os.environ.get('FLUTTER_INITIALIZED') == 'true':
+        documents_dir = os.path.expanduser('~/Documents')
+        return os.path.join(documents_dir, db_name)
+    return os.path.join(BASE_DIR, db_name)
+
+
+DB_PATH = get_db_path()
 
 
 def get_connection():

@@ -9,7 +9,6 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from bot.utils.formatters import fmt_amount
 from fincontrolapp.db_queries import (
-    get_all_linked_users,
     get_subscriptions,
     get_goals,
     get_monthly_stats,
@@ -23,10 +22,7 @@ from fincontrolapp.db_queries import (
 from bot.handlers.purchase_timer import make_decision_keyboard
 
 logger = logging.getLogger(__name__)
-
-
-def _next_charge_date(charge_day: int) -> datetime.date:
-    today = datetime.date.today()
+def _next_charge_date(charge_day: int, today: datetime.date) -> datetime.date:
     last_day = calendar.monthrange(today.year, today.month)[1]
     day = min(charge_day, last_day)
     candidate = today.replace(day=day)
@@ -55,7 +51,7 @@ async def _notify_user(bot: Bot, user: dict) -> None:
     # 1. Подписки, которые спишутся завтра
     if prefs["notify_subscriptions"]:
         subs = get_subscriptions(user_id)
-        due_subs = [s for s in subs if _next_charge_date(s["charge_day"]) == tomorrow]
+        due_subs = [s for s in subs if _next_charge_date(s["charge_day"], today) == tomorrow]
         if due_subs:
             lines = ["💳 Завтра спишется:"]
             total = 0.0

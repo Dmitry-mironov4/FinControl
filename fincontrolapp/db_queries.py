@@ -2,17 +2,11 @@ from datetime import date, datetime, timedelta
 import calendar
 import re
 import secrets
-import sqlite3
-import os
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, 'database.db')
-
-
-def get_connection():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row  # доступ к полям по имени: row['amount']
-    return conn
+try:
+    from fincontrolapp.database import DB_PATH, create_tables as _create_tables, get_connection as _get_connection
+except ImportError:
+    from database import DB_PATH, create_tables as _create_tables, get_connection as _get_connection
 
 
 def normalize_phone(phone: str) -> str:
@@ -25,165 +19,12 @@ def normalize_phone(phone: str) -> str:
     return '+' + digits if digits else phone
 
 
+def get_connection():
+    return _get_connection()
+
+
 def create_tables():
-    conn = get_connection()
-    cursor = conn.cursor()
-
-    # пользователи
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            telegram_id INTEGER UNIQUE,
-            email TEXT UNIQUE,
-            phone TEXT UNIQUE,
-            username TEXT,
-            password_hash TEXT,
-            notification_hour INTEGER DEFAULT 9,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        )
-    ''')
-
-    # категории доходов и расходов
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS categories (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL,
-            type TEXT NOT NULL CHECK(type IN ('income', 'expense'))
-        )
-    ''')
-
-    # транзакции (доходы и расходы)
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS transactions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            type TEXT NOT NULL CHECK(type IN ('income', 'expense')),
-            amount DECIMAL(10,2) NOT NULL,
-            category_id INTEGER NOT NULL,
-            description TEXT,
-            date DATE NOT NULL,
-            is_recurring INTEGER DEFAULT 0,  -- 1 = повторяющийся (зарплата)
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id),
-            FOREIGN KEY (category_id) REFERENCES categories(id)
-        )
-    ''')
-
-    # финансовые цели
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS goals (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            name TEXT NOT NULL,
-            target_amount DECIMAL(10,2) NOT NULL,
-            current_amount DECIMAL(10,2) DEFAULT 0,
-            deadline DATE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id)
-        )
-    ''')
-
-    # подписки
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS subscriptions (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            name TEXT NOT NULL,
-            amount DECIMAL(10,2) NOT NULL,
-            charge_day INTEGER NOT NULL,  -- день месяца списания (1-31)
-            period TEXT DEFAULT 'monthly' CHECK(period IN ('monthly', 'yearly')),
-            start_date DATE,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id)
-        )
-    ''')
-
-    # таймеры антиимпульсных покупок
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS purchase_timers (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            item_name TEXT NOT NULL,
-            amount DECIMAL(10,2) NOT NULL,
-            remind_at TIMESTAMP NOT NULL,
-            notified INTEGER DEFAULT 0,
-            decision TEXT CHECK(decision IN ('bought', 'cancelled')),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id)
-        )
-    ''')
-
-    # бюджетные лимиты по категориям
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS budgets (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            category_id INTEGER NOT NULL,
-            limit_amount DECIMAL(10,2) NOT NULL,
-            period TEXT DEFAULT 'monthly' CHECK(period IN ('monthly', 'yearly')),
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users(id),
-            FOREIGN KEY (category_id) REFERENCES categories(id),
-            UNIQUE(user_id, category_id, period)
-        )
-    ''')
-
-    # миграция: добавляем start_date в subscriptions для существующих БД
-    try:
-        cursor.execute('ALTER TABLE subscriptions ADD COLUMN start_date DATE')
-    except Exception:
-        pass  # колонка уже существует
-
-    # AUTO-2: миграция — is_paused и last_charged_at
-    try:
-        cursor.execute('ALTER TABLE subscriptions ADD COLUMN is_paused INTEGER DEFAULT 0')
-    except Exception:
-        pass
-    try:
-        cursor.execute('ALTER TABLE subscriptions ADD COLUMN last_charged_at DATE')
-    except Exception:
-        pass
-
-    # миграция: notification_hour для существующих пользователей
-    try:
-        cursor.execute('ALTER TABLE users ADD COLUMN notification_hour INTEGER DEFAULT 9')
-    except Exception:
-        pass
-
-    # стартовые категории
-    cursor.execute("SELECT COUNT(*) FROM categories")
-    if cursor.fetchone()[0] == 0:
-        default_categories = [
-            ('Начальный баланс', 'income'),
-            ('Зарплата', 'income'),
-            ('Фриланс', 'income'),
-            ('Другое', 'income'),
-            ('Еда', 'expense'),
-            ('Транспорт', 'expense'),
-            ('Здоровье', 'expense'),
-            ('Покупки', 'expense'),
-            ('Развлечения', 'expense'),
-            ('Жильё', 'expense'),
-            ('Образование', 'expense'),
-            ('Накопления', 'expense'),
-            ('Другое', 'expense'),
-        ]
-        cursor.executemany(
-            "INSERT INTO categories (name, type) VALUES (?, ?)",
-            default_categories
-        )
-    else:
-        # добавляем категорию Накопления если её нет
-        cursor.execute("SELECT id FROM categories WHERE name='Накопления' AND type='expense'")
-        if not cursor.fetchone():
-            cursor.execute("INSERT INTO categories (name, type) VALUES ('Накопления', 'expense')")
-        # AUTO-2: категория Подписки
-        cursor.execute("SELECT id FROM categories WHERE name='Подписки' AND type='expense'")
-        if not cursor.fetchone():
-            cursor.execute("INSERT INTO categories (name, type) VALUES ('Подписки', 'expense')")
-
-    conn.commit()
-    conn.close()
+    return _create_tables()
 
 
 # ─── ПОЛЬЗОВАТЕЛИ ─────────────────────────────────────────────────────────────
@@ -580,7 +421,8 @@ def get_subscriptions_monthly_total(user_id):
             '''SELECT SUM(CASE WHEN period='monthly' THEN amount
                               WHEN period='yearly' THEN amount/12.0
                          END) as total
-               FROM subscriptions WHERE user_id = ?''',
+               FROM subscriptions
+               WHERE user_id = ? AND (is_paused IS NULL OR is_paused = 0)''',
             (user_id,)
         ).fetchone()
     return row['total'] or 0
