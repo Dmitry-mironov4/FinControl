@@ -1,14 +1,13 @@
 import os
 import flet as ft
-
 from pages import HomePage, TransactionsPage, GoalsPage, SettingsPage, SubscriptionsPage, IncomePage, ExpensesPage, AnalyticsPage, SimulatorPage
 from pages.auth import AuthPage
 from components import AppTheme
 from controllers import (HomeController, GoalsController, SubscriptionsController,
                          TransactionsController, ExpensesController, IncomeController,
                          SettingsController, SimulatorController)
-from components import show_dialog, close_dialog
 from database import create_tables, get_connection
+from components.dialogs import show_dialog, close_dialog
 
 
 
@@ -17,7 +16,7 @@ from database import create_tables, get_connection
 def main(page: ft.Page):
     create_tables()
 
-    page.fonts = {
+    page.fonts = { 
         "Montserrat": "fonts/Montserrat-Regular.ttf",
         "Montserrat Bold": "fonts/Montserrat-Bold.ttf",
         "Montserrat Semibold": "fonts/Montserrat-SemiBold.ttf",
@@ -29,7 +28,7 @@ def main(page: ft.Page):
     page.theme_mode = ft.ThemeMode.LIGHT
     page.window.width = 390
     page.window.height = 844
-    page.bgcolor = AppTheme.BG_PAGE
+    page.bgcolor = AppTheme.BACKGROUND
     page.padding = 0
     page.data = {}
     page.data.setdefault("_s_currency", "RUB")
@@ -178,6 +177,7 @@ def main(page: ft.Page):
                 home = page.data.get("pages", {}).get(0)
                 if home:
                     home.refresh()
+                    home.refresh()
 
         dlg.content = ft.Column([
             ft.Text("Сколько денег у тебя сейчас?",font_family="Montserrat SemiBold", color="#000000", size=14),
@@ -262,15 +262,38 @@ def main(page: ft.Page):
 
         return
 
-    # ─── ОСНОВНОЕ ПРИЛОЖЕНИЕ ──────────────────────────────────────────────────
+# ─── ОСНОВНОЕ ПРИЛОЖЕНИЕ ──────────────────────────────────────────────────
 
     def show_main_app():
-        content = ft.Container(expand=True)
+        # 1. Сначала определяем uid и словарь pages
+        uid = page.data["user_id"]
+        pages = {
+            0: HomePage(page, HomeController(uid)),
+            1: AnalyticsPage(page, uid),
+            2: GoalsPage(page, GoalsController(uid)),
+            3: SettingsPage(page, SettingsController(uid)),
+            4: SubscriptionsPage(page, SubscriptionsController(uid)),
+            5: IncomePage(page, IncomeController(uid)),
+            6: ExpensesPage(page, ExpensesController(uid)),
+            7: TransactionsPage(page, TransactionsController(uid)),
+            8: SimulatorPage(page, SimulatorController()),
+        }
+
+        # 2. Теперь можем безопасно использовать pages[0]
+        content = ft.AnimatedSwitcher(
+            content=pages[0],
+            expand=True,
+            transition=ft.AnimatedSwitcherTransition.FADE,
+            duration=200,
+            reverse_duration=200,
+            switch_in_curve=ft.AnimationCurve.EASE_IN,
+            switch_out_curve=ft.AnimationCurve.EASE_OUT,
+        )
         nav_container = ft.Container(expand=False)
 
         def build_nav(selected_index: int) -> ft.Container:
             items = [
-                ("navigation/home.svg",         0),
+                ("navigation/home.svg",        0),
                 ("navigation/analytics.svg",    1),
                 ("navigation/goals.svg",        2),
                 ("navigation/test.svg",         8),
@@ -312,24 +335,17 @@ def main(page: ft.Page):
             )
 
         def navigate(index: int):
-            pages[index].refresh()
+            pages[index].key = str(index) + "_" + str(id(pages[index]))
             content.content = pages[index]
-            content.update()
             nav_container.content = build_nav(index)
-            nav_container.update()
-
-        uid = page.data["user_id"]
-        pages = {
-            0: HomePage(page, HomeController(uid)),
-            1: AnalyticsPage(page, uid),
-            2: GoalsPage(page, GoalsController(uid)),
-            3: SettingsPage(page, SettingsController(uid)),
-            4: SubscriptionsPage(page, SubscriptionsController(uid)),
-            5: IncomePage(page, IncomeController(uid)),
-            6: ExpensesPage(page, ExpensesController(uid)),
-            7: TransactionsPage(page, TransactionsController(uid)),
-            8: SimulatorPage(page, SimulatorController()),
-        }
+            # Обновляем всё сразу
+            page.update()
+            # Только потом перестраиваем данные
+            try:
+                pages[index].rebuild()
+                page.update()
+            except Exception as e:
+                print(f"navigate rebuild error: {e}")
 
         def logout():
             page.session.store.remove("user_id")
@@ -344,7 +360,10 @@ def main(page: ft.Page):
             page.data.get("user_id")
         )
 
-        content.content = pages[0]
+        content.content = ft.Container(
+            content=pages[0],
+            key="0",
+        )
         nav_container.content = build_nav(0)
 
         inner.content = ft.Column(

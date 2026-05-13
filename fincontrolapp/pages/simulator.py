@@ -7,13 +7,13 @@ from utils import get_currency_symbol
 
 _CARD_GRADIENT = ft.LinearGradient(
     colors=["#ffffff", "#88A2FF"],
-    begin=ft.Alignment(-1, -1),
-    end=ft.Alignment(1, 1),
+    begin=ft.Alignment(-2, -1),
+    end=ft.Alignment(1, 8),
 )
 _BTN_GRADIENT = ft.RadialGradient(
     colors=["#ffffff", "#88A2FF"],
     center=ft.Alignment(0, -0.2),
-    radius=4.0,
+    radius=8.0,
     stops=[0.0, 0.8],
 )
 
@@ -72,43 +72,43 @@ class SimulatorPage(BasePage):
         for i, label in enumerate(_TABS):
             active = (i == self._active_tab)
             chips.append(
-            ft.GestureDetector(
-                on_tap=lambda e, i=i: self._switch_tab(i),
-                content=ft.Container(
-                    padding=ft.Padding.only(left=20, right=20, top=9, bottom=9),
-                    border_radius=20,
-                    gradient=ft.RadialGradient(
-                        colors=["#ffffff", "#88A2FF"],
-                        center=ft.Alignment(0, -0.2),
-                        radius=4.0,
-                        stops=[0.0, 0.8],
-                    ) if active else None,
-                    bgcolor=ft.Colors.with_opacity(0.07, "#483EB7") if not active else None,
-                    content=ft.Text(
-                        label,
-                        size=16,
-                        font_family="Montserrat SemiBold",
-                        color="#253A82" if active else ft.Colors.with_opacity(0.5, "#253A82"),
+                ft.GestureDetector(
+                    on_tap=lambda e, i=i: self._switch_tab(i),
+                    content=ft.Container(
+                        padding=ft.Padding.only(left=20, right=20, top=9, bottom=9),
+                        border_radius=20,
+                        gradient=ft.RadialGradient(
+                            colors=["#ffffff", "#88A2FF"],
+                            center=ft.Alignment(0, -0.2),
+                            radius=8.0,
+                            stops=[0.0, 0.8],
+                        ) if active else None,
+                        bgcolor=ft.Colors.with_opacity(0.07, "#483EB7") if not active else None,
+                        content=ft.Text(
+                            label,
+                            size=16,
+                            font_family="Montserrat SemiBold",
+                            color="#253A82" if active else ft.Colors.with_opacity(0.5, "#253A82"),
+                        ),
                     ),
-                ),
+                )
             )
-        )
         return ft.Container(
-        border_radius=24,
-        gradient=ft.LinearGradient(
-            colors=["#ffffff", "#88A2FF"],
-            begin=ft.Alignment(-1, -1),
-            end=ft.Alignment(5, 5),
-        ),
-        padding=ft.Padding.only(left=4, right=4, top=4, bottom=4),
-        clip_behavior=ft.ClipBehavior.HARD_EDGE,
-        content=ft.Row(
-            chips,
-            spacing=4,
-            tight=True,
-            scroll=ft.ScrollMode.AUTO,
-        ),
-    )
+            border_radius=24,
+            gradient=ft.LinearGradient(
+                colors=["#ffffff", "#88A2FF"],
+                begin=ft.Alignment(-2, -1),
+                end=ft.Alignment(5, 8),
+            ),
+            padding=ft.Padding.only(left=4, right=4, top=4, bottom=4),
+            clip_behavior=ft.ClipBehavior.HARD_EDGE,
+            content=ft.Row(
+                chips,
+                spacing=4,
+                tight=True,
+                scroll=ft.ScrollMode.AUTO,
+            ),
+        )
 
     def _switch_tab(self, i: int):
         self._active_tab = i
@@ -141,7 +141,6 @@ class SimulatorPage(BasePage):
 
     def _instant_hint(self, value_text: str, icon=ft.Icons.INFO_OUTLINE,
                       color="#6C63FF") -> ft.Container:
-        """Small inline hint row that appears below the cost field."""
         return ft.Container(
             border_radius=10,
             padding=ft.Padding.symmetric(horizontal=12, vertical=8),
@@ -160,67 +159,67 @@ class SimulatorPage(BasePage):
 
     def _scenario_cards(self, scenarios: list[dict]) -> ft.Column:
         tone_icon = {
-        "good":    ft.Icons.TRENDING_UP,
-        "warn":    ft.Icons.WARNING_AMBER_OUTLINED,
-        "bad":     ft.Icons.TRENDING_DOWN,
-        "neutral": ft.Icons.COMPARE_ARROWS,
-    }
+            "good":    ft.Icons.TRENDING_UP,
+            "warn":    ft.Icons.WARNING_AMBER_OUTLINED,
+            "bad":     ft.Icons.TRENDING_DOWN,
+            "neutral": ft.Icons.COMPARE_ARROWS,
+        }
         cards = []
         for s in scenarios:
-          tone  = s.get("tone", "neutral")
-          color = _TONE_COLOR[tone]
-          icon  = tone_icon.get(tone, ft.Icons.COMPARE_ARROWS)
-          cards.append(
-            ft.Container(
-                border_radius=14,
-                padding=ft.Padding.symmetric(horizontal=14, vertical=12),
-                bgcolor="rgba(255,255,255,0.55)",
-                content=ft.Row(
-                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-                    vertical_alignment=ft.CrossAxisAlignment.CENTER,
-                    spacing=0,
-                    controls=[
-                        ft.Container(
-                            width=36, height=36,
-                            border_radius=10,
-                            bgcolor=ft.Colors.with_opacity(0.15, color) if isinstance(color, str) else "rgba(255,255,255,0.15)",
-                            content=ft.Icon(icon, color=color, size=18),
-                            alignment=ft.Alignment(0, 0),
-                        ),
-                        ft.Container(
-                            expand=True,
-                            padding=ft.Padding.only(left=10),
-                            content=ft.Column(
-                                controls=[
-                                    ft.Text(
-                                        s["label"],
-                                        size=13,
-                                        color="#253A82",
-                                        no_wrap=True,
-                                        overflow=ft.TextOverflow.ELLIPSIS,
-                                        font_family="Montserrat SemiBold",
-                                    ),
-                                    ft.Text(
-                                        s.get("sub", ""),
-                                        size=11,
-                                        color=ft.Colors.with_opacity(0.5, "#253A82"),
-                                        font_family="Montserrat Medium",
-                                    ),
-                                ],
-                                spacing=2,
+            tone  = s.get("tone", "neutral")
+            color = _TONE_COLOR[tone]
+            icon  = tone_icon.get(tone, ft.Icons.COMPARE_ARROWS)
+            cards.append(
+                ft.Container(
+                    border_radius=14,
+                    padding=ft.Padding.symmetric(horizontal=14, vertical=12),
+                    bgcolor="rgba(255,255,255,0.55)",
+                    content=ft.Row(
+                        alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                        vertical_alignment=ft.CrossAxisAlignment.CENTER,
+                        spacing=0,
+                        controls=[
+                            ft.Container(
+                                width=36, height=36,
+                                border_radius=10,
+                                bgcolor=ft.Colors.with_opacity(0.15, color) if isinstance(color, str) else "rgba(255,255,255,0.15)",
+                                content=ft.Icon(icon, color=color, size=18),
+                                alignment=ft.Alignment(0, 0),
                             ),
-                        ),
-                        ft.Text(
-                            s["value"],
-                            size=15,
-                            color=color,
-                            font_family="Montserrat SemiBold",
-                            no_wrap=True,
-                        ),
-                    ],
-                ),
+                            ft.Container(
+                                expand=True,
+                                padding=ft.Padding.only(left=10),
+                                content=ft.Column(
+                                    controls=[
+                                        ft.Text(
+                                            s["label"],
+                                            size=13,
+                                            color="#253A82",
+                                            no_wrap=True,
+                                            overflow=ft.TextOverflow.ELLIPSIS,
+                                            font_family="Montserrat SemiBold",
+                                        ),
+                                        ft.Text(
+                                            s.get("sub", ""),
+                                            size=11,
+                                            color=ft.Colors.with_opacity(0.5, "#253A82"),
+                                            font_family="Montserrat Medium",
+                                        ),
+                                    ],
+                                    spacing=2,
+                                ),
+                            ),
+                            ft.Text(
+                                s["value"],
+                                size=15,
+                                color=color,
+                                font_family="Montserrat SemiBold",
+                                no_wrap=True,
+                            ),
+                        ],
+                    ),
+                )
             )
-        )
         return ft.Column(controls=cards, spacing=8)
 
     # ── SIM-UI-3: before/after progress bars ─────────────────────────────────
@@ -228,10 +227,7 @@ class SimulatorPage(BasePage):
     def _goal_progress_bars(self, before: float, after: float,
                             goal: float) -> ft.Container:
         sym = get_currency_symbol(self.page_ref)
-        """
-        Shows two labelled ProgressBar rows side-by-side (before vs after).
-        Values are fractions 0..1.
-        """
+
         def _bar_row(label: str, value: float, color: str) -> ft.Column:
             pct = min(1.0, max(0.0, value))
             return ft.Column(
@@ -302,12 +298,9 @@ class SimulatorPage(BasePage):
     # ── on_change validators (live feedback while typing) ────────────────────
 
     def _make_amount_validator(self, field: ft.TextField):
-        """Возвращает on_change-обработчик: число > 0, иначе ошибка под полем."""
         def _validate(e):
-            v = (field.value or "").replace(" ", "").replace("\u202f", "").replace(",", ".").strip()
+            v = (field.value or "").replace(" ", "").replace(" ", "").replace(",", ".").strip()
             if not v:
-                # пустое поле во время ввода — не считаем ошибкой; required-логика
-                # отрабатывает в _parse_amount при нажатии «Рассчитать»
                 field.error = None
             else:
                 try:
@@ -321,7 +314,6 @@ class SimulatorPage(BasePage):
         return _validate
 
     def _make_months_validator(self, field: ft.TextField):
-        """Возвращает on_change-обработчик: целое число от 1 до 360."""
         def _validate(e):
             v = (field.value or "").strip()
             if not v:
@@ -344,7 +336,6 @@ class SimulatorPage(BasePage):
         return _validate
 
     def _make_percent_validator(self, field: ft.TextField):
-        """Возвращает on_change-обработчик: число от 1 до 99."""
         def _validate(e):
             v = (field.value or "").replace(",", ".").strip()
             if not v:
@@ -372,17 +363,15 @@ class SimulatorPage(BasePage):
         self._purchase_expenses = self._field("Ежемесячные расходы")
         self._purchase_savings  = self._field("Уже накоплено", hint="0")
 
-        # validation + instant hint для поля стоимости
         _validate_cost = self._make_amount_validator(self._purchase_cost)
         def _cost_change(e):
             _validate_cost(e)
             self._on_purchase_cost_change(e)
-        self._purchase_cost.on_change   = _cost_change
+        self._purchase_cost.on_change     = _cost_change
         self._purchase_income.on_change   = self._make_amount_validator(self._purchase_income)
         self._purchase_expenses.on_change = self._make_amount_validator(self._purchase_expenses)
         self._purchase_savings.on_change  = self._make_amount_validator(self._purchase_savings)
 
-        # SIM-UI-1 — instant hint container
         self._purchase_hint = ft.Container(visible=False)
 
         return self._panel_card(
@@ -395,12 +384,10 @@ class SimulatorPage(BasePage):
         )
 
     def _on_purchase_cost_change(self, e):
-        """SIM-UI-1: instant hint when typing the cost."""
         raw = (self._purchase_cost.value or "").replace(" ", "").replace(",", ".").strip()
         try:
             val = float(raw)
             if val > 0:
-                # Simple rough estimate: assume 20% saving rate as a teaser
                 sym = get_currency_symbol(self.page_ref)
                 hint_text = f"≈ {val * 0.2:,.0f} {sym} в месяц — 20% от суммы"
                 self._purchase_hint.content = self._instant_hint(
@@ -510,7 +497,7 @@ class SimulatorPage(BasePage):
 
     def _parse_amount(self, field: ft.TextField, label: str,
                       required: bool = True, default: float = 0.0):
-        raw = (field.value or "").replace(",", ".").replace(" ", "").replace("\u202f", "").strip()
+        raw = (field.value or "").replace(",", ".").replace(" ", "").replace(" ", "").strip()
         if not raw:
             if required:
                 field.error = f"Введите {label}"
@@ -590,7 +577,6 @@ class SimulatorPage(BasePage):
             self._show_error(f"Ошибка расчёта: {ex}")
             return
 
-        # SIM-UI-2 — scenario cards for purchase
         sym = get_currency_symbol(self.page_ref)
         monthly_free = income - expenses
         if monthly_free > 0:
@@ -635,7 +621,6 @@ class SimulatorPage(BasePage):
             self._show_error(f"Ошибка расчёта: {ex}")
             return
 
-        # SIM-UI-2 — subscription scenarios
         sym = get_currency_symbol(self.page_ref)
         total_cost = sub_cost * months
         free_without = (income - expenses) * months
@@ -681,9 +666,8 @@ class SimulatorPage(BasePage):
             self._show_error(f"Ошибка расчёта: {ex}")
             return
 
-        # SIM-UI-3 — before/after progress bars
         monthly_free = income - expenses
-        after_savings = savings + monthly_free * 12  # projection after 1 year
+        after_savings = savings + monthly_free * 12
         result["_goal_bars"] = {
             "before": savings,
             "after":  after_savings,
@@ -708,7 +692,6 @@ class SimulatorPage(BasePage):
             self._show_error(f"Ошибка расчёта: {ex}")
             return
 
-        # SIM-UI-2 — cut scenarios
         sym = get_currency_symbol(self.page_ref)
         saved_monthly = expenses * (percent / 100)
         new_expenses  = expenses - saved_monthly
@@ -748,8 +731,8 @@ class SimulatorPage(BasePage):
     # ── result rendering ──────────────────────────────────────────────────────
 
     def _build_result(self, result: dict) -> ft.Control:
-        status   = result.get("status", "ok")
-        metrics  = result.get("metrics", [])
+        status     = result.get("status", "ok")
+        metrics    = result.get("metrics", [])
         projection = result.get("projection", [])
 
         card_style = _RESULT_CARD.get(status, _RESULT_CARD["ok"])
@@ -786,7 +769,6 @@ class SimulatorPage(BasePage):
             ),
         ]
 
-        # SIM-UI-2 — scenario cards (if provided by handler)
         if "_scenarios" in result:
             controls.append(
                 ft.Text("Сценарии", size=13, color="#888888",
@@ -794,7 +776,6 @@ class SimulatorPage(BasePage):
             )
             controls.append(self._scenario_cards(result["_scenarios"]))
 
-        # SIM-UI-3 — before/after progress bars (goal tab only)
         if "_goal_bars" in result:
             gb = result["_goal_bars"]
             controls.append(
@@ -819,45 +800,45 @@ class SimulatorPage(BasePage):
         value_str = m.get("value", "—")
         sym = get_currency_symbol(self.page_ref)
         if value_str.endswith(sym) or value_str.endswith(f" {sym}") or value_str.endswith("₽") or value_str.endswith(" ₽"):
-          icon = ft.Icons.CURRENCY_RUBLE
+            icon = ft.Icons.CURRENCY_RUBLE
         elif value_str.endswith("мес."):
-          icon = ft.Icons.CALENDAR_MONTH_OUTLINED
+            icon = ft.Icons.CALENDAR_MONTH_OUTLINED
         elif value_str.endswith("%"):
-          icon = ft.Icons.PERCENT
+            icon = ft.Icons.PERCENT
         else:
-          icon = ft.Icons.INFO_OUTLINE
+            icon = ft.Icons.INFO_OUTLINE
 
         return ft.Container(
-        border_radius=12,
-        padding=ft.Padding(left=12, right=12, top=10, bottom=10),
-        bgcolor="rgba(255,255,255,0.55)",
-        content=ft.Row(
-            alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
-            controls=[
-                ft.Row(
-                    controls=[
-                        ft.Icon(icon, color=value_color, size=16),
-                        ft.Text(
-                            m.get("label", ""),
-                            size=13,
-                            color="#888888",
-                            font_family="Montserrat Medium",
-                            expand=True,
-                        ),
-                    ],
-                    spacing=8,
-                    expand=True,  # занимает всё доступное место
-                ),
-                ft.Text(
-                    value_str,
-                    size=14,
-                    color=value_color,
-                    font_family="Montserrat SemiBold",
-                    no_wrap=True,  # значение не переносится
-                ),
-            ],
-        ),
-    )
+            border_radius=12,
+            padding=ft.Padding(left=12, right=12, top=10, bottom=10),
+            bgcolor="rgba(255,255,255,0.55)",
+            content=ft.Row(
+                alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                controls=[
+                    ft.Row(
+                        controls=[
+                            ft.Icon(icon, color=value_color, size=16),
+                            ft.Text(
+                                m.get("label", ""),
+                                size=13,
+                                color="#888888",
+                                font_family="Montserrat Medium",
+                                expand=True,
+                            ),
+                        ],
+                        spacing=8,
+                        expand=True,
+                    ),
+                    ft.Text(
+                        value_str,
+                        size=14,
+                        color=value_color,
+                        font_family="Montserrat SemiBold",
+                        no_wrap=True,
+                    ),
+                ],
+            ),
+        )
 
     def _projection_bars(self, projection: list) -> ft.Control:
         step = max(1, len(projection) // 12)
@@ -904,7 +885,7 @@ class SimulatorPage(BasePage):
                         controls=bars,
                         alignment=ft.MainAxisAlignment.SPACE_AROUND,
                         vertical_alignment=ft.CrossAxisAlignment.END,
-                        scroll=ft.ScrollMode.AUTO,  # ← не уходит за экран
+                        scroll=ft.ScrollMode.AUTO,
                     ),
                 ),
             ],

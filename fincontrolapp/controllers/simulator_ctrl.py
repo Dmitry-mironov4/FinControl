@@ -36,6 +36,7 @@ class SimulatorController:
                 "metrics": [
                     {"label": "Не хватает", "value": _m(cost - current_savings, sym), "tone": "bad"},
                     {"label": "Текущий баланс", "value": _m(current_savings, sym), "tone": "neutral"},
+                    {"label": r["message"], "value": "—", "tone": "bad"},
                 ],
             }
 
