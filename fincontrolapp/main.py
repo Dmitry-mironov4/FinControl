@@ -280,7 +280,6 @@ def main(page: ft.Page):
                 ("navigation/home.svg",         0),
                 ("navigation/analytics.svg",    1),
                 ("navigation/goals.svg",        2),
-                ("navigation/budget.svg",       9),
                 ("navigation/settings.svg",     3),
             ]
 
@@ -332,7 +331,7 @@ def main(page: ft.Page):
         uid = page.data["user_id"]
         pages = {
             0: HomePage(page, HomeController(uid)),
-            1: AnalyticsPage(page, uid),
+            1: AnalyticsPage(page, uid, budget_controller=BudgetController(uid)),
             2: GoalsPage(page, GoalsController(uid)),
             3: SettingsPage(page, SettingsController(uid)),
             4: SubscriptionsPage(page, SubscriptionsController(uid)),

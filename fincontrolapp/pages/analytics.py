@@ -205,8 +205,9 @@ def _has_enough_data(monthly: list[dict]) -> bool:
 
 class AnalyticsPage(BasePage):
 
-    def __init__(self, page: ft.Page, user_id: int | None = None):
+    def __init__(self, page: ft.Page, user_id: int | None = None, budget_controller=None):
         self.user_id = user_id
+        self._budget_ctrl = budget_controller
         self.selected_year = datetime.now().year
         super().__init__(page, "Аналитика")
 
@@ -253,6 +254,11 @@ class AnalyticsPage(BasePage):
             _card(self._category_bars(categories)) if categories
             else _card(_stub("Нет расходов за выбранный год"))
         )
+        # Бюджеты по категориям
+        self._budget_container = ft.Container(
+            content=self._build_budget_section()
+        )
+        controls.append(self._budget_container)
 
         return controls
 
@@ -532,3 +538,154 @@ class AnalyticsPage(BasePage):
                 ),
             ], spacing=6))
         return ft.Column(rows, spacing=14)
+    
+    # ── Секция бюджетов ──────────────────────────────────────────────────────
+    def _build_budget_section(self) -> ft.Control:
+        if not self._budget_ctrl:
+            return ft.Container()
+
+        budgets = self._budget_ctrl.get_budgets()
+        currency = get_currency_symbol(self.page_ref)
+
+        def open_dialog(budget=None):
+            categories = self._budget_ctrl.get_expense_categories()
+            if not categories:
+                return
+
+            amount_field = ft.TextField(
+                label=f"Лимит ({currency})",
+                keyboard_type=ft.KeyboardType.NUMBER,
+                text_style=ft.TextStyle(font_family="Montserrat Medium"),
+                label_style=ft.TextStyle(font_family="Montserrat Medium"),
+                border_color="#6976EB",
+                value=str(int(budget.limit_amount)) if budget else "",
+            )
+            cat_dropdown = ft.Dropdown(
+                label="Категория",
+                value=str(budget.category_id) if budget else None,
+                options=[ft.dropdown.Option(key=str(c["id"]), text=c["name"]) for c in categories],
+                text_style=ft.TextStyle(font_family="Montserrat Medium"),
+                label_style=ft.TextStyle(font_family="Montserrat Medium"),
+                border_color="#6976EB",
+                disabled=budget is not None,
+            )
+            dlg = ft.AlertDialog(
+                modal=True,
+                title=ft.Text("Бюджет по категории", font_family="Montserrat SemiBold"),
+            )
+
+            def on_save(e):
+                raw = (amount_field.value or "").strip()
+                cat_id_str = cat_dropdown.value
+                if not raw or not cat_id_str:
+                    return
+                try:
+                    limit = float(raw.replace(",", "."))
+                except ValueError:
+                    return
+                if limit <= 0:
+                    return
+                self._budget_ctrl.set_budget(int(cat_id_str), limit)
+                from components import close_dialog
+                close_dialog(self.page_ref, dlg)
+                self._refresh_budget_section()
+
+            def on_delete(e):
+                if budget:
+                    self._budget_ctrl.delete_budget(budget.id)
+                from components import close_dialog
+                close_dialog(self.page_ref, dlg)
+                self._refresh_budget_section()
+
+            def on_cancel(e):
+                from components import close_dialog
+                close_dialog(self.page_ref, dlg)
+
+            dlg.content = ft.Column(
+                controls=[cat_dropdown, amount_field],
+                tight=True, spacing=12,
+            )
+            actions = [
+                ft.TextButton("Отмена", on_click=on_cancel,
+                    style=ft.ButtonStyle(color="#483EB7",
+                        text_style=ft.TextStyle(font_family="Montserrat SemiBold"))),
+                ft.TextButton("Сохранить", on_click=on_save,
+                    style=ft.ButtonStyle(color="#483EB7",
+                        text_style=ft.TextStyle(font_family="Montserrat SemiBold"))),
+            ]
+            if budget:
+                actions.insert(1, ft.TextButton("Удалить", on_click=on_delete,
+                    style=ft.ButtonStyle(color="#F44336",
+                        text_style=ft.TextStyle(font_family="Montserrat SemiBold"))))
+            dlg.actions = actions
+            from components import show_dialog
+            show_dialog(self.page_ref, dlg)
+
+        # Строки бюджетов
+        if not budgets:
+            budget_rows = [
+                ft.Container(
+                    content=ft.Text(
+                        "Нет бюджетов. Нажмите + чтобы задать лимит.",
+                        color=ft.Colors.with_opacity(0.6, "#483EB7"),
+                        font_family="Montserrat Medium",
+                        size=13,
+                        text_align=ft.TextAlign.CENTER,
+                    ),
+                    alignment=ft.Alignment(0, 0),
+                    padding=ft.padding.symmetric(vertical=16),
+                )
+            ]
+        else:
+            budget_rows = []
+            for b in budgets:
+                pct = min(b.progress_pct, 100)
+                budget_rows.append(
+                    ft.GestureDetector(
+                        on_tap=lambda e, budget=b: open_dialog(budget),
+                        content=ft.Column([
+                            ft.Row([
+                                ft.Text(b.category_name, font_family="Montserrat SemiBold",
+                                        size=13, color=ft.Colors.with_opacity(0.9, "#483EB7"), expand=True),
+                                ft.Text(
+                                    f"{b.spent_amount:,.0f} / {b.limit_amount:,.0f} {currency}",
+                                    font_family="Montserrat Medium",
+                                    size=12, color=ft.Colors.with_opacity(0.6, "#483EB7"),
+                                ),
+                            ]),
+                            ft.ProgressBar(
+                                value=pct / 100,
+                                bgcolor=ft.Colors.with_opacity(0.1, "#483EB7"),
+                                color=b.status_color,
+                                height=8,
+                                border_radius=ft.border_radius.all(4),
+                            ),
+                            ft.Text(
+                                f"{b.progress_pct:.0f}% использовано",
+                                font_family="Montserrat Medium",
+                                size=11,
+                                color=ft.Colors.with_opacity(0.5, "#483EB7"),
+                            ),
+                        ], spacing=6),
+                    )
+                )
+
+        add_btn = ft.TextButton(
+            "+ Добавить",
+            style=ft.ButtonStyle(color="#483EB7",
+                text_style=ft.TextStyle(font_family="Montserrat SemiBold")),
+            on_click=lambda e: open_dialog(),
+        )
+
+        return ft.Column([
+            ft.Row([
+                _title("Бюджеты по категориям"),
+                add_btn,
+            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+            _card(ft.Column(budget_rows, spacing=14)),
+        ], spacing=6)
+
+    def _refresh_budget_section(self):
+        """Перерисовывает только секцию бюджетов без перестройки всей страницы."""
+        self._budget_container.content = self._build_budget_section()
+        self.page_ref.update()
