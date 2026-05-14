@@ -7,16 +7,21 @@ class BudgetRepository:
     def __init__(self, con: sqlite3.Connection):
         self.con = con
 
-    def get_budgets_with_spent(self, user_id: int, period: str = 'monthly') -> list[Budget]:
+    def get_budgets_with_spent(self, user_id: int, period: str = 'monthly', year: int | None = None) -> list[Budget]:
         """
-        Возвращает все бюджеты пользователя вместе с суммой потраченного за текущий период.
+        Возвращает все бюджеты пользователя вместе с суммой потраченного за период.
+        Если year задан и не совпадает с текущим — показывает расходы за весь тот год.
         """
         today = date.today()
-        if period == 'monthly':
-            start = today.replace(day=1).isoformat()
+        if year is None or year == today.year:
+            if period == 'monthly':
+                start = today.replace(day=1).isoformat()
+            else:
+                start = today.replace(month=1, day=1).isoformat()
+            end = today.isoformat()
         else:
-            start = today.replace(month=1, day=1).isoformat()
-        end = today.isoformat()
+            start = date(year, 1, 1).isoformat()
+            end = date(year, 12, 31).isoformat()
 
         rows = self.con.execute(
             """SELECT b.id, b.category_id, b.limit_amount, b.period,

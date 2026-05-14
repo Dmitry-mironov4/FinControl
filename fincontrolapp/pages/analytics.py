@@ -28,7 +28,7 @@ from flet_charts import (
     ChartGridLines, ChartAxis, ChartAxisLabel,
 )
 from flet_charts.bar_chart import BarChartTooltip
-from datetime import datetime, date, timedelta
+from datetime import datetime, date
 from database import get_connection
 from components.base_page import BasePage
 from utils import get_currency_symbol
@@ -152,7 +152,7 @@ def period_dates(period: str, year: int | None = None) -> tuple[str, str]:
     if period == "month":
         start = anchor.replace(day=1).isoformat()
     elif period == "quarter":
-        month = anchor.month - 3
+        month = anchor.month - 2
         yr = anchor.year
         if month <= 0:
             month += 12
@@ -165,8 +165,11 @@ def period_dates(period: str, year: int | None = None) -> tuple[str, str]:
             month += 12
             yr -= 1
         start = date(yr, month, 1).isoformat()
-    else:  # year
+    elif period == "year":
         start = anchor.replace(month=1, day=1).isoformat()
+    else:  # all
+        start = "2000-01-01"
+        end = date.today().isoformat()
     return start, end
 
 
@@ -176,31 +179,39 @@ def get_trend_6months(user_id: int, year: int | None = None) -> list[dict]:
     """
     today = date.today()
     anchor = today if (year is None or year == today.year) else date(year, 12, 31)
+
+    start_month = anchor.month - 5
+    start_year = anchor.year
+    while start_month <= 0:
+        start_month += 12
+        start_year -= 1
+
+    with get_connection() as conn:
+        rows = conn.execute(
+            """SELECT strftime('%Y', date) AS yr, strftime('%m', date) AS mo,
+                      SUM(CASE WHEN type='income'  THEN amount ELSE 0 END) AS income,
+                      SUM(CASE WHEN type='expense' THEN amount ELSE 0 END) AS expense
+               FROM transactions
+               WHERE user_id = ? AND date BETWEEN ? AND ?
+               GROUP BY yr, mo
+               ORDER BY yr, mo""",
+            (user_id, f"{start_year}-{start_month:02d}-01", anchor.isoformat()),
+        ).fetchall()
+
+    db_data = {
+        (int(r["yr"]), int(r["mo"])): {"income": r["income"] or 0.0, "expense": r["expense"] or 0.0}
+        for r in rows
+    }
+
     results = []
     for i in range(5, -1, -1):
-        month = anchor.month - i
-        yr = anchor.year
-        while month <= 0:
-            month += 12
-            yr -= 1
-        start = f"{yr}-{month:02d}-01"
-        next_month = date(yr, month, 28) + timedelta(days=4)
-        last_day = (next_month - timedelta(days=next_month.day)).day
-        end = f"{yr}-{month:02d}-{last_day:02d}"
-        with get_connection() as conn:
-            row = conn.execute(
-                """SELECT
-                      SUM(CASE WHEN type='income' THEN amount ELSE 0 END) AS income,
-                      SUM(CASE WHEN type='expense' THEN amount ELSE 0 END) AS expense
-                   FROM transactions
-                   WHERE user_id = ? AND date BETWEEN ? AND ?""",
-                (user_id, start, end),
-            ).fetchone()
-        results.append({
-            "month": MONTH_NAMES[month - 1],
-            "income": row["income"] or 0.0,
-            "expense": row["expense"] or 0.0,
-        })
+        m = anchor.month - i
+        y = anchor.year
+        while m <= 0:
+            m += 12
+            y -= 1
+        d = db_data.get((y, m), {"income": 0.0, "expense": 0.0})
+        results.append({"month": MONTH_NAMES[m - 1], "income": d["income"], "expense": d["expense"]})
     return results
 
 
@@ -272,9 +283,8 @@ class AnalyticsPage(BasePage):
         )
 
     def _build_chart_controls(self) -> list[ft.Control]:
-        monthly    = get_monthly_summary(self.user_id, self.selected_year)
-        categories = get_expense_breakdown_by_year(self.user_id, self.selected_year)
-        enough     = _has_enough_data(monthly)
+        monthly = get_monthly_summary(self.user_id, self.selected_year)
+        enough  = _has_enough_data(monthly)
 
         controls = [self._summary(monthly)]
 
@@ -290,22 +300,18 @@ class AnalyticsPage(BasePage):
             else _card(_stub("Добавьте хотя бы 2 месяца данных,\nчтобы увидеть график баланса"))
         )
 
+        # Структура расходов (с фильтром по периоду)
         controls.append(_title("Структура расходов"))
-        controls.append(
-            _card(self._category_bars(categories)) if categories
-            else _card(_stub("Нет расходов за выбранный год"))
-        )
-        # Структура расходов за период (с фильтром)
-        controls.append(_title("Структура расходов за период"))
         period_dropdown = ft.Dropdown(
             value=self.current_period,
             width=160,
             text_style=ft.TextStyle(font_family="Montserrat Medium", size=13, color="#000000"),
             options=[
-                ft.dropdown.Option(key="month", text="Месяц"),
-                ft.dropdown.Option(key="quarter", text="Квартал"),
-                ft.dropdown.Option(key="half", text="Полгода"),
+                ft.dropdown.Option(key="all", text="Все время"),
                 ft.dropdown.Option(key="year", text="Год"),
+                ft.dropdown.Option(key="half", text="Полгода"),
+                ft.dropdown.Option(key="quarter", text="Квартал"),
+                ft.dropdown.Option(key="month", text="Месяц"),
             ],
             on_select=lambda e: self._reload_period_data(e.control.value),
             bgcolor="#F0F0F0", border_color="#483EB7",
@@ -429,7 +435,9 @@ class AnalyticsPage(BasePage):
                      ft.Colors.with_opacity(0.6, "#FF7E1C"), ft.Icons.TRENDING_DOWN),
             ], spacing=10),
             ft.Row([
-                tile("Экономия", savings, "#6C63FF", ft.Icons.SAVINGS_OUTLINED),
+                tile("Экономия", savings,
+                     "#6C63FF" if savings >= 0 else "#FF5252",
+                     ft.Icons.SAVINGS_OUTLINED if savings >= 0 else ft.Icons.TRENDING_DOWN),
                 ft.Container(
                     expand=True,
                     border=ft.Border.all(1.5, ft.Colors.with_opacity(0.06, "#483EB7")),
@@ -443,7 +451,7 @@ class AnalyticsPage(BasePage):
                                     size=12, color="#888888", expand=True),
                         ], spacing=6),
                         ft.ProgressBar(
-                            value=max(0, savings_pct) / 100,
+                            value=min(1.0, max(0, savings_pct) / 100),
                             bgcolor=ft.Colors.with_opacity(0.6, "#483EB7"),
                             color="#483EB7",
                             height=8,
@@ -669,7 +677,7 @@ class AnalyticsPage(BasePage):
         if not self._budget_ctrl:
             return ft.Container()
 
-        budgets = self._budget_ctrl.get_budgets()
+        budgets = self._budget_ctrl.get_budgets(year=self.selected_year)
         currency = get_currency_symbol(self.page_ref)
 
         def open_dialog(budget=None):
@@ -833,9 +841,28 @@ class AnalyticsPage(BasePage):
         expenses = [d["expense"] for d in trend]
         n = len(months)
         max_val = max(max(incomes), max(expenses), 1)
+        sym = get_currency_symbol(self.page_ref)
 
-        income_points = [LineChartDataPoint(x=i, y=incomes[i]) for i in range(n)]
-        expense_points = [LineChartDataPoint(x=i, y=expenses[i]) for i in range(n)]
+        income_points = [
+            LineChartDataPoint(
+                x=i, y=incomes[i],
+                tooltip=LineChartDataPointTooltip(
+                    text=f"↑ {incomes[i]:,.0f} {sym}",
+                    text_style=ft.TextStyle(color="#FFFFFF", size=12, font_family="Montserrat SemiBold"),
+                ),
+            )
+            for i in range(n)
+        ]
+        expense_points = [
+            LineChartDataPoint(
+                x=i, y=expenses[i],
+                tooltip=LineChartDataPointTooltip(
+                    text=f"↓ {expenses[i]:,.0f} {sym}",
+                    text_style=ft.TextStyle(color="#FFFFFF", size=12, font_family="Montserrat SemiBold"),
+                ),
+            )
+            for i in range(n)
+        ]
 
         income_series = LineChartData(points=income_points, stroke_width=2, color="#23CF01", curved=True)
         expense_series = LineChartData(points=expense_points, stroke_width=2, color="#FF7E1C", curved=True)
@@ -866,6 +893,10 @@ class AnalyticsPage(BasePage):
                             horizontal_grid_lines=ChartGridLines(
                                 color=ft.Colors.with_opacity(0.09, "#483EB7")
                             ),
+                            tooltip=LineChartTooltip(
+                                bgcolor=ft.Colors.with_opacity(0.4, "#483EB7"),
+                                border_radius=5,
+                            ),
                             expand=True,
                         ),
                     ),
@@ -888,4 +919,4 @@ class AnalyticsPage(BasePage):
     def _refresh_budget_section(self):
         """Перерисовывает только секцию бюджетов без перестройки всей страницы."""
         self._budget_container.content = self._build_budget_section()
-        self.page_ref.update()
+        self._budget_container.update()

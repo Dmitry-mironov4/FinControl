@@ -81,7 +81,7 @@ def main(page: ft.Page):
 
     def on_auth_success(user_id: int, is_new: bool = False):
         page.data["user_id"] = user_id
-        page.session.store.set("user_id", user_id)
+        _save_session(user_id)
         show_main_app()
         _check_and_add_recurring_income(user_id)  # AUTO-1: автодобавить зарплату, если наступил новый месяц
         _check_and_charge_subscriptions(user_id)  # AUTO-2: списать подписки с charge_day ≤ сегодня
@@ -161,27 +161,32 @@ def main(page: ft.Page):
 # ─── ОСНОВНОЕ ПРИЛОЖЕНИЕ ──────────────────────────────────────────────────
 
     def show_main_app():
-        # 1. Сначала определяем uid и словарь pages
         uid = page.data["user_id"]
-        pages = {
-            0: HomePage(page, HomeController(uid)),
-            1: AnalyticsPage(page, uid),
-            2: GoalsPage(page, GoalsController(uid)),
-            3: SettingsPage(page, SettingsController(uid)),
-            4: SubscriptionsPage(page, SubscriptionsController(uid)),
-            5: IncomePage(page, IncomeController(uid)),
-            6: ExpensesPage(page, ExpensesController(uid)),
-            7: TransactionsPage(page, TransactionsController(uid)),
-            8: SimulatorPage(page, SimulatorController()),
-        }
 
-        # 2. Теперь можем безопасно использовать pages[0]
+        _factories = {
+            1: lambda: AnalyticsPage(page, uid, budget_controller=BudgetController(uid)),
+            2: lambda: GoalsPage(page, GoalsController(uid)),
+            3: lambda: SettingsPage(page, SettingsController(uid)),
+            4: lambda: SubscriptionsPage(page, SubscriptionsController(uid)),
+            5: lambda: IncomePage(page, IncomeController(uid)),
+            6: lambda: ExpensesPage(page, ExpensesController(uid)),
+            7: lambda: TransactionsPage(page, TransactionsController(uid)),
+            8: lambda: SimulatorPage(page, SimulatorController()),
+            9: lambda: BudgetPage(page, BudgetController(uid)),
+        }
+        pages = {0: HomePage(page, HomeController(uid))}
+
+        def _get_page(index: int):
+            if index not in pages:
+                pages[index] = _factories[index]()
+            return pages[index]
+
         content = ft.AnimatedSwitcher(
-            content=pages[0],
+            content=ft.Container(content=_get_page(0), key="0"),
             expand=True,
             transition=ft.AnimatedSwitcherTransition.FADE,
-            duration=200,
-            reverse_duration=200,
+            duration=150,
+            reverse_duration=150,
             switch_in_curve=ft.AnimationCurve.EASE_IN,
             switch_out_curve=ft.AnimationCurve.EASE_OUT,
         )
@@ -232,27 +237,14 @@ def main(page: ft.Page):
             )
 
         def navigate(index: int):
-            pages[index].key = str(index) + "_" + str(id(pages[index]))
-            content.content = pages[index]
+            pg = _get_page(index)
+            pg.key = str(index) + "_" + str(id(pg))
+            content.content = pg
             nav_container.content = build_nav(index)
-            nav_container.update()
-
-        uid = page.data["user_id"]
-        pages = {
-            0: HomePage(page, HomeController(uid)),
-            1: AnalyticsPage(page, uid, budget_controller=BudgetController(uid)),
-            2: GoalsPage(page, GoalsController(uid)),
-            3: SettingsPage(page, SettingsController(uid)),
-            4: SubscriptionsPage(page, SubscriptionsController(uid)),
-            5: IncomePage(page, IncomeController(uid)),
-            6: ExpensesPage(page, ExpensesController(uid)),
-            7: TransactionsPage(page, TransactionsController(uid)),
-            8: SimulatorPage(page, SimulatorController()),
-            9: BudgetPage(page, BudgetController(uid)),
-        }
+            page.update()
 
         def logout():
-            page.session.store.remove("user_id")
+            _clear_session()
             page.data = {}
             page.data.setdefault("_s_currency", "RUB")
             show_auth()
@@ -261,10 +253,6 @@ def main(page: ft.Page):
         page.data["logout"] = logout
         page.data["pages"] = pages
 
-        content.content = ft.Container(
-            content=pages[0],
-            key="0",
-        )
         nav_container.content = build_nav(0)
 
         inner.content = ft.Column(
@@ -276,7 +264,7 @@ def main(page: ft.Page):
 
     # ─── СТАРТ ────────────────────────────────────────────────────────────────
 
-    stored_id = page.session.store.get("user_id") if page.session.store.contains_key("user_id") else None
+    stored_id = _load_session()
     if stored_id:
         with get_connection() as conn:
             user = conn.execute("SELECT id FROM users WHERE id=?", (stored_id,)).fetchone()

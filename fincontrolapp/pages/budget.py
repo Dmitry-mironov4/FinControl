@@ -82,7 +82,7 @@ class BudgetPage(BasePage):
                 ft.Container(
                     content=ft.Text(
                         "Нет бюджетов. Нажмите + чтобы задать лимит.",
-                        color=ft.Colors.WHITE54, font_family="Montserrat Medium",
+                        color=ft.Colors.WHITE_54, font_family="Montserrat Medium",
                         size=14, text_align=ft.TextAlign.CENTER,
                     ),
                     alignment=ft.Alignment(0, 0),
@@ -106,7 +106,7 @@ class BudgetPage(BasePage):
                                         ft.Text(
                                             f"{b.spent_amount:,.0f} / {b.limit_amount:,.0f} {currency}",
                                             font_family="Montserrat Medium",
-                                            size=12, color=ft.Colors.WHITE70,
+                                            size=12, color=ft.Colors.WHITE_70,
                                         ),
                                     ],
                                 ),
@@ -130,7 +130,7 @@ class BudgetPage(BasePage):
                                 ft.Text(
                                     f"{b.progress_pct:.0f}% использовано",
                                     font_family="Montserrat Medium",
-                                    size=11, color=ft.Colors.WHITE54,
+                                    size=11, color=ft.Colors.WHITE_54,
                                 ),
                             ],
                             spacing=6,

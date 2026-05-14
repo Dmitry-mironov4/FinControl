@@ -7,10 +7,10 @@ class BudgetService:
     def __init__(self, user_id: int):
         self._user_id = user_id
 
-    def get_budgets(self, period: str = 'monthly') -> list[Budget]:
+    def get_budgets(self, period: str = 'monthly', year: int | None = None) -> list[Budget]:
         with get_connection() as con:
             repo = BudgetRepository(con)
-            return repo.get_budgets_with_spent(self._user_id, period)
+            return repo.get_budgets_with_spent(self._user_id, period, year)
 
     def set_budget(self, category_id: int, limit_amount: float, period: str = 'monthly') -> None:
         with get_connection() as con:

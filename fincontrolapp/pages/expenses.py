@@ -49,6 +49,7 @@ class ExpensesPage(BasePage):
         expenses = [t for t in expenses_all if self._is_current_month(t["date"])]
         period = self._current_period_label()
         month_total = sum(t["amount"] for t in expenses)
+        sym = get_currency_symbol(self.page_ref)
         title = (
             f"История: {self._selected_category_name}"
             if self._selected_category_name
@@ -80,12 +81,11 @@ class ExpensesPage(BasePage):
                     controls=[
                         ft.Icon(ft.Icons.CALENDAR_MONTH, size=14, color="#6976EB"),
                         ft.Text(f"Период: {period}", size=12,font_family="Montserrat SemiBold", color="#6976EB"),
-                        ft.Text(f"Сумма: {month_total:,.0f} ₽",font_family="Montserrat SemiBold", size=12, color="#483EB7"),
+                        ft.Text(f"Сумма: {month_total:,.0f} {sym}",font_family="Montserrat SemiBold", size=12, color="#483EB7"),
                     ],
                     alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                 ),
             ),
-            self._expense_list(expenses),
             ft.GestureDetector(
                 on_tap=self._open_add_dialog,
                 content=ft.Container(
@@ -107,6 +107,7 @@ class ExpensesPage(BasePage):
                     ),
                 ),
             ),
+            self._expense_list(expenses),
         ], spacing=16)
 
     def _category_card(self, category):

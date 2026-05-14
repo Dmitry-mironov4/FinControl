@@ -53,6 +53,16 @@ class SimulatorPage(BasePage):
 
     def build_body(self):
         self._result_container = ft.Container(visible=False)
+        self._focus_sink = ft.TextField(
+            keyboard_type=ft.KeyboardType.NONE,
+            border_color=ft.Colors.TRANSPARENT,
+            focused_border_color=ft.Colors.TRANSPARENT,
+            bgcolor=ft.Colors.TRANSPARENT,
+            color=ft.Colors.TRANSPARENT,
+            cursor_color=ft.Colors.TRANSPARENT,
+            label_style=ft.TextStyle(color=ft.Colors.TRANSPARENT),
+            height=1,
+        )
 
         panel_builders = [
             self._build_purchase_panel,
@@ -63,7 +73,8 @@ class SimulatorPage(BasePage):
         active_panel = panel_builders[self._active_tab]()
 
         return ft.Column(
-            controls=[self._build_tab_switcher(), active_panel, self._result_container],
+            controls=[self._build_tab_switcher(), active_panel,
+                      self._focus_sink, self._result_container],
             spacing=16,
         )
 
@@ -559,7 +570,8 @@ class SimulatorPage(BasePage):
 
     # ── event handlers ────────────────────────────────────────────────────────
 
-    def _on_calculate_purchase(self, e):
+    async def _on_calculate_purchase(self, _):
+        await self._focus_sink.focus()
         fields = (self._purchase_cost, self._purchase_income,
                   self._purchase_expenses, self._purchase_savings)
         cost,     ok1 = self._parse_amount(self._purchase_cost, "стоимость покупки")
@@ -605,7 +617,8 @@ class SimulatorPage(BasePage):
 
         self._show_result(result)
 
-    def _on_calculate_subscription(self, e):
+    async def _on_calculate_subscription(self, _):
+        await self._focus_sink.focus()
         fields = (self._sub_cost, self._sub_income, self._sub_expenses, self._sub_months)
         sub_cost,  ok1 = self._parse_amount(self._sub_cost, "стоимость подписки")
         income,    ok2 = self._parse_amount(self._sub_income, "доход")
@@ -648,7 +661,8 @@ class SimulatorPage(BasePage):
         result["_scenarios"] = scenarios
         self._show_result(result)
 
-    def _on_calculate_goal(self, e):
+    async def _on_calculate_goal(self, _):
+        await self._focus_sink.focus()
         fields = (self._goal_amount, self._goal_income,
                   self._goal_expenses, self._goal_savings)
         goal,     ok1 = self._parse_amount(self._goal_amount, "целевую сумму")
@@ -675,7 +689,8 @@ class SimulatorPage(BasePage):
         }
         self._show_result(result)
 
-    def _on_calculate_cut(self, e):
+    async def _on_calculate_cut(self, _):
+        await self._focus_sink.focus()
         fields = (self._cut_income, self._cut_expenses,
                   self._cut_percent, self._cut_months)
         income,   ok1 = self._parse_amount(self._cut_income, "доход")

@@ -6,8 +6,8 @@ class BudgetController:
     def __init__(self, user_id: int):
         self._service = BudgetService(user_id)
 
-    def get_budgets(self, period: str = 'monthly') -> list[Budget]:
-        return self._service.get_budgets(period)
+    def get_budgets(self, period: str = 'monthly', year: int | None = None) -> list[Budget]:
+        return self._service.get_budgets(period, year)
 
     def set_budget(self, category_id: int, limit_amount: float, period: str = 'monthly') -> None:
         self._service.set_budget(category_id, limit_amount, period)
