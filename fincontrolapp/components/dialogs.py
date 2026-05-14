@@ -1,6 +1,9 @@
 def show_dialog(page, dialog):
-    page.open(dialog)
+    page.dialog = dialog
+    dialog.open = True
+    page.update()
 
 
 def close_dialog(page, dialog):
-    page.close(dialog)
+    dialog.open = False
+    page.update()

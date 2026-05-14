@@ -125,14 +125,17 @@ def main(page: ft.Page):
                 amount = float(raw.replace(",", "."))
             except ValueError:
                 close_dialog(page, dlg)
-                page.open(ft.SnackBar(
+                sb = ft.SnackBar(
                     content=ft.Text("Введите корректную сумму", color="#FFFFFF", font_family="Montserrat Medium", size=14),
                     bgcolor="#F44336",
                     shape=ft.RoundedRectangleBorder(radius=12),
                     behavior=ft.SnackBarBehavior.FLOATING,
                     margin=ft.Margin.only(left=16, right=16, bottom=80),
                     duration=3000,
-                ))
+                )
+                page.snack_bar = sb
+                sb.open = True
+                page.update()
                 return
 
             if amount <= 0:
