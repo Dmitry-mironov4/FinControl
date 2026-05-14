@@ -1,8 +1,19 @@
-import sqlite3
 import os
+import platform
+import sqlite3
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, 'database.db')
+
+
+def get_db_path():
+    db_name = 'database.db'
+    if platform.system() == 'Darwin' and os.environ.get('FLUTTER_INITIALIZED') == 'true':
+        documents_dir = os.path.expanduser('~/Documents')
+        return os.path.join(documents_dir, db_name)
+    return os.path.join(BASE_DIR, db_name)
+
+
+DB_PATH = get_db_path()
 
 
 def get_connection():
@@ -83,7 +94,7 @@ def create_tables():
         )
     ''')
 
-   # бюджеты по категориям
+    # бюджеты по категориям
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS budgets (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -96,7 +107,28 @@ def create_tables():
             FOREIGN KEY (category_id) REFERENCES categories(id),
             UNIQUE(user_id, category_id, period)
         )
-    ''') 
+    ''')
+
+    # таймеры антиимпульсных покупок
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS purchase_timers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            item_name TEXT NOT NULL,
+            amount DECIMAL(10,2) NOT NULL,
+            remind_at TIMESTAMP NOT NULL,
+            notified INTEGER DEFAULT 0,
+            decision TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id)
+        )
+    ''')
+
+    # миграция: notification_hour для пользователей (default 9 = 09:00)
+    try:
+        cursor.execute('ALTER TABLE users ADD COLUMN notification_hour INTEGER DEFAULT 9')
+    except Exception:
+        pass
 
     # миграция: добавляем start_date в subscriptions для существующих БД
     try:
@@ -111,6 +143,67 @@ def create_tables():
         pass
     try:
         cursor.execute('ALTER TABLE subscriptions ADD COLUMN last_charged_at DATE')
+    except Exception:
+        pass
+
+    # миграция: настройки уведомлений бота
+    try:
+        cursor.execute('ALTER TABLE users ADD COLUMN notify_subscriptions INTEGER DEFAULT 1')
+    except Exception:
+        pass
+    try:
+        cursor.execute('ALTER TABLE users ADD COLUMN notify_goals INTEGER DEFAULT 1')
+    except Exception:
+        pass
+    try:
+        cursor.execute('ALTER TABLE users ADD COLUMN notify_budget INTEGER DEFAULT 1')
+    except Exception:
+        pass
+
+    # миграция: временный пароль для восстановления через бота
+    try:
+        cursor.execute('ALTER TABLE users ADD COLUMN reset_password TEXT')
+    except Exception:
+        pass
+
+    # миграция: токен привязки Telegram (15 минут)
+    try:
+        cursor.execute('ALTER TABLE users ADD COLUMN link_token TEXT')
+    except Exception:
+        pass
+    try:
+        cursor.execute('ALTER TABLE users ADD COLUMN link_token_expires_at TIMESTAMP')
+    except Exception:
+        pass
+
+    # миграция: настройки отображения валюты
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN display_currency TEXT DEFAULT 'RUB'")
+    except Exception:
+        pass
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN currency_conversion TEXT DEFAULT 'as_is'")
+    except Exception:
+        pass
+    try:
+        cursor.execute("ALTER TABLE users ADD COLUMN secondary_currency TEXT DEFAULT NULL")
+    except Exception:
+        pass
+
+    # миграция: нормализация телефонов к формату +7XXXXXXXXXX
+    try:
+        rows = cursor.execute("SELECT id, phone FROM users WHERE phone IS NOT NULL").fetchall()
+        for row in rows:
+            phone = row[1]
+            import re as _re
+            digits = _re.sub(r'\D', '', phone)
+            if len(digits) == 11 and digits[0] in ('7', '8'):
+                digits = '7' + digits[1:]
+            elif len(digits) == 10:
+                digits = '7' + digits
+            normalized = '+' + digits if digits else phone
+            if normalized != phone:
+                cursor.execute("UPDATE users SET phone=? WHERE id=?", (normalized, row[0]))
     except Exception:
         pass
 

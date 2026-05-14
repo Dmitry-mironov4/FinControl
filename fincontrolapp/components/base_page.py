@@ -16,9 +16,10 @@ BasePage определяет скелет экрана (заголовок + т
         def build_body(self):
             return ft.Text("Привет!")
 """
-
+import uuid
 import flet as ft
 from datetime import date
+from components.theme import AppTheme
 
 MONTH_NAMES = [
     "январь", "февраль", "март", "апрель", "май", "июнь",
@@ -61,9 +62,11 @@ class BasePage(ft.Container):
         self.page_ref   = page
         self.page_title = title
         self.expand     = True                    # занимает всё доступное пространство
-        self.bgcolor    = "transparent"               # фоновый цвет экрана
-        self.padding    = ft.Padding(left=16, right=16, top=48, bottom=8)
-        # top=48 — отступ сверху, чтобы контент не уходил под системную строку статуса
+        self.bgcolor    = AppTheme.BACKGROUND               # фоновый цвет экрана
+        self.padding    = ft.Padding(left=16, right=16, top=20, bottom=8)
+        self.alignment  = ft.Alignment(-1, -1)
+        self.key = str(uuid.uuid4())  # новый key при каждом rebuild
+        # top=20 — отступ сверху, чтобы контент не уходил под системную строку статуса
         # scroll=AUTO на внешней колонке — скроллится весь экран целиком,
         # включая заголовок. Дочерние build_body() НЕ должны задавать
         # собственный scroll, иначе получится скролл внутри скролла.
@@ -159,9 +162,9 @@ class BasePage(ft.Container):
         """Перестраивает тело страницы и обновляет UI."""
         self.rebuild()
         try:
-            self.update()
-        except RuntimeError:
-            pass
+            self.page_ref.update()  # обновляем всю страницу, не только контейнер
+        except Exception as e:
+            print(f"refresh error: {e}")
 
     def _is_current_month(self, value):
         if not value:

@@ -5,6 +5,7 @@ from collections import OrderedDict
 from components.base_page import BasePage
 from components.dialogs import close_dialog as _close_dialog
 from components.form_utils import parse_amount, parse_date
+from utils import format_amount
 
 
 CATEGORY_ICONS = {
@@ -71,7 +72,7 @@ class TransactionsPage(BasePage):
     # ── Фильтр ──────────────────────────────────────────────────────────────
 
     def _filter_row(self):
-         filters = [("Все", None), ("Доходы", "income"), ("Расходы", "expense")]
+         filters = [("Все", None), ("Пополнение", "income"), ("Траты", "expense")]
          buttons = []
          for label, value in filters:
              active = self._filter == value
@@ -80,11 +81,11 @@ class TransactionsPage(BasePage):
                 on_tap=lambda e, v=value: self._set_filter(v),
                 content=ft.Container(
                     padding=ft.Padding.only(left=20, right=20, top=9, bottom=9),
-                    border_radius=20,
+                    border_radius=24,
                     gradient=ft.RadialGradient(
                         colors=["#ffffff", "#88A2FF"],
                         center=ft.Alignment(0, -0.2),
-                        radius=4.0,
+                        radius=8.0,
                         stops=[0.0, 0.8],
                     ) if active else None,
                     bgcolor=ft.Colors.with_opacity(0.07, "#483EB7") if not active else None,
@@ -104,7 +105,7 @@ class TransactionsPage(BasePage):
                 gradient=ft.LinearGradient(
                     colors=["#ffffff", "#88A2FF"],
                     begin=ft.Alignment(-1, -1),
-                    end=ft.Alignment(5, 5),
+                    end=ft.Alignment(5, 8),
                 ),
                 padding=ft.Padding.only(left=4, right=4, top=4, bottom=4),
                 content=ft.Row(buttons, spacing=4, tight=True),
@@ -186,7 +187,7 @@ class TransactionsPage(BasePage):
         )
         page.overlay.append(dlg)
         page.update()
-        page.dialog = dlg; dlg.open = True; page.update()
+        page.show_dialog(dlg)
 
     # ── Список транзакций с группировкой по датам ─────────────────────────────
 
@@ -197,8 +198,8 @@ class TransactionsPage(BasePage):
                 padding=24,
                 gradient=ft.LinearGradient(
                     colors=["#ffffff", "#88A2FF"],
-                    begin=ft.Alignment(-1, -1),
-                    end=ft.Alignment(1, 1),
+                    begin=ft.Alignment(-2, -1),
+                    end=ft.Alignment(1, 8),
                 ),
                 content=ft.Column([
                     ft.Icon(
@@ -216,7 +217,7 @@ class TransactionsPage(BasePage):
                 ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=8),
             )
 
-        # Группируем по дате (сохраняем порядок)
+        # Группируем по дате
         groups: OrderedDict = OrderedDict()
         for t in transactions:
             groups.setdefault(t["date"], []).append(t)
@@ -272,12 +273,12 @@ class TransactionsPage(BasePage):
 
                 row_content = ft.Container(
                     padding=ft.Padding.only(left=12, right=8, top=10, bottom=10),
-                    border_radius=12,
+                    border_radius=24,
                     border=ft.Border(),
                     gradient=ft.LinearGradient(
                         colors=["#ffffff", "#88A2FF"],
                         begin=ft.Alignment(-2, -2),
-                        end=ft.Alignment(2, 3),
+                        end=ft.Alignment(2, 8),
                     ),
                     content=ft.Row(
                         alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
@@ -311,7 +312,7 @@ class TransactionsPage(BasePage):
                             ], spacing=12, expand=True),
                             ft.Row([
                                 ft.Text(
-                                    f"{'+ ' if is_income else '− '}{t['amount']:,.0f} ₽",
+                                    format_amount(t['amount'], self.page_ref, '+ ' if is_income else '− '),
                                     color="#253A82" if is_income else ft.Colors.with_opacity(0.6, "#FF7E1C"),
                                     size=14,
                                     font_family="Montserrat SemiBold",

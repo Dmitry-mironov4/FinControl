@@ -348,7 +348,7 @@ class IncomePage(BasePage):
         )
         page.overlay.append(dlg)
         page.update()
-        page.dialog = dlg; dlg.open = True; page.update()
+        page.show_dialog(dlg)
 
     def _make_date_field(self, label, initial_value):
         """Создаёт TextField с DatePicker для повторного использования."""
@@ -436,7 +436,7 @@ class IncomePage(BasePage):
         )
         page.overlay.append(dlg)
         page.update()
-        page.dialog = dlg; dlg.open = True; page.update()
+        page.show_dialog(dlg)
 
     def _make_date_field(self, label, initial_value):
         """Создаёт TextField с DatePicker для повторного использования."""

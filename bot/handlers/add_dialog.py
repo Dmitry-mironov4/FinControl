@@ -5,7 +5,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message, CallbackQuery
 
-from bot.keyboards.inline import type_keyboard, categories_keyboard, skip_keyboard, main_menu_keyboard
+from bot.keyboards.inline import type_keyboard, categories_keyboard, skip_keyboard
 from fincontrolapp.db_queries import (
     get_user_by_telegram_id,
     get_categories,
@@ -31,7 +31,7 @@ async def cmd_cancel(message: Message, state: FSMContext):
         await message.answer("Нет активного диалога.")
         return
     await state.clear()
-    await message.answer("❌ Отменено.", reply_markup=main_menu_keyboard())
+    await message.answer("❌ Отменено.")
 
 
 @router.message(Command("add"))
@@ -68,7 +68,7 @@ async def process_amount(message: Message, state: FSMContext):
     data = await state.get_data()
     tx_type = data["type"]
 
-    categories = get_categories(type=tx_type)
+    categories = get_categories(type_=tx_type)
     await state.set_state(AddTransaction.category)
     await message.answer("Выбери категорию:", reply_markup=categories_keyboard(categories))
 
@@ -79,7 +79,7 @@ async def process_category(callback: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     tx_type = data["type"]
 
-    categories = get_categories(type=tx_type)
+    categories = get_categories(type_=tx_type)
     category_name = next((c["name"] for c in categories if c["id"] == category_id), "Другое")
 
     await state.update_data(category_id=category_id, category_name=category_name)
@@ -118,7 +118,7 @@ async def _finish_add(message: Message, state: FSMContext, description, edit=Fal
 
     add_transaction(
         user_id=user["id"],
-        type=tx_type,
+        type_=tx_type,
         amount=amount,
         category_id=category_id,
         description=description,
@@ -128,7 +128,6 @@ async def _finish_add(message: Message, state: FSMContext, description, edit=Fal
     await state.clear()
 
     sign = "+" if tx_type == "income" else "-"
-    label = "Доход" if tx_type == "income" else "Расход"
     amount_str = f"{amount:,.0f}".replace(",", " ")
     desc_part = f" ({description})" if description else ""
     text = (
@@ -137,6 +136,6 @@ async def _finish_add(message: Message, state: FSMContext, description, edit=Fal
     )
 
     if edit:
-        await message.edit_text(text, reply_markup=main_menu_keyboard())
+        await message.edit_text(text)
     else:
-        await message.answer(text, reply_markup=main_menu_keyboard())
+        await message.answer(text)
