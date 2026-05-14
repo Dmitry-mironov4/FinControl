@@ -55,12 +55,12 @@ class BudgetPage(BasePage):
                         ft.Container(
                             content=ft.Text("Бюджеты", font_family="Montserrat Bold",
                                            size=22, color=ft.Colors.WHITE),
-                            padding=ft.padding.only(left=16, top=16, bottom=8),
+                            padding=ft.Padding.only(left=16, top=16, bottom=8),
                         ),
                         ft.Container(
                             content=self._list_ref,
                             expand=True,
-                            padding=ft.padding.symmetric(horizontal=16),
+                            padding=ft.Padding.symmetric(horizontal=16),
                         ),
                     ],
                     expand=True,
@@ -69,7 +69,7 @@ class BudgetPage(BasePage):
                 ft.Container(
                     content=add_btn,
                     alignment=ft.Alignment(1, 1),
-                    padding=ft.padding.only(right=16, bottom=16),
+                    padding=ft.Padding.only(right=16, bottom=16),
                 ),
             ],
             expand=True,
@@ -86,7 +86,7 @@ class BudgetPage(BasePage):
                         size=14, text_align=ft.TextAlign.CENTER,
                     ),
                     alignment=ft.Alignment(0, 0),
-                    padding=ft.padding.only(top=60),
+                    padding=ft.Padding.only(top=60),
                 )
             ]
 
@@ -135,7 +135,7 @@ class BudgetPage(BasePage):
                             ],
                             spacing=6,
                         ),
-                        padding=ft.padding.all(14),
+                        padding=ft.Padding.all(14),
                         border_radius=14,
                         bgcolor="#1A1A24",
                     ),

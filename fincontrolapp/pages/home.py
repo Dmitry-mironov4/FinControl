@@ -93,7 +93,7 @@ class HomePage(BasePage):
                                 # Кнопка «Все →» — явный сигнал, что можно тапнуть
                                 ft.Container(
                                     border_radius=20,
-                                    padding=ft.padding.symmetric(horizontal=10, vertical=5),
+                                    padding=ft.Padding.symmetric(horizontal=10, vertical=5),
                                     gradient=ft.LinearGradient(
                                         colors=["#ffffff", "#88A2FF"],
                                         begin=ft.Alignment(-1, -1),
