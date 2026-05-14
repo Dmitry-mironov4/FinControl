@@ -339,6 +339,7 @@ def main(page: ft.Page):
             6: ExpensesPage(page, ExpensesController(uid)),
             7: TransactionsPage(page, TransactionsController(uid)),
             8: SimulatorPage(page, SimulatorController()),
+            9: BudgetPage(page, BudgetController(uid)),
         }
 
         def logout():
