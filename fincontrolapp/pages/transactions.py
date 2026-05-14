@@ -5,7 +5,6 @@ from collections import OrderedDict
 from components.base_page import BasePage
 from components.dialogs import close_dialog as _close_dialog
 from components.form_utils import parse_amount, parse_date
-from utils import get_currency_symbol
 
 
 CATEGORY_ICONS = {
@@ -187,7 +186,7 @@ class TransactionsPage(BasePage):
         )
         page.overlay.append(dlg)
         page.update()
-        page.show_dialog(dlg)
+        page.open(dlg)
 
     # ── Список транзакций с группировкой по датам ─────────────────────────────
 
@@ -312,7 +311,7 @@ class TransactionsPage(BasePage):
                             ], spacing=12, expand=True),
                             ft.Row([
                                 ft.Text(
-                                    f"{'+ ' if is_income else '− '}{t['amount']:,.0f} {get_currency_symbol(self.page_ref)}",
+                                    f"{'+ ' if is_income else '− '}{t['amount']:,.0f} ₽",
                                     color="#253A82" if is_income else ft.Colors.with_opacity(0.6, "#FF7E1C"),
                                     size=14,
                                     font_family="Montserrat SemiBold",
@@ -465,7 +464,7 @@ class TransactionsPage(BasePage):
             category_dd.update()
 
         amount_field.on_change = validate_amount
-        category_dd.on_change = validate_category
+        category_dd.on_select = validate_category
 
         def load_categories(type_val):
             try:
@@ -478,7 +477,7 @@ class TransactionsPage(BasePage):
             category_dd.value = str(_other.id) if _other else None
             self.page_ref.update()
 
-        type_field.on_change = lambda e: load_categories(type_field.value)
+        type_field.on_select = lambda e: load_categories(type_field.value)
         load_categories("expense")
 
         bs = ft.BottomSheet(open=False, content=ft.Container())
@@ -676,7 +675,7 @@ class TransactionsPage(BasePage):
             category_dd.update()
 
         amount_field.on_change = validate_amount
-        category_dd.on_change = validate_category
+        category_dd.on_select = validate_category
 
         def load_categories(type_val, selected_id=None):
             try:
@@ -692,7 +691,7 @@ class TransactionsPage(BasePage):
                 category_dd.value = str(_other.id) if _other else None
             self.page_ref.update()
 
-        type_field.on_change = lambda e: load_categories(type_field.value)
+        type_field.on_select = lambda e: load_categories(type_field.value)
         load_categories(transaction["type"], transaction["category_id"])
 
         bs = ft.BottomSheet(open=False, content=ft.Container())
@@ -857,7 +856,7 @@ class TransactionsPage(BasePage):
             category_dd.update()
 
         amount_field.on_change = validate_amount
-        category_dd.on_change = validate_category
+        category_dd.on_select = validate_category
 
         def load_categories(type_val, selected_id=None):
             try:
@@ -873,7 +872,7 @@ class TransactionsPage(BasePage):
                 category_dd.value = str(_other.id) if _other else None
             self.page_ref.update()
 
-        type_field.on_change = lambda e: load_categories(type_field.value)
+        type_field.on_select = lambda e: load_categories(type_field.value)
         load_categories(transaction["type"], transaction["category_id"])
 
         bs = ft.BottomSheet(open=False, content=ft.Container())

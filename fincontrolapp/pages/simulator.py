@@ -252,7 +252,7 @@ class SimulatorPage(BasePage):
                         bgcolor="rgba(0,0,0,0.08)",
                         color=color,
                         height=8,
-                        border_radius=ft.border_radius.all(4),
+                        border_radius=ft.BorderRadius.all(4),
                     ),
                 ],
             )

@@ -326,7 +326,7 @@ class SubscriptionsPage(BasePage):
         )
         page.overlay.append(dlg)
         page.update()
-        page.show_dialog(dlg)
+        page.open(dlg)
 
     def _open_add_dialog(self, e):
         error_style = ft.TextStyle(

@@ -125,7 +125,7 @@ class BudgetPage(BasePage):
                                     bgcolor="#333355",
                                     color=b.status_color,
                                     height=8,
-                                    border_radius=ft.border_radius.all(4),
+                                    border_radius=ft.BorderRadius.all(4),
                                 ),
                                 ft.Text(
                                     f"{b.progress_pct:.0f}% использовано",
