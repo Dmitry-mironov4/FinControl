@@ -1,7 +1,6 @@
 import flet as ft
 import os
 import threading
-import time
 from datetime import datetime
 from components.base_page import BasePage
 from components.empty_state import empty_state
@@ -9,7 +8,6 @@ from utils import get_currency_symbol, format_amount
 
 
 def _format_time_left(remind_at: str) -> str:
-    """Return time left like '2 ч 15 мин', '45 мин', or 'Пора!'."""
     try:
         target = datetime.strptime(remind_at, "%Y-%m-%d %H:%M:%S")
     except ValueError:
@@ -137,7 +135,7 @@ class HomePage(BasePage):
         self._body_container = ft.Container(
             content=_skeleton_body(),
             opacity=1,
-            animate_opacity=ft.Animation(400, ft.AnimationCurve.EASE_OUT),
+            animate_opacity=ft.Animation(150, ft.AnimationCurve.EASE_OUT),
         )
         threading.Thread(target=self._load_data, daemon=True).start()
         return self._body_container
@@ -167,8 +165,6 @@ class HomePage(BasePage):
             self._body_container.update()
         except Exception:  
             return
-
-        time.sleep(0.25)
 
         # Подменяем контент и fade in
         self._body_container.content = self._real_body(balance, monthly, transactions)

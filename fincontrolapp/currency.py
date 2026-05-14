@@ -11,7 +11,7 @@ _CACHE: dict | None = None
 _CACHE_TS: float = 0.0
 _CACHE_TTL: float = 3600.0  # секунды
 
-SUPPORTED: tuple = ("USD", "EUR", "CNY", "GBP")
+SUPPORTED: tuple = ("USD", "EUR", "CNY", "GBP", "KZT", "BYN")
 _API_URL = "https://www.cbr-xml-daily.ru/daily_json.js"
 
 

@@ -261,6 +261,7 @@ def update_transaction(transaction_id: int, amount: float, date, user_id: int) -
         return cursor.rowcount > 0
 
 
+
 # ─── БАЛАНС (для Home) ────────────────────────────────────────────────────────
 
 def get_balance(user_id):

@@ -28,7 +28,7 @@ from flet_charts import (
     ChartGridLines, ChartAxis, ChartAxisLabel,
 )
 from flet_charts.bar_chart import BarChartTooltip
-from datetime import datetime
+from datetime import datetime, date, timedelta
 from database import get_connection
 from components.base_page import BasePage
 from utils import get_currency_symbol
@@ -93,6 +93,7 @@ def get_monthly_summary(user_id: int, year: int) -> list[dict]:
     return result
 
 
+
 def get_expense_breakdown_by_year(user_id: int, year: int) -> list[dict]:
     with get_connection() as conn:
         rows = conn.execute(
@@ -120,6 +121,90 @@ def get_expense_breakdown_by_year(user_id: int, year: int) -> list[dict]:
         for i, r in enumerate(rows)
     ]
 
+
+def get_expense_breakdown_by_period(user_id: int, start_date: str, end_date: str) -> list[dict]:
+    """Разбивка расходов по категориям за произвольный период."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            """SELECT c.name AS category, SUM(t.amount) AS total
+               FROM transactions t JOIN categories c ON t.category_id = c.id
+               WHERE t.user_id = ? AND t.type = 'expense' AND t.date BETWEEN ? AND ?
+               GROUP BY c.id, c.name ORDER BY total DESC""",
+            (user_id, start_date, end_date),
+        ).fetchall()
+    total = sum(r["total"] for r in rows) or 0
+    if total == 0:
+        return []
+    palette = ["#6976EB", "#FF7684", "#00B487", "#FFB347", "#9B59B6", "#5DADE2"]
+    return [
+        {"label": r["category"], "value": round(r["total"] / total * 100), "color": palette[i % len(palette)]}
+        for i, r in enumerate(rows)
+    ]
+
+
+def period_dates(period: str, year: int | None = None) -> tuple[str, str]:
+    """Возвращает (start, end) для периода.
+    Если year задан и он не текущий — точка отсчёта 31 декабря того года.
+    """
+    today = date.today()
+    anchor = today if (year is None or year == today.year) else date(year, 12, 31)
+    end = anchor.isoformat()
+    if period == "month":
+        start = anchor.replace(day=1).isoformat()
+    elif period == "quarter":
+        month = anchor.month - 3
+        yr = anchor.year
+        if month <= 0:
+            month += 12
+            yr -= 1
+        start = date(yr, month, 1).isoformat()
+    elif period == "half":
+        month = anchor.month - 6
+        yr = anchor.year
+        if month <= 0:
+            month += 12
+            yr -= 1
+        start = date(yr, month, 1).isoformat()
+    else:  # year
+        start = anchor.replace(month=1, day=1).isoformat()
+    return start, end
+
+
+def get_trend_6months(user_id: int, year: int | None = None) -> list[dict]:
+    """Доходы и расходы за последние 6 месяцев выбранного года.
+    Если year не задан или это текущий год — считает от сегодня.
+    """
+    today = date.today()
+    anchor = today if (year is None or year == today.year) else date(year, 12, 31)
+    results = []
+    for i in range(5, -1, -1):
+        month = anchor.month - i
+        yr = anchor.year
+        while month <= 0:
+            month += 12
+            yr -= 1
+        start = f"{yr}-{month:02d}-01"
+        next_month = date(yr, month, 28) + timedelta(days=4)
+        last_day = (next_month - timedelta(days=next_month.day)).day
+        end = f"{yr}-{month:02d}-{last_day:02d}"
+        with get_connection() as conn:
+            row = conn.execute(
+                """SELECT
+                      SUM(CASE WHEN type='income' THEN amount ELSE 0 END) AS income,
+                      SUM(CASE WHEN type='expense' THEN amount ELSE 0 END) AS expense
+                   FROM transactions
+                   WHERE user_id = ? AND date BETWEEN ? AND ?""",
+                (user_id, start, end),
+            ).fetchone()
+        results.append({
+            "month": MONTH_NAMES[month - 1],
+            "income": row["income"] or 0.0,
+            "expense": row["expense"] or 0.0,
+        })
+    return results
+
+
+# ─── UI-helpers ──────────────────────────────────────────────────────────────
 
 def _title(text: str) -> ft.Text:
     return ft.Text(text, size=16, font_family="Montserrat SemiBold",
@@ -164,10 +249,14 @@ def _has_enough_data(monthly: list[dict]) -> bool:
 
 class AnalyticsPage(BasePage):
 
-    def __init__(self, page: ft.Page, user_id: int | None = None):
+    def __init__(self, page: ft.Page, user_id: int | None = None, budget_controller=None):
         self.user_id = user_id
+        self._budget_ctrl = budget_controller
         self.selected_year = datetime.now().year
+        self.current_period = "month"
+        self.period_container = ft.Container()
         super().__init__(page, "Аналитика")
+        self._reload_period_data(self.current_period)
 
     def build_header(self):
         return ft.AppBar(
@@ -206,6 +295,40 @@ class AnalyticsPage(BasePage):
             _card(self._category_bars(categories)) if categories
             else _card(_stub("Нет расходов за выбранный год"))
         )
+        # Структура расходов за период (с фильтром)
+        controls.append(_title("Структура расходов за период"))
+        period_dropdown = ft.Dropdown(
+            value=self.current_period,
+            width=160,
+            text_style=ft.TextStyle(font_family="Montserrat Medium", size=13, color="#000000"),
+            options=[
+                ft.dropdown.Option(key="month", text="Месяц"),
+                ft.dropdown.Option(key="quarter", text="Квартал"),
+                ft.dropdown.Option(key="half", text="Полгода"),
+                ft.dropdown.Option(key="year", text="Год"),
+            ],
+            on_select=lambda e: self._reload_period_data(e.control.value),
+            bgcolor="#F0F0F0", border_color="#483EB7",
+        )
+        period_block = ft.Container(
+            content=ft.Column([
+                ft.Row([period_dropdown], alignment=ft.MainAxisAlignment.END),
+                self.period_container,
+            ], spacing=10),
+            padding=ft.Padding.all(16),
+            border_radius=16,
+            bgcolor=ft.Colors.with_opacity(0.2, "#483EB7"),
+        )
+        controls.append(period_block)
+
+        # Бюджеты по категориям
+        self._budget_container = ft.Container(
+            content=self._build_budget_section()
+        )
+        controls.append(self._budget_container)
+
+        controls.append(_title("Тренд 6 месяцев"))
+        controls.append(_card(self._trend_6months_chart()))
 
         return controls
 
@@ -265,6 +388,7 @@ class AnalyticsPage(BasePage):
             years = get_available_years(self.user_id)
             self._render_year_buttons(years)
             self._charts_col.controls = self._build_chart_controls()
+            self._reload_period_data(self.current_period)
             self.page_ref.update()
         return handler
 
@@ -539,3 +663,229 @@ class AnalyticsPage(BasePage):
                 ),
             ], spacing=6))
         return ft.Column(rows, spacing=14)
+
+    # ── Секция бюджетов ──────────────────────────────────────────────────────
+    def _build_budget_section(self) -> ft.Control:
+        if not self._budget_ctrl:
+            return ft.Container()
+
+        budgets = self._budget_ctrl.get_budgets()
+        currency = get_currency_symbol(self.page_ref)
+
+        def open_dialog(budget=None):
+            categories = self._budget_ctrl.get_expense_categories()
+            if not categories:
+                return
+
+            amount_field = ft.TextField(
+                label=f"Лимит ({currency})",
+                keyboard_type=ft.KeyboardType.NUMBER,
+                text_style=ft.TextStyle(font_family="Montserrat Medium"),
+                label_style=ft.TextStyle(font_family="Montserrat Medium"),
+                border_color="#6976EB",
+                value=str(int(budget.limit_amount)) if budget else "",
+            )
+            cat_dropdown = ft.Dropdown(
+                label="Категория",
+                value=str(budget.category_id) if budget else None,
+                options=[ft.dropdown.Option(key=str(c["id"]), text=c["name"]) for c in categories],
+                text_style=ft.TextStyle(font_family="Montserrat Medium"),
+                label_style=ft.TextStyle(font_family="Montserrat Medium"),
+                border_color="#6976EB",
+                disabled=budget is not None,
+            )
+            dlg = ft.AlertDialog(
+                modal=True,
+                title=ft.Text("Бюджет по категории", font_family="Montserrat SemiBold"),
+            )
+
+            def on_save(e):
+                raw = (amount_field.value or "").strip()
+                cat_id_str = cat_dropdown.value
+                if not raw or not cat_id_str:
+                    return
+                try:
+                    limit = float(raw.replace(",", "."))
+                except ValueError:
+                    return
+                if limit <= 0:
+                    return
+                self._budget_ctrl.set_budget(int(cat_id_str), limit)
+                from components import close_dialog
+                close_dialog(self.page_ref, dlg)
+                self._refresh_budget_section()
+
+            def on_delete(e):
+                if budget:
+                    self._budget_ctrl.delete_budget(budget.id)
+                from components import close_dialog
+                close_dialog(self.page_ref, dlg)
+                self._refresh_budget_section()
+
+            def on_cancel(e):
+                from components import close_dialog
+                close_dialog(self.page_ref, dlg)
+
+            dlg.content = ft.Column(
+                controls=[cat_dropdown, amount_field],
+                tight=True, spacing=12,
+            )
+            actions = [
+                ft.TextButton("Отмена", on_click=on_cancel,
+                    style=ft.ButtonStyle(color="#483EB7",
+                        text_style=ft.TextStyle(font_family="Montserrat SemiBold"))),
+                ft.TextButton("Сохранить", on_click=on_save,
+                    style=ft.ButtonStyle(color="#483EB7",
+                        text_style=ft.TextStyle(font_family="Montserrat SemiBold"))),
+            ]
+            if budget:
+                actions.insert(1, ft.TextButton("Удалить", on_click=on_delete,
+                    style=ft.ButtonStyle(color="#F44336",
+                        text_style=ft.TextStyle(font_family="Montserrat SemiBold"))))
+            dlg.actions = actions
+            from components import show_dialog
+            show_dialog(self.page_ref, dlg)
+
+        # Строки бюджетов
+        if not budgets:
+            budget_rows = [
+                ft.Container(
+                    content=ft.Text(
+                        "Нет бюджетов. Нажмите + чтобы задать лимит.",
+                        color=ft.Colors.with_opacity(0.6, "#483EB7"),
+                        font_family="Montserrat Medium",
+                        size=13,
+                        text_align=ft.TextAlign.CENTER,
+                    ),
+                    alignment=ft.Alignment(0, 0),
+                    padding=ft.Padding.symmetric(vertical=16),
+                )
+            ]
+        else:
+            budget_rows = []
+            for b in budgets:
+                pct = min(b.progress_pct, 100)
+                budget_rows.append(
+                    ft.GestureDetector(
+                        on_tap=lambda e, budget=b: open_dialog(budget),
+                        content=ft.Column([
+                            ft.Row([
+                                ft.Text(b.category_name, font_family="Montserrat SemiBold",
+                                        size=13, color=ft.Colors.with_opacity(0.9, "#483EB7"), expand=True),
+                                ft.Text(
+                                    f"{b.spent_amount:,.0f} / {b.limit_amount:,.0f} {currency}",
+                                    font_family="Montserrat Medium",
+                                    size=12, color=ft.Colors.with_opacity(0.6, "#483EB7"),
+                                ),
+                            ]),
+                            ft.ProgressBar(
+                                value=pct / 100,
+                                bgcolor=ft.Colors.with_opacity(0.1, "#483EB7"),
+                                color=b.status_color,
+                                height=8,
+                                border_radius=ft.BorderRadius.all(4),
+                            ),
+                            ft.Text(
+                                f"{b.progress_pct:.0f}% использовано",
+                                font_family="Montserrat Medium",
+                                size=11,
+                                color=ft.Colors.with_opacity(0.5, "#483EB7"),
+                            ),
+                        ], spacing=6),
+                    )
+                )
+
+        add_btn = ft.TextButton(
+            "+ Добавить",
+            style=ft.ButtonStyle(color="#483EB7",
+                text_style=ft.TextStyle(font_family="Montserrat SemiBold")),
+            on_click=lambda e: open_dialog(),
+        )
+
+        return ft.Column([
+            ft.Row([
+                _title("Бюджеты по категориям"),
+                add_btn,
+            ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+            _card(ft.Column(budget_rows, spacing=14)),
+        ], spacing=6)
+
+    def _reload_period_data(self, period: str):
+        self.current_period = period
+        start, end = period_dates(period, self.selected_year)
+        breakdown = get_expense_breakdown_by_period(self.user_id, start, end)
+        self.period_container.content = (
+            self._category_bars(breakdown) if breakdown
+            else _stub("Нет расходов за выбранный период")
+        )
+        try:
+            self.period_container.update()
+        except RuntimeError:
+            pass
+
+    def _trend_6months_chart(self) -> ft.Control:
+        trend = get_trend_6months(self.user_id, self.selected_year)
+        if not trend or all(d["income"] == 0 and d["expense"] == 0 for d in trend):
+            return _stub("Недостаточно данных для тренда (нужно минимум 2 месяца)")
+
+        months = [d["month"] for d in trend]
+        incomes = [d["income"] for d in trend]
+        expenses = [d["expense"] for d in trend]
+        n = len(months)
+        max_val = max(max(incomes), max(expenses), 1)
+
+        income_points = [LineChartDataPoint(x=i, y=incomes[i]) for i in range(n)]
+        expense_points = [LineChartDataPoint(x=i, y=expenses[i]) for i in range(n)]
+
+        income_series = LineChartData(points=income_points, stroke_width=2, color="#23CF01", curved=True)
+        expense_series = LineChartData(points=expense_points, stroke_width=2, color="#FF7E1C", curved=True)
+
+        bottom_axis = ChartAxis(
+            labels=[
+                ChartAxisLabel(
+                    value=i,
+                    label=ft.Text(months[i], font_family="Montserrat SemiBold", size=11,
+                                  color=ft.Colors.with_opacity(0.9, "#483EB7")),
+                )
+                for i in range(n)
+            ],
+        )
+
+        return ft.Column([
+            ft.Row(
+                scroll=ft.ScrollMode.ALWAYS,
+                controls=[
+                    ft.Container(
+                        width=max(360, n * 70),
+                        height=300,
+                        content=LineChart(
+                            data_series=[income_series, expense_series],
+                            bottom_axis=bottom_axis,
+                            min_x=-0.5, max_x=n - 0.5,
+                            min_y=0, max_y=max_val * 1.25,
+                            horizontal_grid_lines=ChartGridLines(
+                                color=ft.Colors.with_opacity(0.09, "#483EB7")
+                            ),
+                            expand=True,
+                        ),
+                    ),
+                ],
+            ),
+            ft.Row([
+                ft.Row([
+                    ft.Container(width=12, height=3, bgcolor="#23CF01"),
+                    ft.Text("Доходы", font_family="Montserrat Medium", size=12,
+                            color=ft.Colors.with_opacity(0.9, "#483EB7")),
+                ], spacing=6),
+                ft.Row([
+                    ft.Container(width=12, height=3, bgcolor="#FF7E1C"),
+                    ft.Text("Расходы", font_family="Montserrat Medium", size=12,
+                            color=ft.Colors.with_opacity(0.9, "#483EB7")),
+                ], spacing=6),
+            ], spacing=20),
+        ], spacing=10)
+
+    def _refresh_budget_section(self):
+        """Перерисовывает только секцию бюджетов без перестройки всей страницы."""
+        self._budget_container.content = self._build_budget_section()
+        self.page_ref.update()

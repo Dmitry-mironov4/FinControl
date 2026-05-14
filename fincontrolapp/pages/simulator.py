@@ -248,7 +248,7 @@ class SimulatorPage(BasePage):
                         bgcolor="rgba(0,0,0,0.08)",
                         color=color,
                         height=8,
-                        border_radius=ft.border_radius.all(4),
+                        border_radius=ft.BorderRadius.all(4),
                     ),
                 ],
             )
@@ -304,7 +304,7 @@ class SimulatorPage(BasePage):
                 field.error = None
             else:
                 try:
-                    field.error = None if float(v) > 0 else "Сумма должна быть больше нуля"
+                    field.error = None if float(v) >= 0 else "Значение не может быть отрицательным"
                 except ValueError:
                     field.error = "Введите число, например: 5000"
             try:
@@ -361,7 +361,7 @@ class SimulatorPage(BasePage):
         self._purchase_cost     = self._field("Стоимость покупки")
         self._purchase_income   = self._field("Ежемесячный доход")
         self._purchase_expenses = self._field("Ежемесячные расходы")
-        self._purchase_savings  = self._field("Уже накоплено", hint="0")
+        self._purchase_savings  = self._field("Уже накоплено")
 
         _validate_cost = self._make_amount_validator(self._purchase_cost)
         def _cost_change(e):
@@ -406,7 +406,7 @@ class SimulatorPage(BasePage):
         self._sub_cost     = self._field("Стоимость подписки в месяц")
         self._sub_income   = self._field("Ежемесячный доход")
         self._sub_expenses = self._field("Прочие расходы")
-        self._sub_months   = self._field("Период анализа", suffix="мес.", hint="12")
+        self._sub_months   = self._field("Период анализа", suffix="мес.")
         self._sub_cost.on_change     = self._make_amount_validator(self._sub_cost)
         self._sub_income.on_change   = self._make_amount_validator(self._sub_income)
         self._sub_expenses.on_change = self._make_amount_validator(self._sub_expenses)
@@ -423,7 +423,7 @@ class SimulatorPage(BasePage):
         self._goal_amount   = self._field("Целевая сумма")
         self._goal_income   = self._field("Ежемесячный доход")
         self._goal_expenses = self._field("Ежемесячные расходы")
-        self._goal_savings  = self._field("Уже накоплено", hint="0")
+        self._goal_savings  = self._field("Уже накоплено")
         self._goal_amount.on_change   = self._make_amount_validator(self._goal_amount)
         self._goal_income.on_change   = self._make_amount_validator(self._goal_income)
         self._goal_expenses.on_change = self._make_amount_validator(self._goal_expenses)
@@ -440,8 +440,8 @@ class SimulatorPage(BasePage):
         self._cut_income   = self._field("Ежемесячный доход")
         self._cut_expenses = self._field("Текущие расходы")
         self._cut_percent  = self._field("На сколько урезать расходы",
-                                         suffix="%", hint="10")
-        self._cut_months   = self._field("Период анализа", suffix="мес.", hint="12")
+                                         suffix="%")
+        self._cut_months   = self._field("Период анализа", suffix="мес.")
         self._cut_income.on_change   = self._make_amount_validator(self._cut_income)
         self._cut_expenses.on_change = self._make_amount_validator(self._cut_expenses)
         self._cut_percent.on_change  = self._make_percent_validator(self._cut_percent)

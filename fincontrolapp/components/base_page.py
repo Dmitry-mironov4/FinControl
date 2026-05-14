@@ -118,16 +118,17 @@ class BasePage(ft.Container):
 
     def _show_success(self, msg: str):
         """Показывает snackbar с сообщением об успехе."""
-        self.page_ref.show_dialog(
-            ft.SnackBar(
-                content=ft.Text(msg, color="#FFFFFF", font_family="Montserrat Medium", size=14),
-                bgcolor="#4CAF50",
-                shape=ft.RoundedRectangleBorder(radius=12),
-                behavior=ft.SnackBarBehavior.FLOATING,
-                margin=ft.Margin.only(left=16, right=16, bottom=80),
-                duration=2500,
-            )
+        sb = ft.SnackBar(
+            content=ft.Text(msg, color="#FFFFFF", font_family="Montserrat Medium", size=14),
+            bgcolor="#4CAF50",
+            shape=ft.RoundedRectangleBorder(radius=12),
+            behavior=ft.SnackBarBehavior.FLOATING,
+            margin=ft.Margin.only(left=16, right=16, bottom=80),
+            duration=2500,
         )
+        self.page_ref.snack_bar = sb
+        sb.open = True
+        self.page_ref.update()
 
     def _show_error(self, msg: str = "Произошла ошибка", close_bs=None):
         """Показывает snackbar с сообщением об ошибке.
@@ -136,16 +137,17 @@ class BasePage(ft.Container):
         if close_bs is not None:
             close_bs.open = False
             self.page_ref.update()
-        self.page_ref.show_dialog(
-            ft.SnackBar(
-                content=ft.Text(msg, color="#FFFFFF", font_family="Montserrat Medium", size=14),
-                bgcolor="#F44336",
-                shape=ft.RoundedRectangleBorder(radius=12),
-                behavior=ft.SnackBarBehavior.FLOATING,
-                margin=ft.Margin.only(left=16, right=16, bottom=80),
-                duration=3000,
-            )
+        sb = ft.SnackBar(
+            content=ft.Text(msg, color="#FFFFFF", font_family="Montserrat Medium", size=14),
+            bgcolor="#F44336",
+            shape=ft.RoundedRectangleBorder(radius=12),
+            behavior=ft.SnackBarBehavior.FLOATING,
+            margin=ft.Margin.only(left=16, right=16, bottom=80),
+            duration=3000,
         )
+        self.page_ref.snack_bar = sb
+        sb.open = True
+        self.page_ref.update()
 
     def rebuild(self):
         """Перестраивает тело страницы без вызова update."""

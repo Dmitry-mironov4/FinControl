@@ -111,25 +111,25 @@ class ExpensesPage(BasePage):
 
     def _category_card(self, category):
         icon, color = CATEGORY_ICONS.get(
-            category.name, (ft.Icons.MORE_HORIZ, "#483EB7")
+            category.name, (ft.Icons.MORE_HORIZ, "#607D8B")
         )
         active = self._selected_category_id == category.id
         return ft.Container(
-    gradient=ft.RadialGradient(
-        colors=["#ffffff", "#88A2FF"],
-        center=ft.Alignment(0.3, 0.9),
-        radius=7.0,
-        stops=[0.0, 0.8],
-    ) if not active else None,
-    bgcolor=ft.Colors.with_opacity(0.3,"#88A2FF") if active else None,
-    border_radius=12, padding=8, ink=True,
-    on_click=lambda e, c=category: self._set_filter(c.id, c.name),
-    content=ft.Column([
-        ft.Icon(icon, color=color, size=28),
-        ft.Text(category.name, size=11, color="#000000", font_family="Montserrat Medium",
-                text_align=ft.TextAlign.CENTER),
-    ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=4),
-)
+            gradient=ft.RadialGradient(
+                colors=["#ffffff", "#88A2FF"],
+                center=ft.Alignment(0.3, 0.9),
+                radius=7.0,
+                stops=[0.0, 0.8],
+            ) if not active else None,
+            bgcolor=ft.Colors.with_opacity(0.3, "#88A2FF") if active else None,
+            border_radius=12, padding=8, ink=True,
+            on_click=lambda e, c=category: self._set_filter(c.id, c.name),
+            content=ft.Column([
+                ft.Icon(icon, color=color, size=28),
+                ft.Text(category.name, size=11, color="#000000", font_family="Montserrat Medium",
+                        text_align=ft.TextAlign.CENTER),
+            ], horizontal_alignment=ft.CrossAxisAlignment.CENTER, spacing=4),
+        )
 
     def _set_filter(self, category_id, category_name):
         self._selected_category_id = category_id
@@ -414,7 +414,7 @@ class ExpensesPage(BasePage):
                     amount_field.error = "Введите число, например: 500"
             amount_field.update()
 
-        category_dd.on_change = validate_category
+        category_dd.on_select = validate_category
         amount_field.on_change = validate_amount
 
         bs = ft.BottomSheet(open=False, content=ft.Container())
@@ -596,7 +596,7 @@ class ExpensesPage(BasePage):
                     amount_field.error = "Введите число, например: 500"
             amount_field.update()
 
-        category_dd.on_change = validate_category
+        category_dd.on_select = validate_category
         amount_field.on_change = validate_amount
 
         bs = ft.BottomSheet(open=False, content=ft.Container())

@@ -29,6 +29,7 @@ def get_currency_symbol(page) -> str:
     return CURRENCY_SYMBOLS.get(code, "₽")
 
 
+
 def rub_to_display(amount_rub: float, page) -> float:
     """Конвертирует рублёвую сумму из БД в отображаемую валюту."""
     if page is None:

@@ -57,15 +57,6 @@ class SettingsPage(BasePage):
                     on_click=self._open_telegram_dialog, divider=True),
             ]),
 
-            self._section_header("Баланс"),
-            self._group([
-                self._setting_item(
-                    ft.Icons.ACCOUNT_BALANCE_WALLET_OUTLINED, "Изменить баланс",
-                    "Скорректировать текущий баланс",
-                    on_click=lambda _: self.page_ref.data["show_balance_dialog"](),
-                ),
-            ]),
-
             self._section_header("Опасная зона"),
             self._group([
                 self._setting_item(
@@ -538,6 +529,9 @@ class SettingsPage(BasePage):
                 ft.Text("Валюта сохранена ✓", font_family="Montserrat SemiBold"), open=True
             )
             self.page_ref.update()
+            home = self.page_ref.data.get("pages", {}).get(0)
+            if home:
+                home.refresh()
 
         dlg.content = ft.Column(
             [dd, conv_section, dd_secondary],
