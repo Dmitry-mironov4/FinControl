@@ -117,7 +117,7 @@ class IncomePage(BasePage):
                 ft.Text(amount_text, size=24, font_family="Montserrat SemiBold",
                         weight=ft.FontWeight.BOLD,
                         color=ft.Colors.with_opacity(0.8, "#000000")),
-                ft.Button(
+                ft.ElevatedButton(
                     "Указать зарплату" if not salary else "Изменить зарплату",
                     icon=ft.Icons.EDIT,
                     style=ft.ButtonStyle(
@@ -154,51 +154,63 @@ class IncomePage(BasePage):
 
             row_content = ft.Container(
                 padding=ft.Padding(left=16, right=8, top=10, bottom=10),
+                # Разделитель снизу — как в HomePage, но не у последнего элемента
                 border=ft.Border(
                     bottom=ft.BorderSide(1, "#E0E0E0") if not is_last else ft.BorderSide(0)
                 ),
-                content=ft.Row([
-                    ft.Column([
-                        ft.Text(
-                            t["category_name"],
-                            size=14,
-                            color="#000000",
-                            font_family="Montserrat SemiBold",
-                            weight=ft.FontWeight.W_500,
+                content=ft.Row(
+                    [
+                        ft.Column(
+                            [
+                                ft.Text(
+                                    t["category_name"],
+                                    size=14,
+                                    color="#000000",
+                                    font_family="Montserrat SemiBold",
+                                    weight=ft.FontWeight.W_500,
+                                ),
+                                ft.Text(
+                                    t["description"] or t["date"],
+                                    font_family="Montserrat SemiBold",
+                                    size=12,
+                                    color=ft.Colors.with_opacity(0.6, "#000000"),
+                                ),
+                            ],
+                            spacing=2,
+                            expand=True,
                         ),
-                        ft.Text(
-                            t["description"] or t["date"],
-                            font_family="Montserrat SemiBold",
-                            size=12,
-                            color=ft.Colors.with_opacity(0.6, "#000000"),
+                        ft.Row(
+                            [
+                                ft.Text(
+                                    f"+ {t['amount']:,.0f} ₽",
+                                    color="#483EB7",
+                                    size=14,
+                                    font_family="Montserrat SemiBold",
+                                    weight=ft.FontWeight.W_600,
+                                ),
+                                ft.IconButton(
+                                    ft.Icons.EDIT_OUTLINED,
+                                    icon_color=ft.Colors.with_opacity(0.6, "#000000"),
+                                    icon_size=18,
+                                    on_click=lambda e, tr=t: self._open_edit_dialog(tr),
+                                ),
+                                ft.IconButton(
+                                    ft.Icons.DELETE_OUTLINE,
+                                    icon_color=ft.Colors.with_opacity(0.6, "#000000"),
+                                    icon_size=18,
+                                    on_click=lambda e, tid=t["id"], cat=t["category_name"]: (
+                                        self._confirm_delete(tid, cat)
+                                    ),
+                                ),
+                            ],
+                            spacing=0,
                         ),
-                    ], spacing=2, expand=True),
-                    ft.Row([
-                        ft.Text(
-                            f"+ {t['amount']:,.0f} ₽",
-                            color="#483EB7",
-                            size=14,
-                            font_family="Montserrat SemiBold",
-                            weight=ft.FontWeight.W_600,
-                        ),
-                        ft.IconButton(
-                            ft.Icons.EDIT_OUTLINED,
-                            icon_color=ft.Colors.with_opacity(0.6, "#000000"),
-                            icon_size=18,
-                            on_click=lambda e, tr=t: self._open_edit_dialog(tr),
-                        ),
-                        ft.IconButton(
-                            ft.Icons.DELETE_OUTLINE,
-                            icon_color=ft.Colors.with_opacity(0.6, "#000000"),
-                            icon_size=18,
-                            on_click=lambda e, tid=t["id"], cat=t["category_name"]: (
-                                self._confirm_delete(tid, cat)
-                            ),
-                        ),
-                    ], spacing=0),
-                ], alignment=ft.MainAxisAlignment.SPACE_BETWEEN),
+                    ],
+                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                ),
             )
 
+            # Свайп для удаления сохраняем
             delete_bg = ft.Container(
                 border_radius=16,
                 padding=ft.Padding.only(right=16),
@@ -207,10 +219,16 @@ class IncomePage(BasePage):
                 content=ft.Row(
                     alignment=ft.MainAxisAlignment.END,
                     controls=[
-                        ft.Icon(ft.Icons.DELETE_OUTLINE,
-                                color=ft.Colors.with_opacity(0.8, "#FF7E1C"), size=22),
-                        ft.Text("Удалить",
-                                color=ft.Colors.with_opacity(0.8, "#FF7E1C"), size=13),
+                        ft.Icon(
+                            ft.Icons.DELETE_OUTLINE,
+                            color=ft.Colors.with_opacity(0.8, "#FF7E1C"),
+                            size=22,
+                        ),
+                        ft.Text(
+                            "Удалить",
+                            color=ft.Colors.with_opacity(0.8, "#FF7E1C"),
+                            size=13,
+                        ),
                     ],
                     spacing=4,
                 ),
@@ -266,7 +284,7 @@ class IncomePage(BasePage):
                 )
             )
 
-    # Все строки внутри одного градиентного контейнера — как в HomePage
+        # Все строки внутри одного градиентного контейнера — как в HomePage
         return ft.Container(
             border_radius=16,
             gradient=ft.LinearGradient(
@@ -330,7 +348,95 @@ class IncomePage(BasePage):
         )
         page.overlay.append(dlg)
         page.update()
-        page.show_dialog(dlg)
+        page.open(dlg)
+
+    def _make_date_field(self, label, initial_value):
+        """Создаёт TextField с DatePicker для повторного использования."""
+        field = ft.TextField(
+            label=label,
+            value=initial_value,
+            read_only=True,
+            text_style=ft.TextStyle(font_family="Montserrat SemiBold", size=15),
+            border_color="#6976EB",
+            suffix_icon=ft.Icons.CALENDAR_MONTH,
+        )
+
+        def on_date_selected(e):
+            field.value = (
+                e.control.value.strftime("%d.%m.%Y")
+                if e.control.value
+                else initial_value
+            )
+            field.update()
+
+        date_picker = ft.DatePicker(
+            on_change=on_date_selected,
+            first_date=datetime.datetime(2000, 1, 1),
+            last_date=datetime.datetime(2030, 12, 31),
+        )
+        self.page.overlay.append(date_picker)
+
+        def open_date_picker(e):
+            self.page.dialog = date_picker
+            date_picker.open = True
+            self.page.update()
+
+        field.on_click = open_date_picker
+        return field
+
+    def _confirm_delete(self, transaction_id, category_name):
+        page = self.page_ref
+
+        def on_cancel(e):
+            _close_dialog(page, dlg)
+
+        def on_confirm(e):
+            _close_dialog(page, dlg)
+            try:
+                self._ctrl.delete_transaction(transaction_id)
+                self.refresh()
+                self._show_success("Доход удалён")
+            except Exception:
+                self._show_error("Не удалось удалить доход")
+
+        dlg = ft.AlertDialog(
+            modal=True,
+            title=ft.Text(
+                "Удалить доход?",
+                color="#000000",
+                font_family="Montserrat SemiBold",
+                size=24,
+            ),
+            content=ft.Text(
+                f"Доход «{category_name}» будет удалён.",
+                color=ft.Colors.with_opacity(0.6, "#000000"),
+                font_family="Montserrat Medium",
+                size=14,
+            ),
+            actions=[
+                ft.TextButton(
+                    "Отмена",
+                    on_click=on_cancel,
+                    style=ft.ButtonStyle(
+                        color="#483EB7",
+                        text_style=ft.TextStyle(
+                            font_family="Montserrat SemiBold", size=14),
+                    ),
+                ),
+                ft.TextButton(
+                    "Удалить",
+                    on_click=on_confirm,
+                    style=ft.ButtonStyle(
+                        color=ft.Colors.with_opacity(0.6, "#FF7E1C"),
+                        text_style=ft.TextStyle(
+                            font_family="Montserrat SemiBold", size=14),
+                    ),
+                ),
+            ],
+        )
+        page.overlay.append(dlg)
+        page.update()
+        page.open(dlg)
 
     def _make_date_field(self, label, initial_value):
         """Создаёт TextField с DatePicker для повторного использования."""

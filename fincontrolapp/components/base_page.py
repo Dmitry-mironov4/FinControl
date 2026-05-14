@@ -115,7 +115,7 @@ class BasePage(ft.Container):
 
     def _show_success(self, msg: str):
         """Показывает snackbar с сообщением об успехе."""
-        self.page_ref.show_dialog(
+        self.page_ref.open(
             ft.SnackBar(
                 content=ft.Text(msg, color="#FFFFFF", font_family="Montserrat Medium", size=14),
                 bgcolor="#4CAF50",
@@ -133,7 +133,7 @@ class BasePage(ft.Container):
         if close_bs is not None:
             close_bs.open = False
             self.page_ref.update()
-        self.page_ref.show_dialog(
+        self.page_ref.open(
             ft.SnackBar(
                 content=ft.Text(msg, color="#FFFFFF", font_family="Montserrat Medium", size=14),
                 bgcolor="#F44336",

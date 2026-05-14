@@ -1,12 +1,12 @@
 import json
 import os
 import flet as ft
-from pages import HomePage, TransactionsPage, GoalsPage, SettingsPage, SubscriptionsPage, IncomePage, ExpensesPage, AnalyticsPage, SimulatorPage
+from pages import (HomePage, TransactionsPage, GoalsPage, SettingsPage, SubscriptionsPage, IncomePage, ExpensesPage, AnalyticsPage, SimulatorPage, BudgetPage)
 from pages.auth import AuthPage
 from components import AppTheme
 from controllers import (HomeController, GoalsController, SubscriptionsController,
                          TransactionsController, ExpensesController, IncomeController,
-                         SettingsController, SimulatorController)
+                         SettingsController, SimulatorController, BudgetController)
 from components import show_dialog, close_dialog
 from database import create_tables, get_connection
 
@@ -60,6 +60,7 @@ def main(page: ft.Page):
     page.bgcolor = AppTheme.BG_PAGE
     page.padding = 0
     page.data = {}
+    page.data.setdefault("_s_currency", "RUB")
 
     page.theme = ft.Theme(
         color_scheme=ft.ColorScheme(
@@ -124,7 +125,7 @@ def main(page: ft.Page):
                 amount = float(raw.replace(",", "."))
             except ValueError:
                 close_dialog(page, dlg)
-                page.show_dialog(ft.SnackBar(
+                page.open(ft.SnackBar(
                     content=ft.Text("Введите корректную сумму", color="#FFFFFF", font_family="Montserrat Medium", size=14),
                     bgcolor="#F44336",
                     shape=ft.RoundedRectangleBorder(radius=12),
@@ -279,12 +280,15 @@ def main(page: ft.Page):
                 ("navigation/home.svg",         0),
                 ("navigation/analytics.svg",    1),
                 ("navigation/goals.svg",        2),
-                ("navigation/test.svg",         8),
                 ("navigation/settings.svg",     3),
             ]
 
             def nav_item(src, index):
                 active = selected_index == index
+                if index == 9:
+                    icon_widget = ft.Icon(ft.Icons.PIE_CHART_OUTLINE, color=ft.Colors.WHITE, size=24)
+                else:
+                    icon_widget = ft.Image(src=src, width=28, height=28)
                 return ft.GestureDetector(
                     on_tap=lambda e, i=index: navigate(i),
                     content=ft.Container(
@@ -292,9 +296,9 @@ def main(page: ft.Page):
                         border_radius=16,
                         bgcolor="#3D3D6B" if active else "#5B6EC7",
                         alignment=ft.Alignment(0, 0),
-                        content=ft.Image(src=src, width=28, height=28),
+                        content=icon_widget,
                     ),
-                )
+            )
 
             return ft.Container(
                 height=80,
@@ -327,7 +331,7 @@ def main(page: ft.Page):
         uid = page.data["user_id"]
         pages = {
             0: HomePage(page, HomeController(uid)),
-            1: AnalyticsPage(page, uid),
+            1: AnalyticsPage(page, uid, budget_controller=BudgetController(uid)),
             2: GoalsPage(page, GoalsController(uid)),
             3: SettingsPage(page, SettingsController(uid)),
             4: SubscriptionsPage(page, SubscriptionsController(uid)),
@@ -335,11 +339,13 @@ def main(page: ft.Page):
             6: ExpensesPage(page, ExpensesController(uid)),
             7: TransactionsPage(page, TransactionsController(uid)),
             8: SimulatorPage(page, SimulatorController()),
+            9: BudgetPage(page, BudgetController(uid)),
         }
 
         def logout():
             _clear_session()
             page.data = {}
+            page.data.setdefault("_s_currency", "RUB")
             show_auth()
 
         page.data["navigate"] = navigate

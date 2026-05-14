@@ -186,7 +186,7 @@ class TransactionsPage(BasePage):
         )
         page.overlay.append(dlg)
         page.update()
-        page.show_dialog(dlg)
+        page.open(dlg)
 
     # ── Список транзакций с группировкой по датам ─────────────────────────────
 

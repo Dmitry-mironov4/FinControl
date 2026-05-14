@@ -72,7 +72,50 @@ class ExpensesPage(BasePage):
 
 ---
 
-## 3. Слой данных (db_queries.py)
+## 3. Слой данных
+
+В проекте сосуществуют **два** слоя доступа к БД:
+
+### 3.1 Плоский API — `fincontrolapp/db_queries.py`
+
+Простой набор функций (`get_balance`, `get_transactions`, `add_transaction`, …). Используется:
+- **Telegram-ботом** — это единственный разрешённый интерфейс к БД из `bot/`.
+- Старыми страницами/диалогами (легаси).
+
+Не расширять. Новый код пишется через слоистую архитектуру (см. 3.2).
+
+### 3.2 Слоистая архитектура — `modules/<entity>/`
+
+```
+modules/
+└── <entity>/
+    ├── model.py       # @dataclass — структура сущности
+    ├── repository.py  # SQL-запросы, на вход sqlite3.Connection
+    └── service.py     # бизнес-логика поверх репозитория
+```
+
+Поток вызовов:
+```
+Page (UI)
+  └── Controller (controllers/<name>_ctrl.py)
+        └── Service.method()
+              └── Repository.method()
+                    └── sqlite3 (через get_connection())
+```
+
+Контроллер инжектируется в страницу:
+```python
+HomePage(page, HomeController(uid))
+```
+и оборачивает работу с соединением:
+```python
+def get_balance(self) -> dict:
+    with get_connection() as con:
+        row = TransactionRepository(con).get_balance(self._user_id)
+    ...
+```
+
+Сейчас по этому паттерну живут: `transactions`, `goals`, `subscriptions`, `categories`, `users`.
 
 ### Соединение с БД
 
@@ -87,17 +130,17 @@ def get_connection():
 но он только делает `commit()` / `rollback()` — **соединение не закрывает**.
 Соединение закрывается сборщиком мусора. Для SQLite на десктопе это нормально.
 
-### Как устроена функция с фильтрами
+### Как устроена функция с фильтрами (репозиторий)
 
 ```python
-def get_transactions(user_id, type_=None, category_id=None, limit=None):
+def get_transactions(self, user_id, type_=None, category_id=None, limit=None):
     query = "SELECT ... WHERE user_id = ?"
     params = [user_id]
     if type_:
-        query += " AND type = ?"
+        query += " AND t.type = ?"
         params.append(type_)
     # ... динамически добиваем условия
-    conn.execute(query, params)
+    return self.con.execute(query, tuple(params)).fetchall()
 ```
 
 Параметры передаются через `?` (параметризованный запрос) — защита от SQL-инъекций.
@@ -107,7 +150,17 @@ def get_transactions(user_id, type_=None, category_id=None, limit=None):
 ## 4. Навигация (main.py)
 
 ```python
-pages = {0: HomePage, 1: Transactions, ..., 6: ExpensesPage}
+pages = {
+    0: HomePage(page, HomeController(uid)),
+    1: AnalyticsPage(page, uid),
+    2: GoalsPage(page, GoalsController(uid)),
+    3: SettingsPage(page, SettingsController(uid)),
+    4: SubscriptionsPage(page, SubscriptionsController(uid)),
+    5: IncomePage(page, IncomeController(uid)),
+    6: ExpensesPage(page, ExpensesController(uid)),
+    7: TransactionsPage(page, TransactionsController(uid)),
+    8: SimulatorPage(page, SimulatorController()),
+}
 
 def navigate(index):
     pages[index].refresh()        # пересобирает данные
@@ -120,8 +173,9 @@ def navigate(index):
 Страницы создаются **один раз** при запуске и переиспользуются.
 `refresh()` пересобирает только `build_body()`, не весь виджет.
 
-**Страницы 4, 5, 6** (Подписки, Доходы, Расходы) не имеют кнопок в nav bar —
-они открываются только через `page.data["navigate"](n)` из других экранов.
+**Страницы 4, 5, 6, 7, 8** (Подписки, Доходы, Расходы, Транзакции, Симулятор) не имеют кнопок в nav bar — они открываются только через `page.data["navigate"](n)` из других экранов.
+
+**Кросс-обновление страниц:** после изменения данных вызывается `page.data["pages"][0].refresh()`, чтобы Home-экран синхронизировался (баланс, последние операции).
 
 ---
 
@@ -204,7 +258,84 @@ SUM(CASE WHEN period='monthly' THEN amount
 
 ---
 
-## 9. Что можно сделать иначе средствами Flet
+## 9. Симулятор «что если» (`pages/simulator.py`, `calculations.py`)
+
+Отдельная страница (индекс 8), отвечает на сценарии вида:
+- покупка сейчас при зарплате через N дней;
+- влияние новой подписки на свободный остаток;
+- как покупка сдвинет дедлайн цели;
+- эффект сокращения категории расходов на накопления.
+
+Вся математика — в `calculations.py`, чистые функции **без обращения к БД**:
+- `savings_rate(income, expense)` — норма сбережений в %.
+- `moving_average(values, n)` — скользящее среднее.
+- `linear_forecast(values, steps)` — линейная экстраполяция (МНК) на `steps` шагов вперёд.
+- `goal_analysis(target, current, monthly_savings)` — сколько месяцев до цели.
+- `subscription_load(subs_total, income)` — доля подписок в доходе.
+- `sim_purchase`, `sim_goal_impact`, `sim_new_subscription`, `sim_cut_category` — сценарные расчёты, возвращают dict с показателями для UI.
+
+Контроллер `SimulatorController()` создаётся **без user_id** — состояние ввода живёт на странице, цифры берутся из репозиториев по запросу.
+
+**Важно:** не подключать ML-библиотеки (scikit-learn / statsmodels / scipy) — они несовместимы с мобильной сборкой Flet. Прогноз делается вручную через МНК в `linear_forecast`.
+
+---
+
+## 10. Telegram-бот (`bot/`)
+
+Запускается отдельным процессом, делит БД с приложением.
+
+```
+START_BOT.py
+  ├── load_dotenv() → BOT_TOKEN
+  ├── Bot, Dispatcher
+  ├── include_router(start, add_dialog, goals, quick_add, transactions, stats, subscriptions, menu)
+  │     # quick_add ДО transactions — иначе callback cancel_tx уйдёт не в ту ветку
+  └── main():
+        scheduler = setup_notify_scheduler(bot)   # APScheduler из handlers/notify.py
+        scheduler.start()
+        await dp.start_polling(bot)
+```
+
+### Слой БД для бота
+
+Прямой `sqlite3.connect` блокирует aiogram event loop. Поэтому:
+
+```python
+from bot.utils.db_async import run_db
+from fincontrolapp.db_queries import get_balance
+
+balance = await run_db(get_balance, user["id"])   # asyncio.to_thread под капотом
+```
+
+И декоратор для отказоустойчивости:
+
+```python
+@router.message(Command("stats"))
+@safe_db()                      # ловит sqlite3.Error и TelegramBadRequest
+async def cmd_stats(message): ...
+```
+
+Порядок декораторов: `@router....` выше, `@safe_db()` ниже — иначе роутер зарегистрирует не обёрнутую функцию.
+
+### Quick-add и категоризация
+
+`handlers/quick_add.py` парсит сообщения вида `+5000 зарплата` / `-300.50 кофе`:
+```python
+_PATTERN = re.compile(r'^([+-])(\d+(?:[.,]\d+)?)\s+(.+)$', re.DOTALL)
+```
+Категория угадывается через `bot/utils/categorizer.py`; пользователь видит inline-кнопку «Отменить» (`cancel_tx_<id>`), которая удаляет транзакцию через `delete_transaction`.
+
+### Уведомления (`handlers/notify.py`)
+
+APScheduler с CronTrigger:
+- ежедневно — напоминание о подписках, которые спишутся завтра;
+- по понедельникам — сводка по целям и бюджету.
+
+Адресаты — `get_all_linked_users()` (только привязанные через deep link).
+
+---
+
+## 11. Что можно сделать иначе средствами Flet
 
 ### 9.1 DatePicker вместо текстового поля
 
@@ -399,52 +530,28 @@ Flet не имеет встроенного state management (в отличие 
 
 ---
 
-### 9.10 Charts (аналитика)
+### 11.10 Charts (аналитика) — реализовано
 
-Для графиков Flet имеет встроенный модуль `flet.charts`:
+В `pages/analytics.py` используется `flet_charts` (`BarChart` + `LineChart`). Данные берутся из БД через `get_monthly_summary`, `get_expense_breakdown_by_year`, `get_available_years`. Если данных меньше `MIN_MONTHS` — показывается заглушка «Добавьте хотя бы 2 месяца данных».
 
-```python
-import flet.charts as fltc
-
-chart = fltc.BarChart(
-    bar_groups=[
-        fltc.BarChartGroup(x=i, bar_rods=[
-            fltc.BarChartRod(from_y=0, to_y=data[i]['income'], color="#4CAF50"),
-            fltc.BarChartRod(from_y=0, to_y=data[i]['expense'], color="#F44336"),
-        ])
-        for i in range(len(data))
-    ],
-    max_y=max_value,
-    interactive=True,
-)
-
-line_chart = fltc.LineChart(
-    data_series=[
-        fltc.LineChartData(
-            data_points=[fltc.LineChartDataPoint(i, v) for i, v in enumerate(values)],
-            color="#6C63FF",
-            stroke_width=2,
-            curved=True,
-        )
-    ]
-)
-```
-
-Это позволит сделать аналитику без внешних зависимостей.
+Цвета категорий — через константный список `CATEGORY_COLORS`; легенда строится автоматически.
 
 ---
 
-## 10. Что не хватает в текущей версии
+## 12. Что не хватает в текущей версии
 
-| Функция | Сложность | Нужно для |
-|---|---|---|
-| DatePicker в диалогах | Низкая | Удобство |
-| Swipe to delete | Низкая | UX |
-| Аналитика с реальными графиками | Средняя | Ключевая идея проекта |
-| Профиль пользователя (имя) | Низкая | Персонализация |
-| Выбор валюты | Средняя | Затрагивает все страницы |
-| Уведомления о подписках | Высокая | Требует фоновые задачи / планировщик |
-| Telegram-бот интеграция | Высокая | Отдельный сервис |
-| Экспорт данных (CSV/PDF) | Средняя | Отчётность |
-| Тёмная тема / переключатель | Низкая | Комфорт |
-| Мультивалютность | Высокая | Разные счета |
+| Функция | Сложность | Нужно для | Статус |
+|---|---|---|---|
+| DatePicker в диалогах | Низкая | Удобство | TODO |
+| Swipe to delete | Низкая | UX | TODO |
+| Аналитика с реальными графиками | Средняя | Ключевая идея проекта | ✅ сделано |
+| Профиль пользователя (имя) | Низкая | Персонализация | TODO |
+| Выбор валюты | Средняя | Затрагивает все страницы | TODO |
+| Уведомления о подписках | Высокая | Требует фоновые задачи / планировщик | ✅ сделано (бот) |
+| Telegram-бот интеграция | Высокая | Отдельный сервис | ✅ сделано |
+| Экспорт данных (CSV/PDF) | Средняя | Отчётность | TODO |
+| Тёмная тема / переключатель | Низкая | Комфорт | TODO |
+| Мультивалютность | Высокая | Разные счета | TODO |
+| Симулятор «что если» | Средняя | Финансовое планирование | ✅ сделано |
+| Исправить BUG-1 (Reset без `WHERE user_id`) | Низкая | Безопасность данных | TODO |
+| Исправить BUG-2 (дубликаты при изменении баланса) | Средняя | Корректность | TODO |
