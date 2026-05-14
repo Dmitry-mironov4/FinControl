@@ -31,9 +31,9 @@ class SettingsPage(BasePage):
         initials = (parts[0][0] + (parts[1][0] if len(parts) > 1 else "")).upper()
 
         avatar_block = ft.Container(
-    padding=ft.padding.symmetric(horizontal=16, vertical=12),
+    padding=ft.Padding.symmetric(horizontal=16, vertical=12),
     border_radius=18,
-    border=ft.border.all(1.5, ft.Colors.with_opacity(0.06, "#483EB7")),
+    border=ft.Border.all(1.5, ft.Colors.with_opacity(0.06, "#483EB7")),
     bgcolor=ft.Colors.with_opacity(0.04, "#483EB7"),
     content=ft.Row([
         ft.Container(
@@ -124,7 +124,7 @@ class SettingsPage(BasePage):
     def _section_header(self, label: str) -> ft.Container:
         """Заголовок группы (серый текст, как 'Account' / 'Preferences' на картинке)."""
         return ft.Container(
-            padding=ft.padding.only(left=4, top=12, bottom=4),
+            padding=ft.Padding.only(left=4, top=12, bottom=4),
             content=ft.Text(
                 label,
                 size=12,
@@ -155,7 +155,7 @@ class SettingsPage(BasePage):
         divider=True добавляет тонкую разделительную линию сверху.
         """
         row = ft.Container(
-            padding=ft.padding.symmetric(horizontal=16, vertical=14),
+            padding=ft.Padding.symmetric(horizontal=16, vertical=14),
             ink=True,
             on_click=on_click,
             content=ft.Row([

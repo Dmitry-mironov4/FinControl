@@ -425,7 +425,7 @@ class ExpensesPage(BasePage):
                     amount_field.error = "Введите число, например: 500"
             amount_field.update()
 
-        category_dd.on_change = validate_category
+        category_dd.on_select = validate_category
         amount_field.on_change = validate_amount
 
         bs = ft.BottomSheet(open=False, content=ft.Container())
@@ -607,7 +607,7 @@ class ExpensesPage(BasePage):
                     amount_field.error = "Введите число, например: 500"
             amount_field.update()
 
-        category_dd.on_change = validate_category
+        category_dd.on_select = validate_category
         amount_field.on_change = validate_amount
 
         bs = ft.BottomSheet(open=False, content=ft.Container())

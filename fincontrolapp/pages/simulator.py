@@ -141,7 +141,7 @@ class SimulatorPage(BasePage):
         """Small inline hint row that appears below the cost field."""
         return ft.Container(
             border_radius=10,
-            padding=ft.padding.symmetric(horizontal=12, vertical=8),
+            padding=ft.Padding.symmetric(horizontal=12, vertical=8),
             bgcolor="rgba(108,99,255,0.07)",
             content=ft.Row(
                 controls=[
@@ -170,7 +170,7 @@ class SimulatorPage(BasePage):
           cards.append(
             ft.Container(
                 border_radius=14,
-                padding=ft.padding.symmetric(horizontal=14, vertical=12),
+                padding=ft.Padding.symmetric(horizontal=14, vertical=12),
                 bgcolor="rgba(255,255,255,0.55)",
                 content=ft.Row(
                     alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
@@ -186,7 +186,7 @@ class SimulatorPage(BasePage):
                         ),
                         ft.Container(
                             expand=True,
-                            padding=ft.padding.only(left=10),
+                            padding=ft.Padding.only(left=10),
                             content=ft.Column(
                                 controls=[
                                     ft.Text(
@@ -258,7 +258,7 @@ class SimulatorPage(BasePage):
 
         return ft.Container(
             border_radius=14,
-            padding=ft.padding.symmetric(horizontal=14, vertical=12),
+            padding=ft.Padding.symmetric(horizontal=14, vertical=12),
             bgcolor="rgba(255,255,255,0.55)",
             content=ft.Column(
                 controls=[
@@ -710,7 +710,7 @@ class SimulatorPage(BasePage):
             border_radius=16,
             padding=16,
             bgcolor=card_style["bgcolor"],
-            border=ft.border.all(1, card_style["border_color"]),
+            border=ft.Border.all(1, card_style["border_color"]),
             content=ft.Column(controls=controls, spacing=12),
         )
 

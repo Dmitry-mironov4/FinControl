@@ -10,7 +10,7 @@ analytics.py — Экран аналитики финансов.
 """
 
 import flet as ft
-from flet import charts
+import flet_charts as charts
 from datetime import datetime, date, timedelta
 from database import get_connection
 from components.base_page import BasePage
@@ -152,7 +152,7 @@ def _title(text: str) -> ft.Text:
 
 def _card(content: ft.Control) -> ft.Container:
     return ft.Container(
-        border=ft.border.all(1.5, ft.Colors.with_opacity(0.06, "#483EB7")),
+        border=ft.Border.all(1.5, ft.Colors.with_opacity(0.06, "#483EB7")),
         bgcolor=ft.Colors.with_opacity(0.2, "#483EB7"),
         border_radius=16, padding=20, content=content,
     )
@@ -255,7 +255,7 @@ class AnalyticsPage(BasePage):
                 ft.dropdown.Option(key="half", text="Полгода"),
                 ft.dropdown.Option(key="year", text="Год"),
             ],
-            on_change=lambda e: self._reload_period_data(e.control.value),
+            on_select=lambda e: self._reload_period_data(e.control.value),
             bgcolor="#F0F0F0", border_color="#483EB7",
         )
         period_block = ft.Container(
@@ -263,7 +263,7 @@ class AnalyticsPage(BasePage):
                 ft.Row([period_dropdown], alignment=ft.MainAxisAlignment.END),
                 self.period_container,
             ], spacing=10),
-            padding=ft.padding.all(16), margin=ft.margin.only(top=12),
+            padding=ft.Padding.all(16), margin=ft.Margin.only(top=12),
             border_radius=16, bgcolor=ft.Colors.with_opacity(0.2, "#483EB7"),
         )
         controls.append(period_block)
@@ -297,7 +297,7 @@ class AnalyticsPage(BasePage):
                 content=ft.Text(str(y), font_family="Montserrat SemiBold", size=13,
                                 color="#483EB7" if active else "#A8A8A8",
                                 text_align=ft.TextAlign.CENTER),
-                padding=ft.padding.symmetric(horizontal=16, vertical=8),
+                padding=ft.Padding.symmetric(horizontal=16, vertical=8),
                 border_radius=20,
                 gradient=ft.RadialGradient(
                     colors=["#ffffff", "#88A2FF"], center=ft.Alignment(0, -0.2),
@@ -328,7 +328,7 @@ class AnalyticsPage(BasePage):
         def tile(label, value, color, icon):
             return ft.Container(
                 expand=True,
-                border=ft.border.all(1.5, ft.Colors.with_opacity(0.06, "#483EB7")),
+                border=ft.Border.all(1.5, ft.Colors.with_opacity(0.06, "#483EB7")),
                 bgcolor=ft.Colors.with_opacity(0.1, "#483EB7"),
                 border_radius=14, padding=16,
                 content=ft.Column([
@@ -350,7 +350,7 @@ class AnalyticsPage(BasePage):
                 tile("Экономия", savings, "#6C63FF", ft.Icons.SAVINGS_OUTLINED),
                 ft.Container(
                     expand=True,
-                    border=ft.border.all(1.5, ft.Colors.with_opacity(0.06, "#483EB7")),
+                    border=ft.Border.all(1.5, ft.Colors.with_opacity(0.06, "#483EB7")),
                     bgcolor=ft.Colors.with_opacity(0.1, "#483EB7"),
                     border_radius=14, padding=16,
                     content=ft.Column([
@@ -529,7 +529,10 @@ class AnalyticsPage(BasePage):
             self.period_container.content = self._category_bars(breakdown)
         else:
             self.period_container.content = _stub("Нет расходов за выбранный период")
-        self.period_container.update()
+        try:
+            self.period_container.update()
+        except RuntimeError:
+            pass
 
     # --- Тренд 6 месяцев (две линии) ---
     def _trend_6months_chart(self) -> ft.Control:
