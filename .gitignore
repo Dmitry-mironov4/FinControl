@@ -9,4 +9,5 @@ build/
 .pptx
 .md
 .vscode/
-desktop.ini fincontrolapp/session.json
+desktop.ini
+fincontrolapp/session.json
