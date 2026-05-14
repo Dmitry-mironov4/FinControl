@@ -346,7 +346,7 @@ class ExpensesPage(BasePage):
         )
         page.overlay.append(dlg)
         page.update()
-        page.open(dlg)
+        page.dialog = dlg; dlg.open = True; page.update()
 
     def _open_add_dialog(self, e):
         cats = self._ctrl.get_categories()
