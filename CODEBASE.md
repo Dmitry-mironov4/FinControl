@@ -61,7 +61,7 @@ FinControl/
                                     # db_async (run_db), db_safe (@safe_db)
 ```
 
-> В корне проекта дублируются `database.py` и `db_queries.py` — устаревшие копии без последних миграций. Источник истины — версии внутри `fincontrolapp/`.
+> Источник истины для схемы БД и SQL-запросов — `fincontrolapp/database.py` и `fincontrolapp/db_queries.py`. Бот импортирует напрямую из них.
 
 ---
 

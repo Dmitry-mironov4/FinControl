@@ -1,0 +1,11 @@
+# Telegram-бот FinControl
+# Python 3.11 (bot/.venv)
+# Установка: pip install -r requirements.txt
+
+aiogram==3.27.0
+APScheduler==3.11.2
+aiofiles==25.1.0
+python-dotenv==1.2.2
+
+# Dev / тесты
+pytest==9.0.3
