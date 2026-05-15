@@ -65,6 +65,17 @@ def format_amount(amount_rub: float, page, prefix: str = "") -> str:
     return f"{prefix}{disp:,.2f} {sym}"
 
 
+def fmt_tx_amount(t, prefix: str = "") -> str:
+    """Форматирует сумму транзакции используя валюту, записанную в самой транзакции."""
+    try:
+        cur = t["currency"] or "RUB"
+    except (IndexError, KeyError):
+        cur = "RUB"
+    sym = CURRENCY_SYMBOLS.get(cur, "₽")
+    amt = t["amount"]
+    return f"{prefix}{amt:,.0f} {sym}" if cur == "RUB" else f"{prefix}{amt:,.2f} {sym}"
+
+
 def input_to_rub(amount: float, page) -> float:
     """Конвертирует введённую пользователем сумму в рубли для сохранения в БД.
 

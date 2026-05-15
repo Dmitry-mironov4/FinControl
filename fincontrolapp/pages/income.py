@@ -4,7 +4,7 @@ from datetime import date
 from components.base_page import BasePage
 from components.dialogs import close_dialog as _close_dialog
 from components.form_utils import parse_amount, parse_date
-from utils import get_currency_symbol
+from utils import get_currency_symbol, fmt_tx_amount
 
 
 class IncomePage(BasePage):
@@ -141,7 +141,6 @@ class IncomePage(BasePage):
         )
 
     def _income_list(self, incomes):
-        sym = get_currency_symbol(self.page_ref)
         if not incomes:
             return ft.Container(
                 padding=16,
@@ -192,7 +191,7 @@ class IncomePage(BasePage):
                         ft.Row(
                             [
                                 ft.Text(
-                                    f"+ {t['amount']:,.0f} {sym}",
+                                    fmt_tx_amount(t, "+ "),
                                     color="#483EB7",
                                     size=14,
                                     font_family="Montserrat SemiBold",
@@ -458,6 +457,7 @@ class IncomePage(BasePage):
                         description="Зарплата",
                         date=str(parsed_date),
                         is_recurring=1,
+                        currency=(self.page_ref.data or {}).get("_s_currency", "RUB"),
                     )
             except Exception:
                 self._show_error("Не удалось сохранить зарплату", close_bs=bs)
@@ -586,6 +586,7 @@ class IncomePage(BasePage):
                     category_id=int(category_dd.value),
                     description=desc_field.value or None,
                     date=str(parsed_date),
+                    currency=(self.page_ref.data or {}).get("_s_currency", "RUB"),
                 )
             except Exception:
                 self._show_error("Не удалось добавить доход", close_bs=bs)

@@ -5,7 +5,7 @@ from collections import OrderedDict
 from components.base_page import BasePage
 from components.dialogs import close_dialog as _close_dialog
 from components.form_utils import parse_amount, parse_date
-from utils import format_amount
+from utils import fmt_tx_amount
 
 
 CATEGORY_ICONS = {
@@ -327,7 +327,7 @@ class TransactionsPage(BasePage):
                             ], spacing=12, expand=True),
                             ft.Row([
                                 ft.Text(
-                                    format_amount(t['amount'], self.page_ref, '+ ' if is_income else '− '),
+                                    fmt_tx_amount(t, '+ ' if is_income else '− '),
                                     color="#253A82" if is_income else ft.Colors.with_opacity(0.6, "#FF7E1C"),
                                     size=14,
                                     font_family="Montserrat SemiBold",
@@ -537,6 +537,7 @@ class TransactionsPage(BasePage):
                     category_id=int(category_dd.value),
                     description=desc_field.value or None,
                     date=str(parsed_date),
+                    currency=(self.page_ref.data or {}).get("_s_currency", "RUB"),
                 )
             except Exception:
                 self._show_error("Не удалось добавить транзакцию", close_bs=bs)

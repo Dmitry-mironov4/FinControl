@@ -16,7 +16,7 @@ class GoalRepository:
             'INSERT INTO goals (user_id, name, target_amount, deadline) VALUES (?, ?, ?, ?)',
             (user_id, name, target_amount, deadline)
         )
-    def deposit_to_goal(self, user_id, goal_id, amount):
+    def deposit_to_goal(self, user_id, goal_id, amount, currency='RUB'):
         cursor = self.con.execute(
             'UPDATE goals SET current_amount = current_amount + ? WHERE id = ? AND user_id = ?',
             (amount, goal_id, user_id)
@@ -26,9 +26,22 @@ class GoalRepository:
         savings_cat = self.con.execute(
             "SELECT id FROM categories WHERE name='Накопления' AND type='expense'"
         ).fetchone()
-        if savings_cat:
+        if not savings_cat:
+            self.con.execute("INSERT INTO categories (name, type) VALUES ('Накопления', 'expense')")
+            savings_cat = self.con.execute(
+                "SELECT id FROM categories WHERE name='Накопления' AND type='expense'"
+            ).fetchone()
+        try:
             self.con.execute(
-                '''INSERT INTO transactions (user_id, type, amount, category_id, description, date)
+                '''INSERT INTO transactions
+                   (user_id, type, amount, category_id, description, date, currency)
+                   VALUES (?, 'expense', ?, ?, 'Накопления на цель', ?, ?)''',
+                (user_id, amount, savings_cat['id'], str(date.today()), currency)
+            )
+        except Exception:
+            self.con.execute(
+                '''INSERT INTO transactions
+                   (user_id, type, amount, category_id, description, date)
                    VALUES (?, 'expense', ?, ?, 'Накопления на цель', ?)''',
                 (user_id, amount, savings_cat['id'], str(date.today()))
             )

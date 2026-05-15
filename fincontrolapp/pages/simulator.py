@@ -1,6 +1,7 @@
 import flet as ft
 from components.base_page import BasePage
 from utils import get_currency_symbol
+import db_queries
 
 
 # ── shared style constants ────────────────────────────────────────────────────
@@ -435,15 +436,17 @@ class SimulatorPage(BasePage):
         self._goal_income   = self._field("Ежемесячный доход")
         self._goal_expenses = self._field("Ежемесячные расходы")
         self._goal_savings  = self._field("Уже накоплено")
+        self._goal_purchase = self._field("Сумма покупки (из накоплений)", hint="Необязательно")
         self._goal_amount.on_change   = self._make_amount_validator(self._goal_amount)
         self._goal_income.on_change   = self._make_amount_validator(self._goal_income)
         self._goal_expenses.on_change = self._make_amount_validator(self._goal_expenses)
         self._goal_savings.on_change  = self._make_amount_validator(self._goal_savings)
+        self._goal_purchase.on_change = self._make_amount_validator(self._goal_purchase)
         return self._panel_card(
             hint="Рассчитайте, когда вы достигнете своей финансовой цели",
             title="Параметры цели",
             fields=[self._goal_amount, self._goal_income,
-                    self._goal_expenses, self._goal_savings],
+                    self._goal_expenses, self._goal_savings, self._goal_purchase],
             on_calculate=self._on_calculate_goal,
         )
 
@@ -457,11 +460,39 @@ class SimulatorPage(BasePage):
         self._cut_expenses.on_change = self._make_amount_validator(self._cut_expenses)
         self._cut_percent.on_change  = self._make_percent_validator(self._cut_percent)
         self._cut_months.on_change   = self._make_months_validator(self._cut_months)
+
+        self._cut_breakdown = {}
+        self._cut_category_dd = None
+        user_id = self._user_id
+        if user_id:
+            try:
+                rows = db_queries.get_expense_breakdown(user_id)
+                if rows:
+                    total = sum(float(r["total"]) for r in rows)
+                    if total > 0:
+                        self._cut_breakdown = {r["name"]: float(r["total"]) / total for r in rows}
+            except Exception:
+                pass
+
+        fields = [self._cut_income, self._cut_expenses, self._cut_percent, self._cut_months]
+        if self._cut_breakdown:
+            self._cut_category_dd = ft.Dropdown(
+                label="Категория расходов",
+                hint_text="все расходы",
+                options=[ft.dropdown.Option(name) for name in self._cut_breakdown],
+                border_color="#6C63FF",
+                focused_border_color="#6C63FF",
+                border_radius=12,
+                bgcolor="#F5F5FF",
+                label_style=ft.TextStyle(font_family="Montserrat Medium", color="#888888"),
+                text_style=ft.TextStyle(font_family="Montserrat SemiBold", size=16),
+            )
+            fields.insert(0, self._cut_category_dd)
+
         return self._panel_card(
             hint="Увидьте, сколько дополнительно можно накопить, сократив расходы",
             title="Параметры экономии",
-            fields=[self._cut_income, self._cut_expenses,
-                    self._cut_percent, self._cut_months],
+            fields=fields,
             on_calculate=self._on_calculate_cut,
         )
 
@@ -629,6 +660,7 @@ class SimulatorPage(BasePage):
             return
         try:
             result = self._ctrl.simulate_subscription(sub_cost, income, expenses, months,
+                                                       user_id=self._user_id,
                                                        sym=get_currency_symbol(self.page_ref))
         except Exception as ex:
             self._show_error(f"Ошибка расчёта: {ex}")
@@ -664,24 +696,28 @@ class SimulatorPage(BasePage):
     async def _on_calculate_goal(self, _):
         await self._focus_sink.focus()
         fields = (self._goal_amount, self._goal_income,
-                  self._goal_expenses, self._goal_savings)
+                  self._goal_expenses, self._goal_savings, self._goal_purchase)
         goal,     ok1 = self._parse_amount(self._goal_amount, "целевую сумму")
         income,   ok2 = self._parse_amount(self._goal_income, "доход")
         expenses, ok3 = self._parse_amount(self._goal_expenses, "расходы")
         savings,  ok4 = self._parse_amount(self._goal_savings, "накопления",
                                            required=False)
+        purchase, ok5 = self._parse_amount(self._goal_purchase, "сумму покупки",
+                                           required=False)
         self._refresh_fields(*fields)
-        if not all([ok1, ok2, ok3, ok4]):
+        if not all([ok1, ok2, ok3, ok4, ok5]):
             return
         try:
             result = self._ctrl.simulate_goal(goal, income, expenses, savings,
+                                               purchase_amount=purchase,
                                                sym=get_currency_symbol(self.page_ref))
         except Exception as ex:
             self._show_error(f"Ошибка расчёта: {ex}")
             return
 
         monthly_free = income - expenses
-        after_savings = savings + monthly_free * 12
+        effective_savings = max(0.0, savings - purchase)
+        after_savings = effective_savings + monthly_free * 12
         result["_goal_bars"] = {
             "before": savings,
             "after":  after_savings,
@@ -700,21 +736,30 @@ class SimulatorPage(BasePage):
         self._refresh_fields(*fields)
         if not all([ok1, ok2, ok3, ok4]):
             return
+
+        category_share = 1.0
+        category_label = ""
+        if self._cut_breakdown and self._cut_category_dd and self._cut_category_dd.value:
+            selected = self._cut_category_dd.value
+            category_share = self._cut_breakdown.get(selected, 1.0)
+            category_label = f" ({selected})"
+
         try:
             result = self._ctrl.simulate_cut(income, expenses, percent, months,
+                                              category_share=category_share,
                                               sym=get_currency_symbol(self.page_ref))
         except Exception as ex:
             self._show_error(f"Ошибка расчёта: {ex}")
             return
 
         sym = get_currency_symbol(self.page_ref)
-        saved_monthly = expenses * (percent / 100)
+        saved_monthly = expenses * category_share * (percent / 100)
         new_expenses  = expenses - saved_monthly
         free_before   = (income - expenses) * months
         free_after    = (income - new_expenses) * months
         scenarios = [
             {
-                "label": f"Если урежу на {percent:.0f}%",
+                "label": f"Если урежу{category_label} на {percent:.0f}%",
                 "value": f"−{saved_monthly:,.0f} {sym}/мес.",
                 "tone":  "good",
                 "sub":   "экономия в месяц",

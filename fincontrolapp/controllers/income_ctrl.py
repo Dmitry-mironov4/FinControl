@@ -25,10 +25,12 @@ class IncomeController:
         return recurring[0] if recurring else None
 
     def add_transaction(self, amount: float, category_id: int,
-                        description: str | None, date: str, is_recurring: int = 0):
+                        description: str | None, date: str, is_recurring: int = 0,
+                        currency: str = 'RUB'):
         with get_connection() as con:
             TransactionService(TransactionRepository(con)).add_transaction(
-                self._user_id, 'income', amount, category_id, description, date, is_recurring
+                self._user_id, 'income', amount, category_id, description, date,
+                is_recurring, currency
             )
 
     def update_transaction(self, transaction_id: int, amount: float,

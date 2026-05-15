@@ -29,7 +29,6 @@ class GoalsPage(BasePage):
         goals = self._ctrl.get_goals()
         return ft.Column(
             controls=[
-                self._goals_list(goals),
                 ft.GestureDetector(
                     on_tap=self._open_add_dialog,
                     content=ft.Container(
@@ -51,6 +50,7 @@ class GoalsPage(BasePage):
                         ),
                     ),
                 ),
+                self._goals_list(goals),
             ],
             spacing=16,
             expand=True,
@@ -642,7 +642,8 @@ class GoalsPage(BasePage):
                 return
 
             try:
-                self._ctrl.deposit(goal_id, amount)
+                self._ctrl.deposit(goal_id, amount,
+                                   currency=(self.page_ref.data or {}).get("_s_currency", "RUB"))
             except Exception:
                 self._show_error("Не удалось пополнить цель")
                 return
@@ -697,7 +698,7 @@ class GoalsPage(BasePage):
                         alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
                         controls=[
                             ft.Text(
-                                f"Пополнить: {goal_name}",
+                                "Пополнить",
                                 color="#000000",
                                 font_family="Montserrat SemiBold",
                                 size=24,

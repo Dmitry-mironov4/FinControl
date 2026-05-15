@@ -20,10 +20,11 @@ class TransactionsController:
             return CategoryService(CategoryRepository(con)).get_all(type_=type_)
 
     def add_transaction(self, type_: str, amount: float, category_id: int,
-                        description: str | None, date: str):
+                        description: str | None, date: str, currency: str = 'RUB'):
         with get_connection() as con:
             TransactionService(TransactionRepository(con)).add_transaction(
-                self._user_id, type_, amount, category_id, description, date
+                self._user_id, type_, amount, category_id, description, date,
+                currency=currency
             )
 
     def delete_transaction(self, transaction_id: int):

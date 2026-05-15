@@ -112,6 +112,7 @@ def main(page: ft.Page):
 
             # Зачисляем 1-м числом текущего месяца
             first_of_month = date(today.year, today.month, 1).isoformat()
+            user_currency = page.data.get("_s_currency", "RUB")
             repo.add_transaction(
                 user_id=user_id,
                 type_="income",
@@ -120,6 +121,7 @@ def main(page: ft.Page):
                 description=template["description"],
                 date=first_of_month,
                 is_recurring=1,
+                currency=user_currency,
             )
 
     def _check_and_charge_subscriptions(user_id: int):
@@ -144,6 +146,7 @@ def main(page: ft.Page):
                 "SELECT id FROM categories WHERE name='Другое' AND type='expense'"
             ).fetchone()['id']
 
+            user_currency = page.data.get("_s_currency", "RUB")
             for sub in due:
                 tx_repo.add_transaction(
                     user_id=user_id,
@@ -153,6 +156,7 @@ def main(page: ft.Page):
                     description=sub['name'],
                     date=today.isoformat(),
                     is_recurring=1,
+                    currency=user_currency,
                 )
                 sub_repo.mark_charged(sub['id'], today.isoformat())
 

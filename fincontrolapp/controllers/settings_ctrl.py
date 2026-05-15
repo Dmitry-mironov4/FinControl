@@ -40,6 +40,16 @@ class SettingsController:
     def change_password(self, old_pwd: str, new_pwd: str) -> bool:
         return _change_password(self._user_id, old_pwd, new_pwd)
 
+    def verify_password(self, pwd: str) -> bool:
+        from pages.auth import verify_password as _verify
+        with get_connection() as con:
+            row = con.execute(
+                'SELECT password_hash FROM users WHERE id=?', (self._user_id,)
+            ).fetchone()
+        if not row:
+            return False
+        return _verify(row['password_hash'], pwd)
+
     def delete_account(self):
         with get_connection() as con:
             con.execute('DELETE FROM transactions WHERE user_id=?', (self._user_id,))

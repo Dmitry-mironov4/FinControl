@@ -78,7 +78,6 @@ class SubscriptionsPage(BasePage):
                             weight=ft.FontWeight.BOLD, color="#000000"),
                 ], spacing=4),
             ),
-            self._subscriptions_list(subscriptions),
             ft.GestureDetector(
                 on_tap=self._open_add_dialog,
                 content=ft.Container(
@@ -100,6 +99,7 @@ class SubscriptionsPage(BasePage):
                     ),
                 ),
             ),
+            self._subscriptions_list(subscriptions),
         ], spacing=16)
 
     def _subscriptions_list(self, subscriptions):

@@ -29,11 +29,11 @@ class GoalsController:
             service = GoalService(repo)
             service.delete_goal(self._user_id, goal_id)
 
-    def deposit(self, goal_id, amount):
+    def deposit(self, goal_id, amount, currency='RUB'):
         with get_connection() as con:
             repo = GoalRepository(con)
             service = GoalService(repo)
-            service.deposit_to_goal(self._user_id, goal_id, amount)
+            service.deposit_to_goal(self._user_id, goal_id, amount, currency)
 
     def calc_pace(self, target, current, deadline_value):
         """Возвращает строку с темпом накоплений или None."""

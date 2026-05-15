@@ -190,6 +190,12 @@ def create_tables():
     except Exception:
         pass
 
+    # миграция: валюта транзакции
+    try:
+        cursor.execute("ALTER TABLE transactions ADD COLUMN currency TEXT DEFAULT 'RUB'")
+    except Exception:
+        pass
+
     # миграция: нормализация телефонов к формату +7XXXXXXXXXX
     try:
         rows = cursor.execute("SELECT id, phone FROM users WHERE phone IS NOT NULL").fetchall()

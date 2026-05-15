@@ -20,10 +20,11 @@ class ExpensesController:
             )
 
     def add_transaction(self, amount: float, category_id: int,
-                        description: str | None, date: str):
+                        description: str | None, date: str, currency: str = 'RUB'):
         with get_connection() as con:
             TransactionService(TransactionRepository(con)).add_transaction(
-                self._user_id, 'expense', amount, category_id, description, date
+                self._user_id, 'expense', amount, category_id, description, date,
+                currency=currency
             )
 
     def update_transaction(self, transaction_id: int, amount: float,

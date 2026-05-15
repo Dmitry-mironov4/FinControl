@@ -5,8 +5,10 @@ class TransactionService:
     def __init__(self, repository: TransactionRepository):
         self.repository = repository
 
-    def add_transaction(self, user_id, type_, amount, category_id, description, date, is_recurring=0):
-        self.repository.add_transaction(user_id, type_, amount, category_id, description, date, is_recurring)
+    def add_transaction(self, user_id, type_, amount, category_id, description, date,
+                        is_recurring=0, currency='RUB'):
+        self.repository.add_transaction(user_id, type_, amount, category_id, description, date,
+                                        is_recurring, currency)
 
     def get_transactions(self, user_id, type_=None, category_id=None, limit=None):
         return self.repository.get_transactions(user_id, type_, category_id, limit)

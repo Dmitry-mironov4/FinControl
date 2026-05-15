@@ -2,6 +2,7 @@
 SimulatorController — прослойка между SimulatorPage и calculations.py.
 """
 from calculations import sim_purchase, sim_new_subscription, sim_goal_impact, sim_cut_category
+import db_queries
 
 
 def _m(v: float, sym: str = "₽") -> str:
@@ -62,11 +63,12 @@ class SimulatorController:
     # sim_new_subscription(income, fixed_expenses, current_subs, new_sub_cost)
 
     def simulate_subscription(self, subscription_cost, monthly_income,
-                               monthly_expenses, months=12, sym="₽"):
+                               monthly_expenses, months=12, user_id=None, sym="₽"):
+        current_subs = db_queries.get_subscriptions_monthly_total(user_id) if user_id else 0.0
         r = sim_new_subscription(
             income=monthly_income,
             fixed_expenses=monthly_expenses,
-            current_subs=0.0,
+            current_subs=current_subs,
             new_sub_cost=subscription_cost,
         )
         total_cost = subscription_cost * months
@@ -88,7 +90,7 @@ class SimulatorController:
     # sim_goal_impact(goal_target, current_savings, monthly_savings, purchase_amount)
 
     def simulate_goal(self, goal_amount, monthly_income, monthly_expenses,
-                      current_savings=0.0, sym="₽"):
+                      current_savings=0.0, purchase_amount=0.0, sym="₽"):
         monthly_savings = monthly_income - monthly_expenses
         if monthly_savings <= 0:
             return {
@@ -102,7 +104,7 @@ class SimulatorController:
             goal_target=goal_amount,
             current_savings=current_savings,
             monthly_savings=monthly_savings,
-            purchase_amount=0.0,
+            purchase_amount=purchase_amount,
         )
         progress_pct = (current_savings / goal_amount * 100) if goal_amount > 0 else 0
         months = r.get("current_months") or 0
@@ -120,23 +122,28 @@ class SimulatorController:
                     {"label": "Прогресс", "value": _pct(progress_pct), "tone": "good"},
                 ],
             }
+        metrics = [
+            {"label": "Срок до цели", "value": _mo(months), "tone": tone},
+            {"label": "Ежемесячный остаток", "value": _m(monthly_savings, sym), "tone": "neutral"},
+            {"label": "Прогресс", "value": _pct(progress_pct), "tone": "neutral"},
+        ]
+        delay = r.get("delay_months") or 0
+        if delay and delay > 0:
+            metrics.append({"label": "Задержка из-за покупки", "value": _mo(delay), "tone": "warn"})
         return {
             "status": status,
-            "metrics": [
-                {"label": "Срок до цели", "value": _mo(months), "tone": tone},
-                {"label": "Ежемесячный остаток", "value": _m(monthly_savings, sym), "tone": "neutral"},
-                {"label": "Прогресс", "value": _pct(progress_pct), "tone": "neutral"},
-            ],
+            "metrics": metrics,
             "projection": projection,
         }
 
     # ── Урезать ───────────────────────────────────────────────────────────────
     # sim_cut_category(monthly_expense, category_share, cut_pct, goal_remaining, income)
 
-    def simulate_cut(self, monthly_income, current_expenses, cut_percent, months=12, sym="₽"):
+    def simulate_cut(self, monthly_income, current_expenses, cut_percent, months=12,
+                     category_share=1.0, sym="₽"):
         r = sim_cut_category(
             monthly_expense=current_expenses,
-            category_share=1.0,
+            category_share=category_share,
             cut_pct=cut_percent,
             goal_remaining=current_expenses * months,
             income=monthly_income,

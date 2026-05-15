@@ -4,7 +4,7 @@ from datetime import date
 from components.base_page import BasePage
 from components.dialogs import close_dialog as _close_dialog
 from components.form_utils import parse_amount, parse_date
-from utils import get_currency_symbol, input_to_rub, format_amount
+from utils import get_currency_symbol, input_to_rub, fmt_tx_amount
 from components.empty_state import empty_state
 
 CATEGORY_ICONS = {
@@ -202,7 +202,7 @@ class ExpensesPage(BasePage):
                         ], spacing=12, expand=True),
                         ft.Row([
                             ft.Text(
-                                format_amount(t['amount'], self.page_ref, "− "),
+                                fmt_tx_amount(t, "− "),
                                 color="#483EB7", size=14,font_family="Montserrat SemiBold",
                                 weight=ft.FontWeight.W_600,
                             ),
@@ -455,6 +455,7 @@ class ExpensesPage(BasePage):
                     category_id=int(category_dd.value),
                     description=desc_field.value or None,
                     date=str(parsed_date),
+                    currency=(self.page_ref.data or {}).get("_s_currency", "RUB"),
                 )
             except Exception:
                 self._show_error("Не удалось добавить расход", close_bs=bs)

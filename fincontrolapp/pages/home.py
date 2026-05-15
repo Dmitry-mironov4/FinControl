@@ -4,7 +4,7 @@ import threading
 from datetime import datetime
 from components.base_page import BasePage
 from components.empty_state import empty_state
-from utils import get_currency_symbol, format_amount
+from utils import get_currency_symbol, fmt_tx_amount
 
 
 def _format_time_left(remind_at: str) -> str:
@@ -520,7 +520,7 @@ class HomePage(BasePage):
                                 ], spacing=2),
                             ], spacing=12),
                             ft.Text(
-                                format_amount(t['amount'], self.page_ref, '+ ' if is_income else '− '),
+                                fmt_tx_amount(t, '+ ' if is_income else '− '),
                                 color="#253A82" if is_income else ft.Colors.with_opacity(0.6, "#FF7E1C"),
                                 size=15, font_family="Montserrat SemiBold",
                                 weight=ft.FontWeight.W_600,

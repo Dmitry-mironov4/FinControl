@@ -376,7 +376,7 @@ def add_goal(user_id, name, target_amount, deadline=None):
         )
 
 
-def deposit_to_goal(user_id, goal_id, amount):
+def deposit_to_goal(user_id, goal_id, amount, currency='RUB'):
     """Пополняет цель и создаёт расход с категорией Накопления."""
     with get_connection() as conn:
         cursor = conn.execute(
@@ -388,9 +388,22 @@ def deposit_to_goal(user_id, goal_id, amount):
         savings_cat = conn.execute(
             "SELECT id FROM categories WHERE name='Накопления' AND type='expense'"
         ).fetchone()
-        if savings_cat:
+        if not savings_cat:
+            conn.execute("INSERT INTO categories (name, type) VALUES ('Накопления', 'expense')")
+            savings_cat = conn.execute(
+                "SELECT id FROM categories WHERE name='Накопления' AND type='expense'"
+            ).fetchone()
+        try:
             conn.execute(
-                '''INSERT INTO transactions (user_id, type, amount, category_id, description, date)
+                '''INSERT INTO transactions
+                   (user_id, type, amount, category_id, description, date, currency)
+                   VALUES (?, 'expense', ?, ?, 'Накопления на цель', ?, ?)''',
+                (user_id, amount, savings_cat['id'], str(date.today()), currency)
+            )
+        except Exception:
+            conn.execute(
+                '''INSERT INTO transactions
+                   (user_id, type, amount, category_id, description, date)
                    VALUES (?, 'expense', ?, ?, 'Накопления на цель', ?)''',
                 (user_id, amount, savings_cat['id'], str(date.today()))
             )

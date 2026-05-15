@@ -6,35 +6,54 @@ class TransactionRepository:
     def __init__(self, con: sqlite3.Connection):
         self.con = con
 
-    def add_transaction(self, user_id, type_, amount, category_id, description, date, is_recurring=0):
-        self.con.execute(
-            '''INSERT INTO transactions (user_id, type, amount, category_id, description, date, is_recurring)
-            VALUES (?, ?, ?, ?, ?, ?, ?)''',
-            (user_id, type_, amount, category_id, description, date, is_recurring)
-        )
+    def add_transaction(self, user_id, type_, amount, category_id, description, date,
+                        is_recurring=0, currency='RUB'):
+        try:
+            self.con.execute(
+                '''INSERT INTO transactions
+                   (user_id, type, amount, category_id, description, date, is_recurring, currency)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+                (user_id, type_, amount, category_id, description, date, is_recurring, currency)
+            )
+        except Exception:
+            self.con.execute(
+                '''INSERT INTO transactions
+                   (user_id, type, amount, category_id, description, date, is_recurring)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)''',
+                (user_id, type_, amount, category_id, description, date, is_recurring)
+            )
 
 
     def get_transactions(self, user_id, type_=None, category_id=None, limit=None):
-        query = '''
-            SELECT t.id, t.type, t.amount, t.description, t.date, t.is_recurring,
-                t.category_id, c.name as category_name
+        base = '''
             FROM transactions t
             JOIN categories c ON t.category_id = c.id
             WHERE t.user_id = ?
         '''
         params = [user_id]
         if type_:
-            query += ' AND t.type = ?'
+            base += ' AND t.type = ?'
             params.append(type_)
         if category_id:
-            query += ' AND t.category_id = ?'
+            base += ' AND t.category_id = ?'
             params.append(category_id)
-        query += ' ORDER BY t.date DESC, t.id DESC'
+        base += ' ORDER BY t.date DESC, t.id DESC'
         if limit:
-            query += ' LIMIT ?'
+            base += ' LIMIT ?'
             params.append(limit)
 
-        return self.con.execute(query, tuple(params)).fetchall()
+        try:
+            return self.con.execute(
+                "SELECT t.id, t.type, t.amount, t.description, t.date, t.is_recurring,"
+                " t.category_id, COALESCE(t.currency, 'RUB') as currency, c.name as category_name"
+                + base, tuple(params)
+            ).fetchall()
+        except Exception:
+            return self.con.execute(
+                "SELECT t.id, t.type, t.amount, t.description, t.date, t.is_recurring,"
+                " t.category_id, 'RUB' as currency, c.name as category_name"
+                + base, tuple(params)
+            ).fetchall()
 
     def delete_transaction(self, transaction_id, user_id):
         self.con.execute('DELETE FROM transactions WHERE id = ? AND user_id = ?', (transaction_id, user_id))

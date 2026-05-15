@@ -535,8 +535,21 @@ class SettingsPage(BasePage):
                 except Exception:
                     pass
 
+        warning = ft.Container(
+            border_radius=10,
+            padding=ft.Padding.symmetric(horizontal=12, vertical=8),
+            bgcolor="rgba(255,200,2,0.12)",
+            content=ft.Text(
+                "Символ валюты изменится везде. Суммы прошлых транзакций "
+                "сохранятся в той валюте, в которой были записаны.",
+                size=12,
+                color="#7A5F00",
+                font_family="Montserrat Medium",
+            ),
+        )
+
         dlg.content = ft.Column(
-            [dd, conv_section, dd_secondary],
+            [dd, conv_section, dd_secondary, warning],
             tight=True,
             spacing=16,
             width=300,
@@ -614,24 +627,52 @@ class SettingsPage(BasePage):
     def _confirm_delete_account(self, _):
         dlg = ft.AlertDialog(modal=True, title=ft.Text("Удалить аккаунт?", font_family="Montserrat SemiBold"))
 
+        pwd_field = ft.TextField(
+            label="Введите пароль для подтверждения",
+            password=True,
+            can_reveal_password=True,
+            border_color="#6976EB",
+            border_radius=12,
+            label_style=ft.TextStyle(font_family="Montserrat SemiBold"),
+            text_style=ft.TextStyle(font_family="Montserrat SemiBold"),
+        )
+        err = ft.Text("", color=ft.Colors.with_opacity(0.8, "#FF7E1C"),
+                      size=12, font_family="Montserrat SemiBold")
+
         def on_cancel(_):
             _close_dialog(self.page_ref, dlg)
 
         def on_confirm(_):
+            pwd = pwd_field.value or ""
+            if not pwd:
+                err.value = "Введите пароль"
+                self.page_ref.update()
+                return
+            if not self._ctrl.verify_password(pwd):
+                err.value = "Неверный пароль"
+                pwd_field.value = ""
+                self.page_ref.update()
+                return
+            _close_dialog(self.page_ref, dlg)
             try:
                 self._ctrl.delete_account()
                 self.page_ref.snack_bar = ft.SnackBar(
-                    ft.Text("Аккаунт удален", font_family="Montserrat SemiBold"), open=True)
+                    ft.Text("Аккаунт удалён", font_family="Montserrat SemiBold"), open=True)
                 self.page_ref.update()
                 self.page_ref.data["logout"]()
             except Exception:
                 self._show_error("Не удалось удалить аккаунт")
-            finally:
-                _close_dialog(self.page_ref, dlg)
 
-        dlg.content = ft.Text(
-            "Профиль, транзакции, цели и подписки будут удалены без возможности восстановления.",
-            font_family="Montserrat SemiBold", color=ft.Colors.with_opacity(0.6, "#000000"))
+        dlg.content = ft.Column([
+            ft.Text(
+                "Профиль, транзакции, цели и подписки будут удалены без возможности восстановления.",
+                font_family="Montserrat SemiBold",
+                color=ft.Colors.with_opacity(0.6, "#000000"),
+                size=13,
+            ),
+            pwd_field,
+            err,
+        ], tight=True, spacing=12, width=300)
         dlg.actions = [
             ft.TextButton("Отмена", style=ft.ButtonStyle(color="#483EB7",
                 text_style=ft.TextStyle(font_family="Montserrat SemiBold")), on_click=on_cancel),

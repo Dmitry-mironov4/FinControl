@@ -10,8 +10,8 @@ class GoalService:
     def add_goal(self, user_id, name, target_amount, deadline=None):
         self.repository.add_goal(user_id, name, target_amount, deadline)
 
-    def deposit_to_goal(self, user_id, goal_id, amount):
-        self.repository.deposit_to_goal(user_id, goal_id, amount)
+    def deposit_to_goal(self, user_id, goal_id, amount, currency='RUB'):
+        self.repository.deposit_to_goal(user_id, goal_id, amount, currency)
 
     def update_goal(self, user_id, goal_id, name, target_amount, deadline):
         self.repository.update_goal(goal_id, user_id, name, target_amount, deadline)
