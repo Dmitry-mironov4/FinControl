@@ -1,4 +1,4 @@
-# FinControl — Подробная архитектура и альтернативы
+# FinControl — Архитектура
 
 ## 1. Общий поток данных
 
@@ -37,7 +37,7 @@ on_submit()
     │
     ├── add_transaction(...)         ← INSERT в SQLite
     ├── self.refresh()               ← пересобирает build_body() текущей страницы
-    ├── pages[0].refresh()           ← пересобирает build_body() HomePage
+    ├── pages[0].refresh()           ← синхронизирует HomePage (баланс)
     ├── page.snack_bar = ...         ← уведомление внизу
     └── page.pop_dialog()            ← закрывает диалог
 ```
@@ -64,11 +64,11 @@ BasePage(ft.Container)
 **Важный порядок инициализации:**
 ```python
 class ExpensesPage(BasePage):
-    def __init__(self, page):
+    def __init__(self, page, ctrl):
         self._selected_category_id = None   # ← СНАЧАЛА атрибуты
         super().__init__(page, "Расходы")   # ← ПОТОМ super() — вызовет build_body()
 ```
-Если поставить super() первым — `build_body()` вызовется раньше, чем `_selected_category_id` создан → AttributeError.
+Если поставить `super()` первым — `build_body()` сработает раньше, чем `_selected_category_id` создан → `AttributeError`.
 
 ---
 
@@ -79,7 +79,7 @@ class ExpensesPage(BasePage):
 ### 3.1 Плоский API — `fincontrolapp/db_queries.py`
 
 Простой набор функций (`get_balance`, `get_transactions`, `add_transaction`, …). Используется:
-- **Telegram-ботом** — это единственный разрешённый интерфейс к БД из `bot/`.
+- **Telegram-ботом** — единственный разрешённый интерфейс к БД из `bot/`.
 - Старыми страницами/диалогами (легаси).
 
 Не расширять. Новый код пишется через слоистую архитектуру (см. 3.2).
@@ -115,7 +115,7 @@ def get_balance(self) -> dict:
     ...
 ```
 
-Сейчас по этому паттерну живут: `transactions`, `goals`, `subscriptions`, `categories`, `users`.
+Сейчас по этому паттерну живут: `transactions`, `goals`, `subscriptions`, `categories`, `users`, `budgets`.
 
 ### Соединение с БД
 
@@ -126,9 +126,7 @@ def get_connection():
     return conn
 ```
 
-`sqlite3.Connection` поддерживает context manager (`with get_connection() as conn`),
-но он только делает `commit()` / `rollback()` — **соединение не закрывает**.
-Соединение закрывается сборщиком мусора. Для SQLite на десктопе это нормально.
+`sqlite3.Connection` поддерживает context manager (`with get_connection() as conn`), но он только делает `commit()` / `rollback()` — **соединение не закрывает**. Для SQLite на десктопе это нормально.
 
 ### Как устроена функция с фильтрами (репозиторий)
 
@@ -139,43 +137,66 @@ def get_transactions(self, user_id, type_=None, category_id=None, limit=None):
     if type_:
         query += " AND t.type = ?"
         params.append(type_)
-    # ... динамически добиваем условия
     return self.con.execute(query, tuple(params)).fetchall()
 ```
 
-Параметры передаются через `?` (параметризованный запрос) — защита от SQL-инъекций.
+Параметры передаются через `?` — защита от SQL-инъекций.
 
 ---
 
 ## 4. Навигация (main.py)
 
-```python
-pages = {
-    0: HomePage(page, HomeController(uid)),
-    1: AnalyticsPage(page, uid),
-    2: GoalsPage(page, GoalsController(uid)),
-    3: SettingsPage(page, SettingsController(uid)),
-    4: SubscriptionsPage(page, SubscriptionsController(uid)),
-    5: IncomePage(page, IncomeController(uid)),
-    6: ExpensesPage(page, ExpensesController(uid)),
-    7: TransactionsPage(page, TransactionsController(uid)),
-    8: SimulatorPage(page, SimulatorController()),
-}
+### Ленивое создание страниц
 
-def navigate(index):
-    pages[index].refresh()        # пересобирает данные
-    content.content = pages[index] # показывает страницу
-    nav_container.content = build_nav(index)  # подсвечивает кнопку
-    content.update()
-    nav_container.update()
+Страницы создаются **по первому обращению** через словарь фабрик, а не все сразу при старте:
+
+```python
+_factories = {
+    1: lambda: AnalyticsPage(page, uid, budget_controller=BudgetController(uid)),
+    2: lambda: GoalsPage(page, GoalsController(uid)),
+    3: lambda: SettingsPage(page, SettingsController(uid)),
+    4: lambda: SubscriptionsPage(page, SubscriptionsController(uid)),
+    5: lambda: IncomePage(page, IncomeController(uid)),
+    6: lambda: ExpensesPage(page, ExpensesController(uid)),
+    7: lambda: TransactionsPage(page, TransactionsController(uid)),
+    8: lambda: SimulatorPage(page, SimulatorController()),
+    9: lambda: BudgetPage(page, BudgetController(uid)),
+}
+pages = {0: HomePage(page, HomeController(uid))}  # HomePage создаётся сразу
+
+def _get_page(index: int):
+    if index not in pages:
+        pages[index] = _factories[index]()
+    return pages[index]
 ```
 
-Страницы создаются **один раз** при запуске и переиспользуются.
-`refresh()` пересобирает только `build_body()`, не весь виджет.
+### AnimatedSwitcher (реализован)
 
-**Страницы 4, 5, 6, 7, 8** (Подписки, Доходы, Расходы, Транзакции, Симулятор) не имеют кнопок в nav bar — они открываются только через `page.data["navigate"](n)` из других экранов.
+Переходы между страницами — через `ft.AnimatedSwitcher` с fade-анимацией (duration=150ms):
 
-**Кросс-обновление страниц:** после изменения данных вызывается `page.data["pages"][0].refresh()`, чтобы Home-экран синхронизировался (баланс, последние операции).
+```python
+content = ft.AnimatedSwitcher(
+    content=ft.Container(content=_get_page(0), key="0"),
+    expand=True,
+    transition=ft.AnimatedSwitcherTransition.FADE,
+    duration=150,
+)
+```
+
+### Функция navigate
+
+```python
+def navigate(index: int):
+    pg = _get_page(index)
+    pg.key = str(index) + "_" + str(id(pg))  # уникальный ключ для AnimatedSwitcher
+    content.content = pg
+    nav_container.content = build_nav(index)
+    page.update()
+```
+
+Страницы в nav bar — только индексы 0, 1, 2, 8, 3. Страницы 4–7, 9 открываются программно через `page.data["navigate"](n)` из других экранов.
+
+**Кросс-обновление:** после изменения данных вызывается `page.data["pages"][0].refresh()`, чтобы HomePage синхронизировалась.
 
 ---
 
@@ -201,10 +222,7 @@ AuthPage (ft.Container)
           └── on_success(user_id, is_new=False)
 ```
 
-Хеш пароля хранится как `"salt_hex:key_hex"`:
-```
-"a1b2c3...:d4e5f6..."   ← 16-байтовая соль + 32-байтовый ключ
-```
+Хеш пароля хранится как `"salt_hex:key_hex"` — 16-байтовая соль + 32-байтовый ключ.
 
 ---
 
@@ -217,7 +235,6 @@ def deposit_to_goal(user_id, goal_id, amount):
 ```
 
 Пополнение цели — это расход. Деньги реально уходят с баланса.
-Прогресс = `current_amount / target_amount`, показывается как прогресс-бар.
 
 ```python
 def _calc_pace(target, current, deadline):
@@ -260,7 +277,7 @@ SUM(CASE WHEN period='monthly' THEN amount
 
 ## 9. Симулятор «что если» (`pages/simulator.py`, `calculations.py`)
 
-Отдельная страница (индекс 8), отвечает на сценарии вида:
+Страница (индекс 8), четыре вкладки:
 - покупка сейчас при зарплате через N дней;
 - влияние новой подписки на свободный остаток;
 - как покупка сдвинет дедлайн цели;
@@ -269,14 +286,14 @@ SUM(CASE WHEN period='monthly' THEN amount
 Вся математика — в `calculations.py`, чистые функции **без обращения к БД**:
 - `savings_rate(income, expense)` — норма сбережений в %.
 - `moving_average(values, n)` — скользящее среднее.
-- `linear_forecast(values, steps)` — линейная экстраполяция (МНК) на `steps` шагов вперёд.
+- `linear_forecast(values, steps)` — линейная экстраполяция (МНК).
 - `goal_analysis(target, current, monthly_savings)` — сколько месяцев до цели.
 - `subscription_load(subs_total, income)` — доля подписок в доходе.
-- `sim_purchase`, `sim_goal_impact`, `sim_new_subscription`, `sim_cut_category` — сценарные расчёты, возвращают dict с показателями для UI.
+- `sim_purchase`, `sim_goal_impact`, `sim_new_subscription`, `sim_cut_category` — сценарные расчёты.
 
-Контроллер `SimulatorController()` создаётся **без user_id** — состояние ввода живёт на странице, цифры берутся из репозиториев по запросу.
+`SimulatorController()` создаётся **без user_id** — состояние ввода живёт на странице.
 
-**Важно:** не подключать ML-библиотеки (scikit-learn / statsmodels / scipy) — они несовместимы с мобильной сборкой Flet. Прогноз делается вручную через МНК в `linear_forecast`.
+**Ограничение:** не подключать ML-библиотеки (scikit-learn / statsmodels / scipy) — они несовместимы с мобильной сборкой Flet.
 
 ---
 
@@ -307,7 +324,7 @@ from fincontrolapp.db_queries import get_balance
 balance = await run_db(get_balance, user["id"])   # asyncio.to_thread под капотом
 ```
 
-И декоратор для отказоустойчивости:
+Декоратор для отказоустойчивости:
 
 ```python
 @router.message(Command("stats"))
@@ -323,7 +340,7 @@ async def cmd_stats(message): ...
 ```python
 _PATTERN = re.compile(r'^([+-])(\d+(?:[.,]\d+)?)\s+(.+)$', re.DOTALL)
 ```
-Категория угадывается через `bot/utils/categorizer.py`; пользователь видит inline-кнопку «Отменить» (`cancel_tx_<id>`), которая удаляет транзакцию через `delete_transaction`.
+Категория угадывается через `bot/utils/categorizer.py`; пользователь видит inline-кнопку «Отменить» (`cancel_tx_<id>`).
 
 ### Уведомления (`handlers/notify.py`)
 
@@ -335,12 +352,11 @@ APScheduler с CronTrigger:
 
 ---
 
-## 11. Что можно сделать иначе средствами Flet
+## 11. Альтернативные подходы средствами Flet
 
-### 9.1 DatePicker вместо текстового поля
+### 11.1 DatePicker вместо текстового поля
 
-Сейчас дата вводится как строка (`TextField(label="Дата", value="2026-03-24")`).
-Flet поддерживает нативный выбор даты:
+Сейчас дата вводится как строка. Flet поддерживает нативный выбор:
 
 ```python
 def open_datepicker(e):
@@ -349,19 +365,11 @@ def open_datepicker(e):
         last_date=date(2030, 12, 31),
         on_change=lambda e: date_field.set_value(e.control.value),
     ))
-
-date_field = ft.TextField(label="Дата", read_only=True)
-ft.IconButton(ft.Icons.CALENDAR_TODAY, on_click=open_datepicker)
 ```
 
-Это убрало бы необходимость вводить дату вручную и парсить строку.
+### 11.2 BottomSheet вместо AlertDialog для форм добавления
 
----
-
-### 9.2 BottomSheet вместо AlertDialog для форм добавления
-
-`AlertDialog` — маленькое модальное окно по центру.
-`BottomSheet` — выезжает снизу, как в мобильных приложениях:
+`BottomSheet` выезжает снизу — нативнее для мобильного UI:
 
 ```python
 bs = ft.BottomSheet(
@@ -379,61 +387,9 @@ bs = ft.BottomSheet(
 page.open(bs)
 ```
 
-Выглядит нативнее для мобильного UI.
+### 11.3 Dismissible для свайпа удаления
 
----
-
-### 9.3 NavigationBar (встроенный) вместо кастомного nav bar
-
-Сейчас nav bar собирается вручную через `GestureDetector` + `Container` + SVG.
-Flet имеет встроенный компонент:
-
-```python
-page.navigation_bar = ft.NavigationBar(
-    destinations=[
-        ft.NavigationBarDestination(icon=ft.Icons.HOME, label="Главная"),
-        ft.NavigationBarDestination(icon=ft.Icons.RECEIPT, label="Операции"),
-        ft.NavigationBarDestination(icon=ft.Icons.STAR, label="Цели"),
-        ft.NavigationBarDestination(icon=ft.Icons.SETTINGS, label="Настройки"),
-    ],
-    on_change=lambda e: navigate(e.control.selected_index),
-)
-```
-
-Плюсы: автоматическая анимация, поддержка жестов, адаптируется под платформу.
-Минусы: меньше контроля над внешним видом (сложнее подогнать под кастомный дизайн).
-
----
-
-### 9.4 ListTile вместо ручной сборки строк списка
-
-Сейчас каждая строка транзакции — это вложенный `Container → Row → Row → Column`:
-
-```python
-# Сейчас: ~20 строк на один элемент списка
-ft.Container(
-    content=ft.Row([
-        ft.Row([icon_container, ft.Column([name, date])]),
-        ft.Row([amount, delete_btn]),
-    ], alignment=...)
-)
-
-# Альтернатива: ft.ListTile
-ft.ListTile(
-    leading=icon_container,
-    title=ft.Text(category_name),
-    subtitle=ft.Text(date),
-    trailing=ft.Row([amount_text, delete_btn], tight=True),
-)
-```
-
-Короче, структурированнее, автоматически выравнивает элементы.
-
----
-
-### 9.5 Dismissible для свайпа удаления
-
-Вместо кнопки с иконкой корзины — свайп влево для удаления (как в iOS/Android):
+Вместо кнопки корзины — свайп влево:
 
 ```python
 ft.Dismissible(
@@ -445,12 +401,7 @@ ft.Dismissible(
 )
 ```
 
----
-
-### 9.6 SegmentedButton для фильтра транзакций
-
-Сейчас фильтр "Все / Доходы / Расходы" — три `ElevatedButton` вручную.
-Flet имеет встроенный `SegmentedButton`:
+### 11.4 SegmentedButton для фильтра транзакций
 
 ```python
 ft.SegmentedButton(
@@ -464,47 +415,11 @@ ft.SegmentedButton(
 )
 ```
 
----
+### 11.5 Реактивное состояние вместо ручного refresh()
 
-### 9.7 AnimatedSwitcher для переходов между страницами
+Сейчас после каждого изменения нужно явно вызывать `self.refresh()` + `pages[0].refresh()` + `page.update()`.
 
-Сейчас смена страниц мгновенная. Можно добавить анимацию:
-
-```python
-content = ft.AnimatedSwitcher(
-    expand=True,
-    transition=ft.AnimatedSwitcherTransition.FADE,
-    duration=200,
-    content=pages[0],
-)
-# при навигации:
-content.content = pages[index]
-content.update()
-```
-
----
-
-### 9.8 Хранение сессии — альтернативы session.json
-
-| Подход | Плюсы | Минусы |
-|---|---|---|
-| `session.json` (сейчас) | Просто, понятно | Файл виден в папке |
-| `page.client_storage` | Встроено в Flet, кросс-платформенно | Не работает в старых версиях |
-| Строка в таблице `users` (флаг `is_active`) | В БД, не нужен отдельный файл | Не подходит для многопользовательского |
-| Keychain/Keystore (через subprocess) | Безопасно | Сложно, платформозависимо |
-
----
-
-### 9.9 Реактивное состояние вместо ручного refresh()
-
-Сейчас после каждого изменения нужно явно вызывать:
-```python
-self.refresh()
-pages[0].refresh()
-page.update()
-```
-
-Можно было бы использовать паттерн Observer / reactive store:
+Паттерн Observer решил бы это:
 
 ```python
 class AppStore:
@@ -516,42 +431,25 @@ class AppStore:
     def notify(self):
         for fn in self._listeners:
             fn()
-
-store = AppStore()
-# каждая страница подписывается:
-store.on_change(lambda: self.refresh())
-# при изменении данных:
-add_transaction(...)
-store.notify()  # все страницы обновятся автоматически
 ```
 
-Flet не имеет встроенного state management (в отличие от Flutter с Provider/Riverpod),
-поэтому такой паттерн нужно реализовывать самостоятельно.
+Flet не имеет встроенного state management, поэтому нужно реализовывать самостоятельно.
 
 ---
 
-### 11.10 Charts (аналитика) — реализовано
+## 12. Состояние задач
 
-В `pages/analytics.py` используется `flet_charts` (`BarChart` + `LineChart`). Данные берутся из БД через `get_monthly_summary`, `get_expense_breakdown_by_year`, `get_available_years`. Если данных меньше `MIN_MONTHS` — показывается заглушка «Добавьте хотя бы 2 месяца данных».
+| Функция | Сложность | Статус |
+|---|---|---|
+| Мультивалютность | Высокая | ✅ сделано |
+| Telegram-бот интеграция | Высокая | ✅ сделано |
+| Уведомления (бот) | Высокая | ✅ сделано |
+| Аналитика с графиками | Средняя | ✅ сделано |
+| Бюджеты по категориям | Средняя | ✅ сделано |
+| Симулятор «что если» | Средняя | ✅ сделано |
+| DatePicker в диалогах | Низкая | ✅ сделано |
+| Swipe to delete | Низкая | ✅ сделано |
+| AnimatedSwitcher переходы | Низкая | ✅ сделано |
+| Экспорт данных (CSV/PDF) | Средняя | TODO |
+| Тёмная тема | Низкая | TODO |
 
-Цвета категорий — через константный список `CATEGORY_COLORS`; легенда строится автоматически.
-
----
-
-## 12. Что не хватает в текущей версии
-
-| Функция | Сложность | Нужно для | Статус |
-|---|---|---|---|
-| DatePicker в диалогах | Низкая | Удобство | TODO |
-| Swipe to delete | Низкая | UX | TODO |
-| Аналитика с реальными графиками | Средняя | Ключевая идея проекта | ✅ сделано |
-| Профиль пользователя (имя) | Низкая | Персонализация | TODO |
-| Выбор валюты | Средняя | Затрагивает все страницы | TODO |
-| Уведомления о подписках | Высокая | Требует фоновые задачи / планировщик | ✅ сделано (бот) |
-| Telegram-бот интеграция | Высокая | Отдельный сервис | ✅ сделано |
-| Экспорт данных (CSV/PDF) | Средняя | Отчётность | TODO |
-| Тёмная тема / переключатель | Низкая | Комфорт | TODO |
-| Мультивалютность | Высокая | Разные счета | TODO |
-| Симулятор «что если» | Средняя | Финансовое планирование | ✅ сделано |
-| Исправить BUG-1 (Reset без `WHERE user_id`) | Низкая | Безопасность данных | TODO |
-| Исправить BUG-2 (дубликаты при изменении баланса) | Средняя | Корректность | TODO |
