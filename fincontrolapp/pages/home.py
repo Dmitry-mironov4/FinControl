@@ -161,18 +161,21 @@ class HomePage(BasePage):
 
         # Fade out скелетон
         self._body_container.opacity = 0
-        try: 
+        try:
             self._body_container.update()
-        except Exception:  
-            return
+        except Exception:
+            pass  # страница не видима — анимация не нужна, но контент всё равно устанавливаем
 
         # Подменяем контент и fade in
         self._body_container.content = self._real_body(balance, monthly, transactions)
         self._body_container.opacity = 1
-        try: 
+        try:
             self._body_container.update()
-        except Exception:  
-            pass
+        except Exception:
+            try:
+                self.page_ref.update()
+            except Exception:
+                pass
 
     # ── Real content ──────────────────────────────────────────────────────────
 

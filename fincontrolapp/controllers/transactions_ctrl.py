@@ -9,10 +9,10 @@ class TransactionsController:
     def __init__(self, user_id: int):
         self._user_id = user_id
 
-    def get_transactions(self, type_=None):
+    def get_transactions(self, type_=None, limit=None):
         with get_connection() as con:
             return TransactionService(TransactionRepository(con)).get_transactions(
-                self._user_id, type_=type_
+                self._user_id, type_=type_, limit=limit
             )
 
     def get_categories(self, type_=None):

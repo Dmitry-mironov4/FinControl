@@ -529,10 +529,11 @@ class SettingsPage(BasePage):
                 ft.Text("Валюта сохранена ✓", font_family="Montserrat SemiBold"), open=True
             )
             self.page_ref.update()
-            for idx in (0, 8):
-                pg = self.page_ref.data.get("pages", {}).get(idx)
-                if pg:
+            for pg in self.page_ref.data.get("pages", {}).values():
+                try:
                     pg.refresh()
+                except Exception:
+                    pass
 
         dlg.content = ft.Column(
             [dd, conv_section, dd_secondary],
