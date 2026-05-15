@@ -5,6 +5,7 @@ from components.base_page import BasePage
 from components.dialogs import close_dialog as _close_dialog
 from utils import get_currency_symbol
 from components.empty_state import empty_state
+from calculations import find_duplicate_subscriptions
 
 MONTH_SHORT = ["янв", "фев", "мар", "апр", "май", "июн",
                "июл", "авг", "сен", "окт", "ноя", "дек"]
@@ -44,6 +45,7 @@ def _days_until(next_date) -> int:
 class SubscriptionsPage(BasePage):
     def __init__(self, page: ft.Page, ctrl):
         self._ctrl = ctrl
+        self._ignored_pairs: set = set()
         super().__init__(page, "Подписки")
 
     def build_header(self):
@@ -63,44 +65,112 @@ class SubscriptionsPage(BasePage):
         subscriptions = self._ctrl.get_subscriptions()
         monthly_total = self._ctrl.get_monthly_total()
 
-        return ft.Column([
-            ft.Container(
-                padding=16,
-                border_radius=16,
-                gradient=ft.LinearGradient(
+        _monthly_card = ft.Container(
+            padding=16,
+            border_radius=16,
+            gradient=ft.LinearGradient(
+                colors=["#ffffff", "#88A2FF"],
+                begin=ft.Alignment(-2, -1),
+                end=ft.Alignment(1, 8),
+            ),
+            content=ft.Column([
+                ft.Text("Сумма подписок в месяц", size=14, font_family="Montserrat SemiBold", color=ft.Colors.with_opacity(0.8, "#000000")),
+                ft.Text(f"{monthly_total:,.0f} {get_currency_symbol(self.page_ref)}", size=28, font_family="Montserrat SemiBold",
+                        weight=ft.FontWeight.BOLD, color="#000000"),
+            ], spacing=4),
+        )
+        _add_btn = ft.GestureDetector(
+            on_tap=self._open_add_dialog,
+            content=ft.Container(
+                width=float("inf"),
+                height=48,
+                border_radius=24,
+                gradient=ft.RadialGradient(
                     colors=["#ffffff", "#88A2FF"],
-                    begin=ft.Alignment(-2, -1),
-                    end=ft.Alignment(1, 8),
+                    center=ft.Alignment(0, -0.2),
+                    radius=8.0,
+                    stops=[0.0, 0.8],
                 ),
-                content=ft.Column([
-                    ft.Text("Сумма подписок в месяц", size=14,font_family="Montserrat SemiBold", color=ft.Colors.with_opacity(0.8, "#000000")),
-                    ft.Text(f"{monthly_total:,.0f} {get_currency_symbol(self.page_ref)}", size=28,font_family="Montserrat SemiBold",
-                            weight=ft.FontWeight.BOLD, color="#000000"),
-                ], spacing=4),
-            ),
-            ft.GestureDetector(
-                on_tap=self._open_add_dialog,
-                content=ft.Container(
-                    width=float("inf"),
-                    height=48,
-                    border_radius=24,
-                    gradient=ft.RadialGradient(
-                        colors=["#ffffff", "#88A2FF"],
-                        center=ft.Alignment(0, -0.2),
-                        radius=8.0,
-                        stops=[0.0, 0.8],
-                    ),
-                    alignment=ft.Alignment(0, 0),
-                    content=ft.Text(
-                        "＋ Добавить подписку",
-                        color=ft.Colors.BLACK,
-                        font_family="Montserrat SemiBold",
-                        size=16,
-                    ),
+                alignment=ft.Alignment(0, 0),
+                content=ft.Text(
+                    "＋ Добавить подписку",
+                    color=ft.Colors.BLACK,
+                    font_family="Montserrat SemiBold",
+                    size=16,
                 ),
             ),
-            self._subscriptions_list(subscriptions),
-        ], spacing=16)
+        )
+        _controls = [_monthly_card, _add_btn]
+        _banner = self._duplicate_banner(subscriptions)
+        if _banner is not None:
+            _controls.append(_banner)
+        _controls.append(self._subscriptions_list(subscriptions))
+        return ft.Column(_controls, spacing=16)
+
+    def _duplicate_banner(self, subscriptions):
+        if not subscriptions:
+            return None
+        sub_dicts = [{"id": s["id"], "name": s["name"]} for s in subscriptions]
+        groups, _ = find_duplicate_subscriptions(sub_dicts, self._ignored_pairs)
+        if not groups:
+            return None
+
+        id_to_name = {s["id"]: s["name"] for s in subscriptions}
+
+        group_rows = []
+        for group in groups:
+            names = " · ".join(id_to_name.get(gid, str(gid)) for gid in group)
+
+            def dismiss(e, g=group):
+                for i in range(len(g)):
+                    for j in range(i + 1, len(g)):
+                        a, b = g[i], g[j]
+                        self._ignored_pairs.add((a, b) if a < b else (b, a))
+                self.refresh()
+
+            group_rows.append(
+                ft.Row(
+                    alignment=ft.MainAxisAlignment.SPACE_BETWEEN,
+                    controls=[
+                        ft.Text(names, size=13, font_family="Montserrat Medium",
+                                color=ft.Colors.with_opacity(0.8, "#000000"), expand=True),
+                        ft.TextButton(
+                            "Не дубликат",
+                            on_click=dismiss,
+                            style=ft.ButtonStyle(
+                                color="#FF7E1C",
+                                text_style=ft.TextStyle(font_family="Montserrat SemiBold", size=12),
+                            ),
+                        ),
+                    ],
+                )
+            )
+
+        return ft.Container(
+            padding=ft.Padding.only(left=14, right=8, top=10, bottom=6),
+            border_radius=14,
+            border=ft.Border(
+                top=ft.BorderSide(1.5, ft.Colors.with_opacity(0.6, "#FF7E1C")),
+                bottom=ft.BorderSide(1.5, ft.Colors.with_opacity(0.6, "#FF7E1C")),
+                left=ft.BorderSide(1.5, ft.Colors.with_opacity(0.6, "#FF7E1C")),
+                right=ft.BorderSide(1.5, ft.Colors.with_opacity(0.6, "#FF7E1C")),
+            ),
+            content=ft.Column(
+                spacing=4,
+                controls=[
+                    ft.Row(
+                        spacing=6,
+                        controls=[
+                            ft.Icon(ft.Icons.WARNING_AMBER_ROUNDED,
+                                    color=ft.Colors.with_opacity(0.8, "#FF7E1C"), size=16),
+                            ft.Text("Возможные дубликаты", size=13,
+                                    font_family="Montserrat SemiBold", color="#000000"),
+                        ],
+                    ),
+                    *group_rows,
+                ],
+            ),
+        )
 
     def _subscriptions_list(self, subscriptions):
         if not subscriptions:

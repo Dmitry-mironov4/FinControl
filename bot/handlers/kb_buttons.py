@@ -24,6 +24,7 @@ from bot.utils.formatters import format_transaction
 from bot.handlers.add_dialog import AddTransaction
 from bot.handlers.purchase_timer import TimerForm
 from bot.handlers.subscriptions import _subs_keyboard, _next_charge_date
+from fincontrolapp.calculations import find_duplicate_subscriptions
 from bot.handlers.goals import _goals_keyboard, _progress_bar, _format_deadline
 
 router = Router()
@@ -186,6 +187,12 @@ async def kb_subscriptions(message: Message):
         period = "/год" if s["period"] == "yearly" else "/мес"
         lines.append(f"• {s['name']} — {fmt_amount(float(s['amount']))}₽{period} · спишется {next_date}")
     lines += ["", f"Итого в месяц: {fmt_amount(total)}₽"]
+    groups, _ = find_duplicate_subscriptions([{"id": s["id"], "name": s["name"]} for s in subs])
+    if groups:
+        id_to_name = {s["id"]: s["name"] for s in subs}
+        lines += ["", "⚠️ Возможные дубликаты:"]
+        for group in groups:
+            lines.append("  • " + " · ".join(id_to_name.get(gid, str(gid)) for gid in group))
     await message.answer("\n".join(lines), reply_markup=_subs_keyboard())
 
 

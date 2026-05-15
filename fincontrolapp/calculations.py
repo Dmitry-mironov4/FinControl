@@ -312,3 +312,59 @@ def sim_cut_category(monthly_expense: float, category_share: float, cut_pct: flo
         "months_saved": months_saved,
         "message": message
     }
+
+
+def find_duplicate_subscriptions(subscriptions, ignored_pairs=None):
+    """
+    Находит группы дублирующихся подписок по ключевым словам.
+    Returns (groups, suggested_pairs).
+      groups          — список списков id подписок, признанных дубликатами
+      suggested_pairs — все пары-кандидаты, ещё не добавленные в ignored_pairs
+    """
+    if ignored_pairs is None:
+        ignored_pairs = set()
+
+    normalized = [{"id": s["id"], "name": str(s["name"]).lower().strip()} for s in subscriptions]
+
+    KEYWORDS = {
+        "кино":     ["кино", "netflix", "ivi", "okko", "кинопоиск", "movie", "film", "видео"],
+        "музыка":   ["музык", "music", "spotify", "apple music", "yandex music", "amazon music", "звук"],
+        "стриминг": ["стриминг", "stream", "twitch", "youtube", "живые эфиры"],
+        "облако":   ["облако", "cloud", "disk", "drive", "dropbox", "google drive", "icloud"],
+        "софт":     ["office", "antivirus", "вирус", "премиум", "premium"],
+    }
+
+    category_to_ids = {cat: [] for cat in KEYWORDS}
+    for sub in normalized:
+        for cat, keywords in KEYWORDS.items():
+            if any(kw in sub["name"] for kw in keywords):
+                category_to_ids[cat].append(sub["id"])
+
+    graph = {sub["id"]: set() for sub in normalized}
+    all_possible_pairs = set()
+    for ids in category_to_ids.values():
+        for i in range(len(ids)):
+            for j in range(i + 1, len(ids)):
+                a, b = ids[i], ids[j]
+                pair = (a, b) if a < b else (b, a)
+                all_possible_pairs.add(pair)
+                if pair not in ignored_pairs:
+                    graph[a].add(b)
+                    graph[b].add(a)
+
+    visited = set()
+    groups = []
+    for node in graph:
+        if node not in visited:
+            stack, group = [node], []
+            while stack:
+                cur = stack.pop()
+                if cur in visited:
+                    continue
+                visited.add(cur)
+                group.append(cur)
+                stack.extend(n for n in graph[cur] if n not in visited)
+            if len(group) > 1:
+                groups.append(group)
+
+    return groups, all_possible_pairs - ignored_pairs

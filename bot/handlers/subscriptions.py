@@ -7,6 +7,7 @@ from aiogram.fsm.state import State, StatesGroup
 from aiogram.types import Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton
 
 from fincontrolapp.db_queries import get_user_by_telegram_id, get_subscriptions, add_subscription
+from fincontrolapp.calculations import find_duplicate_subscriptions
 from bot.utils.formatters import fmt_amount, MONTH_SHORT
 
 router = Router()
@@ -77,6 +78,16 @@ async def cmd_subscriptions(message: Message):
 
     lines.append("")
     lines.append(f"Итого в месяц: {fmt_amount(total)}₽")
+
+    sub_dicts = [{"id": s["id"], "name": s["name"]} for s in subs]
+    groups, _ = find_duplicate_subscriptions(sub_dicts)
+    if groups:
+        lines.append("")
+        lines.append("⚠️ Возможные дубликаты:")
+        for group in groups:
+            id_to_name = {s["id"]: s["name"] for s in subs}
+            names = " · ".join(id_to_name.get(gid, str(gid)) for gid in group)
+            lines.append(f"  • {names}")
 
     await message.answer("\n".join(lines), reply_markup=_subs_keyboard())
 
