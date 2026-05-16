@@ -14,11 +14,6 @@
 
 Одна кодовая база на Python покрывает iOS, Android, десктоп и веб одновременно: Flet транслирует Python-код в нативный Flutter UI под капотом. Без Swift, без Kotlin, без React Native. Приложение и Telegram-бот работают поверх одной локальной SQLite-базы — без внешних серверов.
 
-## Скриншоты
-
-<p align="center">
-  <img src="docs/screenshots/home.png" width="320" alt="Главный экран"/>
-</p>
 
 ## Возможности
 
